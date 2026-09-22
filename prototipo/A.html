@@ -1,0 +1,780 @@
+<title>Puente de Mando</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+:root{
+  --navy:#061E3A; --navy2:#0F2747; --navy3:#142F55;
+  --green:#04A86C; --green-ink:#036D46; --green-lite:#30D69B;
+  --paper:#FFFFFF; --surface:#F1F4F8; --surface2:#E5EBF2; --rail:#F8FAFC;
+  --ink:#0E1F38; --ink2:#43556D; --steel:#6C7C92;
+  --line:#D2DBE5; --line-soft:#E5EAF1;
+  --crit:#A81F26; --crit-bg:#FBE9E9; --crit-mark:#A81F26;
+  --warn:#8F6008; --warn-bg:#FBF1DA;
+  --ok:#036D46; --ok-bg:#E1F5EB;
+  --track:#DDE4EC;
+  --sb-ink:#F7F7F4; --sb-dim:#8FA2B8;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#071F3C; --surface:#0F2747; --surface2:#16325A; --rail:#0A2545;
+    --ink:#EDF1F6; --ink2:#AEBCCD; --steel:#8496AC;
+    --line:#22395C; --line-soft:#1B3054;
+    --green-ink:#30D69B;
+    --crit:#FF9A9A; --crit-bg:#3B1518; --crit-mark:#FF9A9A;
+    --warn:#F2C062; --warn-bg:#37290E;
+    --ok:#30D69B; --ok-bg:#0A3327;
+    --track:#1D3357;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#071F3C; --surface:#0F2747; --surface2:#16325A; --rail:#0A2545;
+  --ink:#EDF1F6; --ink2:#AEBCCD; --steel:#8496AC;
+  --line:#22395C; --line-soft:#1B3054;
+  --green-ink:#30D69B;
+  --crit:#FF9A9A; --crit-bg:#3B1518; --crit-mark:#FF9A9A;
+  --warn:#F2C062; --warn-bg:#37290E;
+  --ok:#30D69B; --ok-bg:#0A3327;
+  --track:#1D3357;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.sb{background:var(--navy);color:var(--sb-ink);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-top{padding:18px 18px 14px;border-bottom:1px solid #12315A}
+.logo{display:flex;align-items:center;gap:9px}
+.chev{flex:0 0 auto}
+.logo-tx{font-weight:800;font-size:17px;letter-spacing:-.02em;line-height:1}
+.logo-sub{font-family:"JetBrains Mono",monospace;font-size:8.5px;letter-spacing:.14em;color:var(--sb-dim);margin-top:4px}
+.nav{padding:10px 10px;display:flex;flex-direction:column;gap:1px;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:3px;color:#B8C7D8;font-size:13.5px;font-weight:500}
+.nav button:hover{background:#0E2A4C;color:var(--sb-ink)}
+.nav button[aria-current="true"]{background:var(--green);color:var(--navy);font-weight:600}
+.nav .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.55;flex:0 0 auto}
+.nav button[aria-current="true"] .dot{opacity:1}
+.nav .badge{margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;background:var(--crit-mark);color:#fff;padding:1px 5px;border-radius:2px}
+.nav button[aria-current="true"] .badge{background:var(--navy);color:#fff}
+.sb-foot{padding:12px 14px;border-top:1px solid #12315A;display:flex;gap:6px;align-items:center}
+.lang{display:flex;border:1px solid #1E3F6B;border-radius:3px;overflow:hidden}
+.lang button{padding:3px 9px;font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:700;color:var(--sb-dim)}
+.lang button[aria-pressed="true"]{background:var(--green);color:var(--navy)}
+
+.main{min-width:0;display:flex;flex-direction:column}
+
+/* ---------- demo banner ---------- */
+.demo{background:var(--warn-bg);color:var(--warn);border-bottom:1px solid var(--line);padding:6px 24px;font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+
+/* ---------- page head ---------- */
+.ph{padding:22px 24px 16px;border-bottom:1px solid var(--line)}
+.ph h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.025em;line-height:1.15}
+.ph p{margin:6px 0 0;color:var(--ink2);font-size:13.5px;max-width:74ch}
+.body{padding:20px 24px 56px;flex:1}
+
+/* ---------- tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.tile{background:var(--paper);padding:16px 16px 14px;display:flex;flex-direction:column}
+.tl{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--steel)}
+.tv{font-size:31px;font-weight:800;letter-spacing:-.035em;margin-top:8px;font-variant-numeric:tabular-nums;line-height:1}
+.tv.c{color:var(--crit)}.tv.w{color:var(--warn)}.tv.g{color:var(--green-ink)}
+.td{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.45;flex:1}
+.tf{margin-top:11px;padding-top:9px;border-top:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.formula{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--steel)}
+
+/* ---------- provenance trigger ---------- */
+.pv{border-bottom:1px dashed var(--steel);cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:4px;color:inherit;font:inherit;text-align:left}
+.pv:hover{border-bottom-color:var(--green);color:var(--green-ink)}
+.pv-ic{font-family:"JetBrains Mono",monospace;font-size:9px;font-weight:700;color:var(--green-ink);border:1px solid var(--green-ink);border-radius:2px;padding:0 3px;line-height:1.35;flex:0 0 auto}
+
+/* ---------- sections ---------- */
+.sec{margin-top:26px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.sec-h h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.sec-h .hint{font-size:12px;color:var(--steel)}
+
+/* ---------- table ---------- */
+.tbox{overflow-x:auto;border:1px solid var(--line);background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:600px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+thead th{background:var(--surface);font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);border-bottom:1px solid var(--line);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.clk{cursor:pointer}
+tbody tr.clk:hover{background:var(--rail)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:"JetBrains Mono",monospace;white-space:nowrap}
+.code{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:700;color:var(--green-ink)}
+.sub{display:block;font-size:11.5px;color:var(--steel);margin-top:1px;font-family:Inter,sans-serif;font-weight:400}
+
+/* ---------- pills ---------- */
+.pill{display:inline-flex;align-items:center;gap:4px;font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 6px;border-radius:2px;white-space:nowrap}
+.p-c{background:var(--crit-bg);color:var(--crit)}
+.p-w{background:var(--warn-bg);color:var(--warn)}
+.p-o{background:var(--ok-bg);color:var(--ok)}
+.p-n{background:var(--surface2);color:var(--ink2)}
+.pill::before{content:"";width:5px;height:5px;flex:0 0 auto}
+.p-c::before{background:var(--crit);border-radius:50%}
+.p-w::before{background:var(--warn);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.p-o::before{background:var(--ok);border-radius:1px}
+.p-n::before{background:var(--steel);border-radius:1px;opacity:.6}
+.dir{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.07em;padding:2px 6px;border-radius:2px;text-transform:uppercase}
+.d-up{background:var(--navy);color:#F7F7F4}
+.d-dn{background:var(--surface2);color:var(--ink2)}
+
+/* ---------- gap bar ---------- */
+.gbar{position:relative;height:9px;background:var(--track);min-width:110px;border-radius:1px;overflow:hidden}
+.gbar i{position:absolute;top:0;height:100%;display:block}
+.gbar .ev{left:0;background:var(--green)}
+.gbar .gp{background-image:repeating-linear-gradient(45deg,var(--crit-mark) 0 3px,transparent 3px 6px);background-color:var(--crit-bg)}
+.glg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink2);margin-top:8px}
+.glg span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:11px;height:9px;border-radius:1px;flex:0 0 auto}
+.sw.ev{background:var(--green)}
+.sw.gp{background-image:repeating-linear-gradient(45deg,var(--crit-mark) 0 3px,transparent 3px 6px);background-color:var(--crit-bg)}
+.sw.rm{background:var(--track)}
+
+/* ---------- gate list ---------- */
+.gates{border:1px solid var(--line)}
+.gate{display:grid;grid-template-columns:minmax(0,1fr) 66px 116px 128px;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line-soft);background:var(--paper)}
+.gate:last-child{border-bottom:0}
+.gate.miss{background:var(--crit-bg)}
+.gate-n{font-size:13px;font-weight:500}
+.gate-e{font-size:11.5px;color:var(--steel);display:block;margin-top:1px}
+.gate-w{font-family:"JetBrains Mono",monospace;font-size:12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)}
+
+/* ---------- eligibility ---------- */
+.elig{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.ecard{border:1px solid var(--line);background:var(--paper)}
+.ecard.no{border-color:var(--crit);border-width:1px 1px 1px 4px}
+.ecard.yes{border-color:var(--ok);border-width:1px 1px 1px 4px}
+.ecard.warn{border-color:var(--warn);border-width:1px 1px 1px 4px}
+.eh{padding:14px 16px 12px;border-bottom:1px solid var(--line-soft)}
+.eq{font-size:13px;color:var(--ink2);margin:0}
+.ea{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:4px 0 0}
+.ea.no{color:var(--crit)}.ea.yes{color:var(--ok)}.ea.warn{color:var(--warn)}
+.erow{display:flex;align-items:center;gap:9px;padding:7px 16px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.erow:last-child{border-bottom:0}
+.erow .nm{flex:1;min-width:0}
+.erow .dd{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--steel);white-space:nowrap}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;margin-bottom:16px}
+.tabs button{padding:8px 13px;font-size:13px;font-weight:500;color:var(--ink2);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--green-ink);border-bottom-color:var(--green);font-weight:600}
+
+/* ---------- kv ---------- */
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.kv div{background:var(--paper);padding:11px 13px}
+.kv dt{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin:0}
+.kv dd{margin:5px 0 0;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ---------- timeline ---------- */
+.tline{border-left:2px solid var(--line);margin-left:6px;padding-left:16px}
+.tev{position:relative;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.tev:last-child{border-bottom:0}
+.tev::before{content:"";position:absolute;left:-21px;top:15px;width:7px;height:7px;border-radius:50%;background:var(--steel);border:2px solid var(--paper)}
+.tev.ev::before{background:var(--green)}
+.tev.bad::before{background:var(--crit-mark)}
+.tev-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.tev-d{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--steel);white-space:nowrap}
+.tev-t{font-size:13px;font-weight:500}
+.tev-b{font-size:12.5px;color:var(--ink2);margin-top:3px}
+.lag{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;background:var(--crit-bg);color:var(--crit);padding:1px 5px;border-radius:2px}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(6,30,58,.45);z-index:40}
+.drw{position:fixed;top:0;right:0;bottom:0;width:min(430px,100vw);background:var(--paper);border-left:1px solid var(--line);z-index:41;display:flex;flex-direction:column;box-shadow:-12px 0 40px -18px rgba(6,30,58,.5)}
+.drw-h{padding:16px 18px 13px;border-bottom:1px solid var(--line);background:var(--navy);color:#F7F7F4}
+.drw-k{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--green-lite)}
+.drw-t{font-size:17px;font-weight:700;letter-spacing:-.015em;margin:5px 0 0}
+.drw-v{font-family:"JetBrains Mono",monospace;font-size:25px;font-weight:700;margin-top:7px;font-variant-numeric:tabular-nums}
+.drw-x{position:absolute;top:13px;right:14px;color:#8FA2B8;font-size:20px;line-height:1;padding:3px 7px;border-radius:3px}
+.drw-x:hover{background:#0E2A4C;color:#fff}
+.drw-b{padding:16px 18px 40px;overflow-y:auto;flex:1}
+.drw-s{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--steel);margin:20px 0 8px}
+.drw-s:first-child{margin-top:0}
+.rule{background:var(--surface);border-left:3px solid var(--green);padding:10px 12px;font-size:12.5px;line-height:1.5}
+.rule code{font-family:"JetBrains Mono",monospace;font-size:11.5px;background:var(--paper);padding:1px 4px;border-radius:2px}
+.src{border:1px solid var(--line);margin-bottom:-1px;padding:9px 11px;background:var(--paper)}
+.src-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.src-n{font-size:12.5px;font-weight:600}
+.src-m{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--steel);margin-top:3px;word-break:break-all}
+.src-v{font-family:"JetBrains Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sum{display:flex;justify-content:space-between;padding:10px 11px;border:1px solid var(--ink);background:var(--surface);font-weight:700;font-size:13px}
+.sum span:last-child{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- misc ---------- */
+.back{font-size:12.5px;color:var(--green-ink);font-weight:500;margin-bottom:10px;display:inline-flex;gap:5px;align-items:center}
+.note{border:1px solid var(--line);border-left:3px solid var(--steel);background:var(--rail);padding:12px 14px;font-size:12.5px;color:var(--ink2);margin-top:16px}
+.note strong{color:var(--ink)}
+.impact{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:700;color:var(--crit);font-variant-numeric:tabular-nums}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .sb{position:static;height:auto;flex-direction:column}
+  .nav{flex-direction:row;overflow-x:auto;padding:8px;gap:3px}
+  .nav button{white-space:nowrap;padding:7px 11px}
+  .nav .dot{display:none}
+  .gate{grid-template-columns:minmax(0,1fr) 56px;gap:8px}
+  .gate .gcol{grid-column:1/-1}
+  .demo,.ph,.body{padding-left:16px;padding-right:16px}
+}
+</style>
+
+<div id="app"></div>
+<div id="drawer"></div>
+
+<script>
+const T0 = new Date('2026-09-22T00:00:00Z');
+const money = n => '$' + n.toLocaleString('en-US');
+
+/* ============ DOMAIN DATA ============ */
+/* Curvas de progreso por categoría. Cada gate solo aporta su peso si tiene evidencia VERIFICADA. */
+const CURVES = {
+  fab: [
+    {id:'ing',  w:10, ev:'Plano Code 1 o Code 2'},
+    {id:'mat',  w:12, ev:'MTR EN 10204 3.1'},
+    {id:'forja',w:13, ev:'Certificado de colada + trazabilidad'},
+    {id:'mec',  w:15, ev:'Informe de avance con fotos fechadas'},
+    {id:'ens',  w:10, ev:'Acta de ensamblaje firmada'},
+    {id:'end',  w:8,  ev:'Informe NDT / prueba hidrostática'},
+    {id:'fat',  w:15, ev:'Acta FAT + release note'},
+    {id:'emb',  w:10, ev:'BL / AWB + packing list'},
+    {id:'rec',  w:7,  ev:'Acta de recepción firmada'}
+  ],
+  cat: [
+    {id:'po',   w:5,  ev:'Confirmación de PO firmada'},
+    {id:'mat',  w:20, ev:'MTR EN 10204 3.1'},
+    {id:'prep', w:25, ev:'Packing list + fotos de embalaje'},
+    {id:'insp', w:20, ev:'Release note de inspección'},
+    {id:'emb',  w:20, ev:'BL / AWB'},
+    {id:'rec',  w:10, ev:'Acta de recepción firmada'}
+  ]
+};
+
+const CONTRACTS = [
+  {
+    id:'GPS-UP-24011', dir:'up', party:'Chevron', curve:'fab', value:840000,
+    incoterm:'DAP Lechería', due:'2026-12-18', owner:'Luis E. Delgado',
+    /* declarado por el proveedor / evidenciado con artefacto verificado */
+    decl:['ing','mat','forja','mec','ens'],
+    evid:['ing','mat','forja'],
+    lines:[
+      {n:'L1', d:'Cabezal de pozo API 6A 5M · 7-1/16"', qty:'6 ud', v:520000, cov:'GPS-DN-24011-A'},
+      {n:'L2', d:'Árbol de navidad convencional 5M',    qty:'2 ud', v:180000, cov:null},
+      {n:'L3', d:'Servicio de instalación en sitio',    qty:'1 glb', v:140000, cov:'propio'}
+    ]
+  },
+  {
+    id:'GPS-UP-24014', dir:'up', party:'PDVSA', curve:'cat', value:315000,
+    incoterm:'CIP Puerto La Cruz', due:'2026-11-30', owner:'Luis E. Delgado',
+    decl:['po','mat','prep','insp'],
+    evid:['po','mat','prep'],
+    lines:[
+      {n:'L1', d:'Repuestos de compresión · kit mayor', qty:'3 kit', v:198000, cov:'GPS-DN-24014-A'},
+      {n:'L2', d:'Servicio de montaje y puesta a punto', qty:'1 glb', v:117000, cov:'propio'}
+    ]
+  },
+  {
+    id:'GPS-UP-24019', dir:'up', party:'Petroindependencia', curve:'fab', value:186000,
+    incoterm:'DAP Anzoátegui', due:'2026-11-10', owner:'Adolfo Calzadilla',
+    decl:['ing','mat','forja','mec','ens','end','fat'],
+    evid:['ing','mat','forja','mec','ens','end'],
+    lines:[
+      {n:'L1', d:'Válvula de bloqueo ASME B16.34 · NACE MR0175', qty:'12 ud', v:92000, cov:'GPS-DN-24019-A'},
+      {n:'L2', d:'Actuadores neumáticos',        qty:'12 ud', v:64000, cov:null},
+      {n:'L3', d:'Servicio de comisionado',      qty:'1 glb', v:30000, cov:'propio'}
+    ]
+  },
+  {id:'GPS-DN-24011-A', dir:'dn', party:'Wellhead Systems Intl.', value:520000, fulfills:'GPS-UP-24011', due:'2026-11-20', ttt:31},
+  {id:'GPS-DN-24014-A', dir:'dn', party:'Nordsteel Forgings',     value:198000, fulfills:'GPS-UP-24014', due:'2026-10-28', ttt:4},
+  {id:'GPS-DN-24019-A', dir:'dn', party:'Valvetec Houston',       value:92000,  fulfills:'GPS-UP-24019', due:'2026-10-15', ttt:12}
+];
+
+/* ---- motor de avance: puro, derivado de gates ---- */
+function pct(c, which){
+  const set = new Set(c[which]);
+  return CURVES[c.curve].reduce((a,g)=> a + (set.has(g.id) ? g.w : 0), 0);
+}
+function gapPts(c){ return pct(c,'decl') - pct(c,'evid'); }
+function gapMoney(c){ return Math.round(c.value * gapPts(c) / 100); }
+
+const UP = CONTRACTS.filter(c=>c.dir==='up');
+const DN = CONTRACTS.filter(c=>c.dir==='dn');
+const PORTFOLIO   = UP.reduce((a,c)=>a+c.value,0);
+const EVIDENCE_GAP= UP.reduce((a,c)=>a+gapMoney(c),0);
+const UNCOVERED   = UP.flatMap(c=>c.lines.filter(l=>l.cov===null).map(l=>({c,l})));
+const COVERAGE_GAP= UNCOVERED.reduce((a,x)=>a+x.l.v,0);
+const TTTS        = DN.map(d=>d.ttt).sort((a,b)=>a-b);
+const TTT_MED     = TTTS[Math.floor(TTTS.length/2)];
+const TTT_WORST   = DN.reduce((a,d)=> d.ttt>a.ttt?d:a, DN[0]);
+
+/* ---- expediting: derivado de los gates declarados sin evidencia ---- */
+const EXPEDITING = [];
+UP.forEach(c=>{
+  const ev = new Set(c.evid);
+  c.decl.filter(id=>!ev.has(id)).forEach(id=>{
+    const g = CURVES[c.curve].find(x=>x.id===id);
+    const dn = DN.find(d=>d.fulfills===c.id);
+    EXPEDITING.push({
+      contract:c.id, party:dn?dn.party:c.party, po:dn?dn.id:'—',
+      gate:id, artifact:g.ev, pts:g.w,
+      impact: Math.round(c.value*g.w/100),
+      asked: id==='mec'?19 : id==='ens'?12 : id==='insp'?6 : 3
+    });
+  });
+});
+EXPEDITING.sort((a,b)=>b.impact-a.impact);
+const EXP_TOTAL = EXPEDITING.reduce((a,e)=>a+e.impact,0);
+
+/* ---- credenciales y requisitos ---- */
+const days = iso => Math.round((new Date(iso+'T00:00:00Z') - T0)/86400000);
+const CRED = [
+  {id:'rif',   nm:'RIF J-50273240-3',            exp:'2027-03-15', have:true},
+  {id:'rm',    nm:'Registro Mercantil Tercero',  exp:null,         have:true},
+  {id:'rupdae',nm:'RUPDAE',                      exp:'2026-11-04', have:true},
+  {id:'prc',   nm:'Póliza de responsabilidad civil', exp:'2027-01-10', have:true},
+  {id:'ppat',  nm:'Póliza patronal',             exp:'2027-01-10', have:true},
+  {id:'slab',  nm:'Solvencia laboral',           exp:'2026-10-30', have:true},
+  {id:'hse',   nm:'Manual HSE V1',               exp:null,         have:true},
+  {id:'kyc',   nm:'Ficha KYC / OFAC / FCPA',     exp:null,         have:false, why:'incompleta'},
+  {id:'i9001', nm:'ISO 9001',                    exp:null,         have:false, why:'no'},
+  {id:'i45001',nm:'ISO 45001',                   exp:null,         have:false, why:'no'}
+];
+const REQS = [
+  {party:'Chevron',            need:['rif','rm','rupdae','prc','ppat','hse','kyc'], soft:['i9001'], close:'2026-10-31'},
+  {party:'PDVSA',              need:['rif','rm','rupdae','slab','hse'],             soft:[],        close:'2026-11-15'},
+  {party:'Petroindependencia', need:['rif','rm','prc','hse'],                       soft:[],        close:'2026-12-01'}
+];
+function eligibility(r){
+  const miss=[], soon=[];
+  r.need.forEach(id=>{
+    const c = CRED.find(x=>x.id===id);
+    if(!c.have){ miss.push(c); return; }
+    if(c.exp){
+      const d = days(c.exp);
+      if(d < 0) miss.push(c);
+      else if(new Date(c.exp) < new Date(r.close) || d <= 60) soon.push({c,d});
+    }
+  });
+  return {miss, soon, ok: miss.length===0};
+}
+
+/* ---- cronología (bitemporal: ocurrió vs se supo) ---- */
+const TIMELINE = {
+  'GPS-UP-24011':[
+    {occ:'2026-07-14', rec:'2026-07-15', t:'evidence', k:'Plano PL-24011-003 rev B aprobado Code 2', ev:'sha256:4f2a…c910'},
+    {occ:'2026-08-02', rec:'2026-08-04', t:'evidence', k:'MTR EN 10204 3.1 · colada 8842-B', ev:'sha256:9b7e…1d43'},
+    {occ:'2026-08-19', rec:'2026-08-21', t:'evidence', k:'Certificado de forja · 6 piezas', ev:'sha256:22c1…7fa8'},
+    {occ:'2026-08-24', rec:'2026-09-24', t:'bad',      k:'Mecanizado declarado al 100% por el proveedor', ev:null, lag:31},
+    {occ:'2026-09-01', rec:'2026-09-26', t:'bad',      k:'Ensamblaje declarado iniciado', ev:null, lag:25},
+    {occ:'2026-09-08', rec:'2026-09-08', t:'plain',    k:'Plano PL-24011-007 enviado a revisión (Code 2)', ev:null}
+  ]
+};
+
+/* ============ i18n ============ */
+const I = {
+  es:{
+    nav:{dash:'Puente de mando',elig:'Elegibilidad',cont:'Contratos',exp:'Expediting'},
+    demo:'Datos de ejemplo · prototipo desechable · no es un sistema en producción',
+    dashT:'Puente de mando', dashS:'Dónde se están separando hoy lo que GPS declara y lo que GPS puede probar.',
+    egT:'Evidence Gap', egD:'Avance declarado que <strong>no tiene artefacto verificado detrás</strong>.',
+    egF:'declarado − evidenciado',
+    cgT:'Coverage Gap', cgD:'Valor comprometido con la operadora <strong>sin orden de compra aguas abajo</strong> que lo respalde.',
+    cgF:'upstream − Σ downstream',
+    tttT:'Time-to-Truth', tttD:'Mediana entre <strong>cuándo ocurrió un hecho y cuándo GPS se enteró</strong>.',
+    tttF:'mediana(recorded − occurred)', worst:'peor', dys:'d',
+    pfT:'Portafolio activo', pfD:'Tres contratos upstream en ejecución.', pfF:'Σ valor de contrato',
+    bySec:'Desglose por contrato', byHint:'Pincha cualquier cifra para ver de dónde sale.',
+    thC:'Contrato', thParty:'Contraparte', thVal:'Valor', thDecl:'Declarado', thEvid:'Evidenciado', thGap:'Gap', thProg:'Avance', thHealth:'Estado', thDue:'Entrega',
+    lgEv:'Evidenciado', lgGap:'Declarado sin evidencia', lgRm:'Pendiente',
+    eligT:'Elegibilidad', eligS:'¿Podemos firmar hoy? Qué falta, qué vence y cuándo.',
+    canSign:'PODEMOS FIRMAR', canNot:'NO PODEMOS FIRMAR', canWarn:'PODEMOS, CON AVISO',
+    qSign:'¿Podemos firmar hoy con', blocker:'Bloqueador', expSoon:'Vence antes del cierre',
+    credT:'Expediente de credenciales', close:'Cierre previsto',
+    inDays:'en {n} d', noHave:'No se posee', incomplete:'Incompleta', valid:'Vigente',
+    contT:'Contratos', contS:'Portafolio bidireccional. GPS promete hacia arriba y compra hacia abajo.',
+    up:'Upstream', dn:'Downstream', upH:'Lo que GPS vende a la operadora', dnH:'Lo que GPS compra a sus fabricantes',
+    thCov:'Cobertura', thFul:'Cubre a', covNo:'Sin cubrir', covOwn:'Ejecución propia', thTtt:'Time-to-Truth',
+    tabRes:'Resumen', tabLin:'Líneas y cobertura', tabGates:'Gates y evidencia', tabTime:'Cronología', tabAud:'Auditoría',
+    kParty:'Contraparte', kVal:'Valor', kInco:'Incoterm', kDue:'Entrega', kOwner:'Responsable', kDecl:'Declarado', kEvid:'Evidenciado', kGap:'Evidence Gap',
+    thLine:'Línea', thDesc:'Descripción', thQty:'Cant.',
+    gateEvid:'Evidencia exigida', stEvid:'Evidenciado', stDecl:'Declarado', stPend:'Pendiente',
+    occ:'Ocurrió', rec:'Se supo', lagD:'{n} d de retraso en informar',
+    expT:'Expediting', expS:'Qué artefacto falta, a quién se lo pedimos y qué desbloquea. Ordenado por impacto.',
+    thArt:'Artefacto que falta', thSup:'Proveedor', thPO:'Orden', thImp:'Desbloquea', thAsk:'Solicitado hace',
+    expSum:'Suma de la cola', expNote:'La cola de expediting suma exactamente el Evidence Gap del portafolio. No es una coincidencia: <strong>el gap es la lista de artefactos que faltan</strong>, valorada en dinero.',
+    prov:'Procedencia', provOf:'Cómo se calcula', rule:'Regla aplicada', sources:'Registros de origen', total:'Total',
+    back:'Volver a contratos', close_:'Cerrar'
+  },
+  en:{
+    nav:{dash:'Command bridge',elig:'Eligibility',cont:'Contracts',exp:'Expediting'},
+    demo:'Sample data · disposable prototype · not a production system',
+    dashT:'Command bridge', dashS:'Where what GPS claims and what GPS can prove are drifting apart today.',
+    egT:'Evidence Gap', egD:'Claimed progress with <strong>no verified artifact behind it</strong>.',
+    egF:'claimed − evidenced',
+    cgT:'Coverage Gap', cgD:'Value committed to the operator <strong>with no downstream purchase order</strong> backing it.',
+    cgF:'upstream − Σ downstream',
+    tttT:'Time-to-Truth', tttD:'Median between <strong>when a fact happened and when GPS found out</strong>.',
+    tttF:'median(recorded − occurred)', worst:'worst', dys:'d',
+    pfT:'Active portfolio', pfD:'Three upstream contracts in execution.', pfF:'Σ contract value',
+    bySec:'Breakdown by contract', byHint:'Click any figure to see where it comes from.',
+    thC:'Contract', thParty:'Counterparty', thVal:'Value', thDecl:'Claimed', thEvid:'Evidenced', thGap:'Gap', thProg:'Progress', thHealth:'Health', thDue:'Delivery',
+    lgEv:'Evidenced', lgGap:'Claimed, no evidence', lgRm:'Pending',
+    eligT:'Eligibility', eligS:'Can we sign today? What is missing, what expires and when.',
+    canSign:'WE CAN SIGN', canNot:'WE CANNOT SIGN', canWarn:'WE CAN, WITH A WARNING',
+    qSign:'Can we sign today with', blocker:'Blocker', expSoon:'Expires before close',
+    credT:'Credential register', close:'Expected close',
+    inDays:'in {n} d', noHave:'Not held', incomplete:'Incomplete', valid:'Valid',
+    contT:'Contracts', contS:'Two-sided portfolio. GPS promises upward and buys downward.',
+    up:'Upstream', dn:'Downstream', upH:'What GPS sells to the operator', dnH:'What GPS buys from its manufacturers',
+    thCov:'Coverage', thFul:'Fulfills', covNo:'Uncovered', covOwn:'Self-performed', thTtt:'Time-to-Truth',
+    tabRes:'Overview', tabLin:'Lines & coverage', tabGates:'Gates & evidence', tabTime:'Timeline', tabAud:'Audit',
+    kParty:'Counterparty', kVal:'Value', kInco:'Incoterm', kDue:'Delivery', kOwner:'Owner', kDecl:'Claimed', kEvid:'Evidenced', kGap:'Evidence Gap',
+    thLine:'Line', thDesc:'Description', thQty:'Qty',
+    gateEvid:'Required evidence', stEvid:'Evidenced', stDecl:'Claimed', stPend:'Pending',
+    occ:'Occurred', rec:'Recorded', lagD:'{n} d late to report',
+    expT:'Expediting', expS:'Which artifact is missing, who we ask, and what it unblocks. Ranked by impact.',
+    thArt:'Missing artifact', thSup:'Supplier', thPO:'Order', thImp:'Unblocks', thAsk:'Asked',
+    expSum:'Queue total', expNote:'The expediting queue sums exactly to the portfolio Evidence Gap. Not a coincidence: <strong>the gap IS the list of missing artifacts</strong>, priced.',
+    prov:'Provenance', provOf:'How this is computed', rule:'Rule applied', sources:'Source records', total:'Total',
+    back:'Back to contracts', close_:'Close'
+  }
+};
+const GATE_NM = {
+  es:{ing:'Ingeniería aprobada',mat:'Materiales certificados',forja:'Corte y forja',mec:'Mecanizado',ens:'Ensamblaje',end:'END / prueba hidrostática',fat:'FAT',emb:'Embarque',rec:'Recepción en sitio',po:'Confirmación de PO',prep:'Preparación y embalaje',insp:'Inspección de liberación'},
+  en:{ing:'Engineering approved',mat:'Certified materials',forja:'Cutting & forging',mec:'Machining',ens:'Assembly',end:'NDT / hydrostatic test',fat:'FAT',emb:'Shipment',rec:'Site receipt',po:'PO confirmation',prep:'Preparation & packing',insp:'Inspection release'}
+};
+const ART_NM = {
+  es:{}, // usa el texto por defecto de la curva
+  en:{'Plano Code 1 o Code 2':'Code 1 or Code 2 drawing','MTR EN 10204 3.1':'MTR EN 10204 3.1','Certificado de colada + trazabilidad':'Heat certificate + traceability','Informe de avance con fotos fechadas':'Progress report with dated photos','Acta de ensamblaje firmada':'Signed assembly record','Informe NDT / prueba hidrostática':'NDT / hydrostatic report','Acta FAT + release note':'FAT record + release note','BL / AWB + packing list':'BL / AWB + packing list','Acta de recepción firmada':'Signed receipt record','Confirmación de PO firmada':'Signed PO confirmation','Packing list + fotos de embalaje':'Packing list + packing photos','Release note de inspección':'Inspection release note','BL / AWB':'BL / AWB'}
+};
+const CRED_EN = {'RIF J-50273240-3':'RIF J-50273240-3','Registro Mercantil Tercero':'Commercial Registry (Third)','RUPDAE':'RUPDAE','Póliza de responsabilidad civil':'Public liability policy','Póliza patronal':'Employer liability policy','Solvencia laboral':'Labour compliance certificate','Manual HSE V1':'HSE Manual V1','Ficha KYC / OFAC / FCPA':'KYC / OFAC / FCPA form','ISO 9001':'ISO 9001','ISO 45001':'ISO 45001'};
+
+let S = {lang:'es', screen:'dash', contract:null, tab:'res', prov:null};
+const t = k => I[S.lang][k];
+const gn = id => GATE_NM[S.lang][id];
+const an = s => S.lang==='en' ? (ART_NM.en[s]||s) : s;
+const cn = s => S.lang==='en' ? (CRED_EN[s]||s) : s;
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fdate = iso => { const d=new Date(iso+'T00:00:00Z');
+  return S.lang==='es' ? d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'})
+                       : d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}); };
+
+/* ============ PROVENANCE ============ */
+function provFor(key){
+  const L=S.lang;
+  if(key==='eg'){
+    return {kicker:t('prov'), title:t('egT'), value:money(EVIDENCE_GAP),
+      rule: L==='es'
+        ? 'Por cada contrato: <code>(Σ pesos de gates declarados − Σ pesos de gates con evidencia verificada) × valor del contrato</code>. Un gate solo cuenta como evidenciado si existe un artefacto verificado atado a él.'
+        : 'For each contract: <code>(Σ weights of claimed gates − Σ weights of gates with verified evidence) × contract value</code>. A gate counts as evidenced only if a verified artifact is attached to it.',
+      rows: UP.map(c=>({n:c.id, m:`${c.party} · ${pct(c,'decl')}% ${L==='es'?'decl':'clm'} − ${pct(c,'evid')}% ${L==='es'?'evid':'evd'} = ${gapPts(c)} pts × ${money(c.value)}`, v:money(gapMoney(c))})),
+      total: money(EVIDENCE_GAP)};
+  }
+  if(key==='cg'){
+    return {kicker:t('prov'), title:t('cgT'), value:money(COVERAGE_GAP),
+      rule: L==='es'
+        ? 'Suma del valor de toda línea upstream que <code>requiere compra</code> y no tiene una línea downstream enlazada por <code>fulfills_line_id</code>. Las líneas de ejecución propia quedan fuera.'
+        : 'Sum of the value of every upstream line that <code>requires purchase</code> and has no downstream line linked through <code>fulfills_line_id</code>. Self-performed lines are excluded.',
+      rows: UNCOVERED.map(x=>({n:`${x.c.id} · ${x.l.n}`, m:x.l.d, v:money(x.l.v)})),
+      total: money(COVERAGE_GAP)};
+  }
+  if(key==='ttt'){
+    return {kicker:t('prov'), title:t('tttT'), value:TTT_MED+' '+t('dys'),
+      rule: L==='es'
+        ? 'Mediana de <code>recorded_at − occurred_at</code> sobre todos los eventos de cada contraparte. El almacén bitemporal guarda las dos fechas, así que el retraso en informar no se puede maquillar.'
+        : 'Median of <code>recorded_at − occurred_at</code> across every event per counterparty. The bitemporal store keeps both dates, so reporting lag cannot be massaged.',
+      rows: DN.slice().sort((a,b)=>b.ttt-a.ttt).map(d=>({n:d.party, m:d.id, v:d.ttt+' '+t('dys')})),
+      total: TTT_MED+' '+t('dys')};
+  }
+  if(key==='pf'){
+    return {kicker:t('prov'), title:t('pfT'), value:money(PORTFOLIO),
+      rule: L==='es' ? 'Suma del valor de los contratos <code>direction = upstream</code> en estado de ejecución.'
+                     : 'Sum of contract value where <code>direction = upstream</code> and status is in execution.',
+      rows: UP.map(c=>({n:c.id, m:c.party, v:money(c.value)})), total: money(PORTFOLIO)};
+  }
+  if(key.startsWith('c:')){
+    const c = CONTRACTS.find(x=>x.id===key.slice(2));
+    const ev=new Set(c.evid), dc=new Set(c.decl);
+    return {kicker:t('prov'), title:c.id+' · '+t('egT'), value:money(gapMoney(c)),
+      rule: L==='es' ? `<code>(${pct(c,'decl')}% declarado − ${pct(c,'evid')}% evidenciado) × ${money(c.value)} = ${money(gapMoney(c))}</code>`
+                     : `<code>(${pct(c,'decl')}% claimed − ${pct(c,'evid')}% evidenced) × ${money(c.value)} = ${money(gapMoney(c))}</code>`,
+      rows: CURVES[c.curve].filter(g=>dc.has(g.id)).map(g=>({
+        n:gn(g.id), m:(ev.has(g.id)? (L==='es'?'Evidencia verificada · ':'Verified evidence · ') : (L==='es'?'SIN EVIDENCIA · falta: ':'NO EVIDENCE · missing: '))+an(g.ev),
+        v:(ev.has(g.id)?'0':'+'+money(Math.round(c.value*g.w/100)))})),
+      total: money(gapMoney(c))};
+  }
+  if(key.startsWith('e:')){
+    const i = +key.slice(2), e = EXPEDITING[i];
+    return {kicker:t('prov'), title:an(e.artifact), value:money(e.impact),
+      rule: L==='es' ? `El gate <code>${gn(e.gate)}</code> pesa <code>${e.pts}%</code> en la curva de ${e.contract}. Está declarado pero sin artefacto verificado, así que no aporta avance: <code>${e.pts}% × ${money(CONTRACTS.find(c=>c.id===e.contract).value)} = ${money(e.impact)}</code>.`
+                     : `Gate <code>${gn(e.gate)}</code> weighs <code>${e.pts}%</code> in the ${e.contract} curve. It is claimed but has no verified artifact, so it contributes no progress: <code>${e.pts}% × ${money(CONTRACTS.find(c=>c.id===e.contract).value)} = ${money(e.impact)}</code>.`,
+      rows:[{n:L==='es'?'Contrato':'Contract', m:e.contract, v:''},
+            {n:L==='es'?'Proveedor':'Supplier', m:e.party+' · '+e.po, v:''},
+            {n:L==='es'?'Solicitado hace':'Asked', m:'', v:e.asked+' '+t('dys')}],
+      total: money(e.impact)};
+  }
+  if(key.startsWith('q:')){
+    const r = REQS.find(x=>x.party===key.slice(2)), st = eligibility(r);
+    return {kicker:t('prov'), title:r.party+' · '+t('eligT'), value: st.ok ? (st.soon.length?t('canWarn'):t('canSign')) : t('canNot'),
+      rule: L==='es' ? 'Se cruzan los <code>requirement</code> de la contraparte contra el expediente de <code>credential</code>. Una obligatoria ausente, vencida, o que venza <em>antes del cierre previsto</em>, bloquea la firma.'
+                     : 'The counterparty <code>requirement</code> set is crossed against the <code>credential</code> register. A mandatory credential that is missing, expired, or expires <em>before the expected close</em> blocks signing.',
+      rows: r.need.map(id=>{ const c=CRED.find(x=>x.id===id);
+        if(!c.have) return {n:cn(c.nm), m:L==='es'?'BLOQUEADOR · '+(c.why==='no'?'no se posee':'incompleta'):'BLOCKER · '+(c.why==='no'?'not held':'incomplete'), v:'✕'};
+        if(c.exp){ const d=days(c.exp);
+          return {n:cn(c.nm), m:(L==='es'?'Vence ':'Expires ')+fdate(c.exp)+' · '+t('inDays').replace('{n}',d), v: d<=60?'!':'✓'};}
+        return {n:cn(c.nm), m:L==='es'?'Sin vencimiento':'No expiry', v:'✓'};}),
+      total: st.ok ? (L==='es'?'Firmable':'Signable') : (L==='es'?'Bloqueado':'Blocked')};
+  }
+}
+
+/* ============ COMPONENTS ============ */
+function pvBtn(key, inner, cls){
+  return `<button class="pv ${cls||''}" data-prov="${key}"><span>${inner}</span><span class="pv-ic">i</span></button>`;
+}
+function gbar(c){
+  const e=pct(c,'evid'), g=gapPts(c);
+  return `<span class="gbar" role="img" aria-label="${e}% ${t('lgEv')}, ${g}% ${t('lgGap')}">
+    <i class="ev" style="width:${e}%"></i><i class="gp" style="left:${e}%;width:${g}%"></i></span>`;
+}
+function healthPill(c){
+  const g=gapPts(c);
+  if(g>=25) return `<span class="pill p-c">${S.lang==='es'?'Crítico':'Critical'}</span>`;
+  if(g>=15) return `<span class="pill p-w">${S.lang==='es'?'Vigilancia':'Watch'}</span>`;
+  return `<span class="pill p-o">${S.lang==='es'?'Sano':'Healthy'}</span>`;
+}
+
+/* ============ SCREENS ============ */
+function screenDash(){
+  return `<div class="ph"><h1>${t('dashT')}</h1><p>${t('dashS')}</p></div><div class="body">
+  <div class="tiles">
+    <div class="tile"><div class="tl">${t('egT')}</div>
+      <div class="tv c">${pvBtn('eg', money(EVIDENCE_GAP))}</div>
+      <div class="td">${t('egD')}</div>
+      <div class="tf"><span class="formula">${t('egF')}</span><span class="pill p-c">${Math.round(EVIDENCE_GAP/PORTFOLIO*100)}% ${S.lang==='es'?'del portafolio':'of portfolio'}</span></div></div>
+    <div class="tile"><div class="tl">${t('cgT')}</div>
+      <div class="tv w">${pvBtn('cg', money(COVERAGE_GAP))}</div>
+      <div class="td">${t('cgD')}</div>
+      <div class="tf"><span class="formula">${t('cgF')}</span><span class="pill p-w">${UNCOVERED.length} ${S.lang==='es'?'líneas':'lines'}</span></div></div>
+    <div class="tile"><div class="tl">${t('tttT')}</div>
+      <div class="tv w">${pvBtn('ttt', TTT_MED+' '+t('dys'))}</div>
+      <div class="td">${t('tttD')}</div>
+      <div class="tf"><span class="formula">${t('tttF')}</span><span class="pill p-c">${t('worst')} ${TTT_WORST.ttt} ${t('dys')}</span></div></div>
+    <div class="tile"><div class="tl">${t('pfT')}</div>
+      <div class="tv">${pvBtn('pf', money(PORTFOLIO))}</div>
+      <div class="td">${t('pfD')}</div>
+      <div class="tf"><span class="formula">${t('pfF')}</span><span class="pill p-n">${UP.length} ${S.lang==='es'?'contratos':'contracts'}</span></div></div>
+  </div>
+
+  <div class="sec"><div class="sec-h"><h2>${t('bySec')}</h2><span class="hint">${t('byHint')}</span></div>
+  <div class="tbox"><table><thead><tr>
+    <th>${t('thC')}</th><th>${t('thParty')}</th><th class="num">${t('thVal')}</th>
+    <th>${t('thProg')}</th><th class="num">${t('thDecl')}</th><th class="num">${t('thEvid')}</th>
+    <th class="num">${t('thGap')}</th><th>${t('thHealth')}</th></tr></thead><tbody>
+    ${UP.map(c=>`<tr class="clk" data-go="${c.id}">
+      <td><span class="code">${c.id}</span></td>
+      <td>${esc(c.party)}<span class="sub">${t('thDue')} ${fdate(c.due)}</span></td>
+      <td class="num">${money(c.value)}</td>
+      <td>${gbar(c)}</td>
+      <td class="num">${pct(c,'decl')}%</td>
+      <td class="num" style="color:var(--green-ink);font-weight:700">${pct(c,'evid')}%</td>
+      <td class="num">${pvBtn('c:'+c.id, `<span style="color:var(--crit);font-weight:700">${money(gapMoney(c))}</span>`)}</td>
+      <td>${healthPill(c)}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="glg"><span><i class="sw ev"></i>${t('lgEv')}</span><span><i class="sw gp"></i>${t('lgGap')}</span><span><i class="sw rm"></i>${t('lgRm')}</span></div>
+  </div></div>`;
+}
+
+function screenElig(){
+  return `<div class="ph"><h1>${t('eligT')}</h1><p>${t('eligS')}</p></div><div class="body">
+  <div class="elig">${REQS.map(r=>{
+    const st=eligibility(r); const cls = !st.ok?'no':(st.soon.length?'warn':'yes');
+    const lbl = !st.ok?t('canNot'):(st.soon.length?t('canWarn'):t('canSign'));
+    return `<div class="ecard ${cls}">
+      <div class="eh"><p class="eq">${t('qSign')} <strong>${esc(r.party)}</strong>?</p>
+        <p class="ea ${cls}">${pvBtn('q:'+r.party, lbl)}</p>
+        <p class="eq mono" style="margin-top:6px;font-size:11.5px">${t('close')}: ${fdate(r.close)}</p></div>
+      ${st.miss.map(c=>`<div class="erow"><span class="pill p-c">${t('blocker')}</span><span class="nm">${esc(cn(c.nm))}</span><span class="dd">${c.why==='no'?t('noHave'):t('incomplete')}</span></div>`).join('')}
+      ${st.soon.map(x=>`<div class="erow"><span class="pill p-w">${t('expSoon')}</span><span class="nm">${esc(cn(x.c.nm))}</span><span class="dd">${t('inDays').replace('{n}',x.d)}</span></div>`).join('')}
+      ${st.ok&&!st.soon.length?`<div class="erow"><span class="pill p-o">${S.lang==='es'?'Completo':'Complete'}</span><span class="nm">${S.lang==='es'?'Todas las credenciales obligatorias vigentes':'All mandatory credentials valid'}</span></div>`:''}
+    </div>`;}).join('')}</div>
+
+  <div class="sec"><div class="sec-h"><h2>${t('credT')}</h2></div>
+  <div class="tbox"><table><thead><tr><th>${S.lang==='es'?'Credencial':'Credential'}</th><th>${S.lang==='es'?'Vencimiento':'Expiry'}</th><th class="num">${S.lang==='es'?'Días':'Days'}</th><th>${S.lang==='es'?'Estado':'Status'}</th></tr></thead><tbody>
+  ${CRED.map(c=>{
+    let pill, dd='—', dn='—';
+    if(!c.have){ pill=`<span class="pill p-c">${c.why==='no'?t('noHave'):t('incomplete')}</span>`; }
+    else if(c.exp){ const d=days(c.exp); dd=fdate(c.exp); dn=d;
+      pill = d<=45?`<span class="pill p-w">${S.lang==='es'?'Por vencer':'Expiring'}</span>`:`<span class="pill p-o">${t('valid')}</span>`; }
+    else pill=`<span class="pill p-o">${t('valid')}</span>`;
+    return `<tr><td>${esc(cn(c.nm))}</td><td class="mono" style="font-size:12px">${dd}</td><td class="num">${dn}</td><td>${pill}</td></tr>`;
+  }).join('')}</tbody></table></div>
+  <div class="note">${S.lang==='es'
+    ? '<strong>ISO 9001 y ISO 45001 aparecen como «no se posee», no ocultas.</strong> El sistema no puede declarar una certificación que no existe: es una restricción del modelo de datos, no una convención de quien teclea.'
+    : '<strong>ISO 9001 and ISO 45001 show as “not held”, not hidden.</strong> The system cannot claim a certification that does not exist: that is a data-model constraint, not a convention someone has to honour.'}</div>
+  </div></div>`;
+}
+
+function screenCont(){
+  return `<div class="ph"><h1>${t('contT')}</h1><p>${t('contS')}</p></div><div class="body">
+  <div class="sec" style="margin-top:0"><div class="sec-h"><h2><span class="dir d-up">${t('up')}</span> ${t('upH')}</h2></div>
+  <div class="tbox"><table><thead><tr><th>${t('thC')}</th><th>${t('thParty')}</th><th class="num">${t('thVal')}</th><th>${t('thProg')}</th><th class="num">${t('thGap')}</th><th>${t('thCov')}</th><th>${t('thHealth')}</th></tr></thead><tbody>
+  ${UP.map(c=>{const unc=c.lines.filter(l=>l.cov===null); return `<tr class="clk" data-go="${c.id}">
+    <td><span class="code">${c.id}</span></td><td>${esc(c.party)}</td><td class="num">${money(c.value)}</td>
+    <td>${gbar(c)}</td><td class="num" style="color:var(--crit);font-weight:700">${money(gapMoney(c))}</td>
+    <td>${unc.length?`<span class="pill p-w">${unc.length} ${t('covNo')}</span>`:`<span class="pill p-o">100%</span>`}</td>
+    <td>${healthPill(c)}</td></tr>`;}).join('')}
+  </tbody></table></div></div>
+
+  <div class="sec"><div class="sec-h"><h2><span class="dir d-dn">${t('dn')}</span> ${t('dnH')}</h2></div>
+  <div class="tbox"><table><thead><tr><th>${S.lang==='es'?'Orden':'Order'}</th><th>${t('thSup')}</th><th class="num">${t('thVal')}</th><th>${t('thFul')}</th><th class="num">${t('thTtt')}</th><th>${t('thDue')}</th></tr></thead><tbody>
+  ${DN.map(d=>`<tr><td><span class="code">${d.id}</span></td><td>${esc(d.party)}</td><td class="num">${money(d.value)}</td>
+    <td><span class="code" style="color:var(--ink2)">${d.fulfills}</span></td>
+    <td class="num">${d.ttt>=20?`<span class="pill p-c">${d.ttt} ${t('dys')}</span>`:d.ttt>=10?`<span class="pill p-w">${d.ttt} ${t('dys')}</span>`:`<span class="pill p-o">${d.ttt} ${t('dys')}</span>`}</td>
+    <td class="mono" style="font-size:12px">${fdate(d.due)}</td></tr>`).join('')}
+  </tbody></table></div></div>
+
+  <div class="note">${S.lang==='es'
+    ? `<strong>Aquí vive el riesgo de GPS.</strong> ${money(COVERAGE_GAP)} están prometidos a la operadora sin una orden de compra que los respalde. Si el precio de mercado se mueve o el plazo de fabricación se alarga, ese hueco lo paga GPS.`
+    : `<strong>This is where GPS carries the risk.</strong> ${money(COVERAGE_GAP)} is promised to the operator with no purchase order backing it. If market price moves or lead time stretches, GPS absorbs the gap.`}</div>
+  </div>`;
+}
+
+function screenCabina(){
+  const c = UP.find(x=>x.id===S.contract) || UP[0];
+  const ev=new Set(c.evid), dc=new Set(c.decl);
+  const tabs=[['res',t('tabRes')],['lin',t('tabLin')],['gat',t('tabGates')],['tim',t('tabTime')],['aud',t('tabAud')]];
+  let inner='';
+  if(S.tab==='res'){
+    inner=`<div class="kv">
+      <div><dt>${t('kParty')}</dt><dd>${esc(c.party)}</dd></div>
+      <div><dt>${t('kVal')}</dt><dd>${money(c.value)}</dd></div>
+      <div><dt>${t('kInco')}</dt><dd style="font-size:13px">${c.incoterm}</dd></div>
+      <div><dt>${t('kDue')}</dt><dd style="font-size:13px">${fdate(c.due)}</dd></div>
+      <div><dt>${t('kOwner')}</dt><dd style="font-size:13px">${c.owner}</dd></div>
+      <div><dt>${t('kDecl')}</dt><dd>${pct(c,'decl')}%</dd></div>
+      <div><dt>${t('kEvid')}</dt><dd style="color:var(--green-ink)">${pct(c,'evid')}%</dd></div>
+      <div><dt>${t('kGap')}</dt><dd style="color:var(--crit)">${pvBtn('c:'+c.id, money(gapMoney(c)))}</dd></div>
+    </div>
+    <div style="margin-top:18px">${gbar(c)}
+    <div class="glg"><span><i class="sw ev"></i>${t('lgEv')} ${pct(c,'evid')}%</span><span><i class="sw gp"></i>${t('lgGap')} ${gapPts(c)}%</span><span><i class="sw rm"></i>${t('lgRm')} ${100-pct(c,'decl')}%</span></div></div>`;
+  }
+  if(S.tab==='lin'){
+    inner=`<div class="tbox"><table><thead><tr><th>${t('thLine')}</th><th>${t('thDesc')}</th><th>${t('thQty')}</th><th class="num">${t('thVal')}</th><th>${t('thCov')}</th></tr></thead><tbody>
+    ${c.lines.map(l=>`<tr><td><span class="code">${l.n}</span></td><td>${esc(l.d)}</td><td class="mono" style="font-size:12px">${l.qty}</td><td class="num">${money(l.v)}</td>
+    <td>${l.cov===null?`<span class="pill p-c">${t('covNo')}</span>`:l.cov==='propio'?`<span class="pill p-n">${t('covOwn')}</span>`:`<span class="code" style="font-size:11.5px">${l.cov}</span>`}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+  if(S.tab==='gat'){
+    inner=`<div class="gates">${CURVES[c.curve].map(g=>{
+      const isEv=ev.has(g.id), isDc=dc.has(g.id);
+      const st = isEv?`<span class="pill p-o">${t('stEvid')}</span>` : isDc?`<span class="pill p-c">${t('stDecl')}</span>` : `<span class="pill p-n">${t('stPend')}</span>`;
+      return `<div class="gate ${isDc&&!isEv?'miss':''}">
+        <div><div class="gate-n">${gn(g.id)}</div><span class="gate-e">${t('gateEvid')}: ${an(g.ev)}</span></div>
+        <div class="gate-w">${g.w}%</div>
+        <div class="gcol">${st}</div>
+        <div class="gate-w">${isDc&&!isEv?`<span class="impact">+${money(Math.round(c.value*g.w/100))}</span>`:'—'}</div>
+      </div>`;}).join('')}</div>
+      <div class="note">${S.lang==='es'
+        ? 'Los gates marcados en rojo están <strong>declarados por el proveedor pero sin artefacto verificado</strong>. No aportan avance. La columna de la derecha es lo que cada uno desbloquearía.'
+        : 'Gates marked red are <strong>claimed by the supplier but have no verified artifact</strong>. They contribute no progress. The right column is what each would unblock.'}</div>`;
+  }
+  if(S.tab==='tim'){
+    const evs = TIMELINE[c.id];
+    inner = evs ? `<div class="tline">${evs.map(e=>{
+      const lag = Math.round((new Date(e.rec)-new Date(e.occ))/86400000);
+      return `<div class="tev ${e.t==='evidence'?'ev':e.t==='bad'?'bad':''}">
+        <div class="tev-h"><span class="tev-d">${fdate(e.occ)}</span><span class="tev-t">${esc(e.k)}</span>${lag>=7?`<span class="lag">${t('lagD').replace('{n}',lag)}</span>`:''}</div>
+        <div class="tev-b">${t('occ')} ${fdate(e.occ)} · ${t('rec')} ${fdate(e.rec)}${e.ev?` · <span class="mono" style="font-size:11px;color:var(--steel)">${e.ev}</span>`:''}</div>
+      </div>`;}).join('')}</div>
+      <div class="note">${S.lang==='es'
+        ? '<strong>El almacén es bitemporal:</strong> guarda cuándo ocurrió el hecho y cuándo se supo. El mecanizado se declaró terminado el 24 de agosto y GPS se enteró 31 días después. Ese retraso es el Time-to-Truth del proveedor, y se acumula contrato tras contrato.'
+        : '<strong>The store is bitemporal:</strong> it keeps when the fact happened and when it was recorded. Machining was declared complete on 24 August and GPS found out 31 days later. That lag is the supplier’s Time-to-Truth, and it accrues contract after contract.'}</div>`
+      : `<div class="note">${S.lang==='es'?'Sin eventos registrados en este contrato de ejemplo.':'No events recorded on this sample contract.'}</div>`;
+  }
+  if(S.tab==='aud'){
+    inner=`<div class="note" style="border-left-color:var(--green)">${S.lang==='es'
+      ? '<strong>La auditoría no es un módulo: es el modelo de datos.</strong> Todo hecho entra como evento inmutable con actor, fuente y hash del artefacto. Nada se edita ni se borra; una corrección es un evento nuevo y ambos permanecen. Por eso el portafolio se puede consultar a cualquier fecha pasada y devuelve lo que se sabía entonces.'
+      : '<strong>Audit is not a module: it is the data model.</strong> Every fact enters as an immutable event with actor, source and artifact hash. Nothing is edited or deleted; a correction is a new event and both remain. That is why the portfolio can be queried at any past date and returns what was known then.'}</div>
+      <div class="tbox" style="margin-top:14px"><table><thead><tr><th>${S.lang==='es'?'Campo':'Field'}</th><th>${S.lang==='es'?'Contenido':'Content'}</th></tr></thead><tbody>
+      <tr><td class="code">occurred_at</td><td>${S.lang==='es'?'Cuándo sucedió en el mundo real':'When it happened in the real world'}</td></tr>
+      <tr><td class="code">recorded_at</td><td>${S.lang==='es'?'Cuándo lo supo el sistema':'When the system found out'}</td></tr>
+      <tr><td class="code">actor_id</td><td>${S.lang==='es'?'Quién lo registró':'Who recorded it'}</td></tr>
+      <tr><td class="code">source</td><td>manual · ${S.lang==='es'?'correo':'email'} · ${S.lang==='es'?'importación':'import'} · ${S.lang==='es'?'regla':'rule'}</td></tr>
+      <tr><td class="code">evidence_id</td><td>${S.lang==='es'?'<strong>Nulo aquí = no cuenta para el avance</strong>':'<strong>Null here = does not count towards progress</strong>'}</td></tr>
+      </tbody></table></div>`;
+  }
+  return `<div class="ph">
+    <button class="back" data-nav="cont">← ${t('back')}</button>
+    <h1><span class="code" style="font-size:20px">${c.id}</span></h1>
+    <p>${esc(c.party)} · ${money(c.value)} · ${t('thDue')} ${fdate(c.due)}</p></div>
+    <div class="body"><div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}">${l}</button>`).join('')}</div>${inner}</div>`;
+}
+
+function screenExp(){
+  return `<div class="ph"><h1>${t('expT')}</h1><p>${t('expS')}</p></div><div class="body">
+  <div class="tbox"><table><thead><tr><th>${t('thArt')}</th><th>${t('thSup')}</th><th>${t('thPO')}</th><th class="num">${t('thImp')}</th><th class="num">${t('thAsk')}</th></tr></thead><tbody>
+  ${EXPEDITING.map((e,i)=>`<tr>
+    <td><strong>${an(e.artifact)}</strong><span class="sub">${gn(e.gate)} · ${e.pts}% · ${e.contract}</span></td>
+    <td>${esc(e.party)}</td><td><span class="code" style="font-size:11.5px">${e.po}</span></td>
+    <td class="num">${pvBtn('e:'+i, `<span class="impact">${money(e.impact)}</span>`)}</td>
+    <td class="num">${e.asked>=14?`<span class="pill p-c">${e.asked} ${t('dys')}</span>`:e.asked>=7?`<span class="pill p-w">${e.asked} ${t('dys')}</span>`:`<span class="pill p-n">${e.asked} ${t('dys')}</span>`}</td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="sum" style="margin-top:-1px"><span>${t('expSum')}</span><span>${money(EXP_TOTAL)}</span></div>
+  <div class="note">${t('expNote')}</div></div>`;
+}
+
+/* ============ RENDER ============ */
+function render(){
+  const navs=[['dash',t('nav').dash],['elig',t('nav').elig],['cont',t('nav').cont],['exp',t('nav').exp]];
+  const cur = S.screen==='cab' ? 'cont' : S.screen;
+  const screen = S.screen==='dash'?screenDash():S.screen==='elig'?screenElig():S.screen==='cont'?screenCont():S.screen==='cab'?screenCabina():screenExp();
+  document.getElementById('app').innerHTML = `<div class="shell">
+    <aside class="sb"><div class="sb-top"><div class="logo">
+      <svg class="chev" width="26" height="20" viewBox="0 0 26 20" aria-hidden="true"><path d="M0 0h8l8 10-8 10H0l8-10z" fill="#04A86C"/><path d="M10 0h8l8 10-8 10h-8l8-10z" fill="#F7F7F4"/></svg>
+      <div><div class="logo-tx">GPS NEXUS</div><div class="logo-sub">GRUPO PRIME SUPPLY</div></div></div></div>
+      <nav class="nav">${navs.map(([k,l])=>`<button data-nav="${k}" aria-current="${cur===k}"><i class="dot"></i>${l}${k==='exp'?`<span class="badge">${EXPEDITING.length}</span>`:''}</button>`).join('')}</nav>
+      <div class="sb-foot"><div class="lang">
+        <button data-lang="es" aria-pressed="${S.lang==='es'}">ES</button>
+        <button data-lang="en" aria-pressed="${S.lang==='en'}">EN</button></div></div>
+    </aside>
+    <main class="main"><div class="demo">◆ ${t('demo')}</div>${screen}</main></div>`;
+  renderDrawer();
+}
+
+function renderDrawer(){
+  const d=document.getElementById('drawer');
+  if(!S.prov){ d.innerHTML=''; return; }
+  const p=provFor(S.prov);
+  d.innerHTML=`<div class="scrim" data-close="1"></div><aside class="drw" role="dialog" aria-modal="true" aria-label="${t('prov')}">
+    <div class="drw-h" style="position:relative"><div class="drw-k">${p.kicker}</div>
+      <div class="drw-t">${p.title}</div><div class="drw-v">${p.value}</div>
+      <button class="drw-x" data-close="1" aria-label="${t('close_')}">×</button></div>
+    <div class="drw-b">
+      <div class="drw-s">${t('rule')}</div><div class="rule">${p.rule}</div>
+      <div class="drw-s">${t('sources')}</div>
+      ${p.rows.map(r=>`<div class="src"><div class="src-h"><span class="src-n">${esc(r.n)}</span><span class="src-v">${r.v}</span></div>${r.m?`<div class="src-m">${esc(r.m)}</div>`:''}</div>`).join('')}
+      <div class="sum" style="margin-top:11px"><span>${t('total')}</span><span>${p.total}</span></div>
+    </div></aside>`;
+}
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-nav],[data-lang],[data-go],[data-tab],[data-prov],[data-close]');
+  if(!b) return;
+  if(b.dataset.close){ S.prov=null; renderDrawer(); return; }
+  if(b.dataset.prov){ S.prov=b.dataset.prov; renderDrawer(); return; }
+  if(b.dataset.lang){ S.lang=b.dataset.lang; render(); return; }
+  if(b.dataset.tab){ S.tab=b.dataset.tab; render(); return; }
+  if(b.dataset.go){ S.contract=b.dataset.go; S.screen='cab'; S.tab='res'; render(); return; }
+  if(b.dataset.nav){ S.screen=b.dataset.nav; S.prov=null; render(); }
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'&&S.prov){ S.prov=null; renderDrawer(); }});
+
+render();
+console.assert(EXP_TOTAL===EVIDENCE_GAP, 'La cola de expediting debe sumar el Evidence Gap');
+</script>
