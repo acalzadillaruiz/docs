@@ -1,11 +1,11 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 7 de 141 sesiones · **5%**
+**Avance:** 8 de 141 sesiones · **6%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las treinta y dos reglas duras y revisa el diccionario
+esquema entero, comprueba las treinta y ocho reglas duras y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -27,6 +27,8 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/02-valuacion.sql` | La hoja de valuación contra un caso calculado a mano aparte, línea por línea. |
 | `db/pruebas/03-generadores.sql` | El asiento que sale de esa valuación, contra el asiento escrito a mano aparte. |
 | `db/pruebas/04-aislamiento.sql` | Se conecta **como un cliente de verdad** e intenta alcanzar lo que no le toca. |
+| `db/pruebas/05-estados.sql` | Que los estados cuadren con el libro y entre sí, y que el cierre respete el orden. |
+| `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -59,6 +61,12 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 22 | Nombrando el contrato de B expresamente, para el cliente de A no existe. |
 | 23 | El cliente **no tiene permiso** sobre el precio de compra. Sí sobre el de venta. |
 | 24 | El cliente no tiene permiso sobre los asientos ni sobre las partidas. |
+| 25 | El libro entero cuadra: descuadre cero en las dos monedas. |
+| 26 | El resultado del período es 1.000.000,00, la obra ejecutada. |
+| 27 | Activo menos pasivo es igual al resultado: el balance cuadra con el estado. |
+| 28 | No se cierra un mes con el anterior abierto. |
+| 29 | Cerrados en orden, los dos meses quedan cerrados. |
+| 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue
 
