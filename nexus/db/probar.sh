@@ -36,9 +36,17 @@ fallos=0
 for f in "$AQUI"/pruebas/[0-9]*.sql; do
   cargar_esquema
   echo "== $(basename "$f") =="
-  salida=$($P -d nexus -f "$f" 2>&1 | grep -E 'OK |FALLO|ERROR' | sed -E 's/^psql:[^:]+:[0-9]+: NOTICE:  //; s/^NOTICE:  //')
-  echo "$salida"
-  if echo "$salida" | grep -qE 'FALLO|ERROR'; then fallos=$((fallos+1)); fi
+  # El '|| true' importa: sin el, un archivo que no imprima ninguna linea util hace
+  # que grep devuelva 1 y, con 'set -e', el lanzador muera en silencio dando la
+  # impresion de que todo fue bien.
+  salida=$($P -d nexus -f "$f" 2>&1 | grep -E 'OK |FALLO|ERROR' | sed -E 's/^psql:[^:]+:[0-9]+: NOTICE:  //; s/^NOTICE:  //' || true)
+  if [ -z "$salida" ]; then
+    echo "FALLO · no imprimió ninguna comprobación (¿murió antes de empezar?)"
+    fallos=$((fallos+1))
+  else
+    echo "$salida"
+    if echo "$salida" | grep -qE 'FALLO|ERROR'; then fallos=$((fallos+1)); fi
+  fi
 done
 
 # El diccionario bilingue se comprueba en la misma pasada: un texto sin traducir
