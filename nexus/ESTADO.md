@@ -1,25 +1,22 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 22 de 141 sesiones · **16%**
+**Avance:** 23 de 141 sesiones · **16%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** las dos piezas criptográficas de la entrada. `totp.ts`
-(segundo factor, comprobado contra los vectores oficiales del RFC 6238) y `clave.ts`
-(scrypt y códigos de recuperación). Veintidós pruebas entre las dos.
+**Lo último terminado:** `db/schema/17-sesiones.sql` con el bloqueo por intentos,
+los códigos de recuperación y las sesiones. Dieciséis comprobaciones nuevas, entre
+ellas la que importa: que un tercero no pueda dejar fuera al dueño de una cuenta.
 
 **Lo siguiente, en este orden exacto:**
 
-1. `app/src/dominio/sesion.ts` — juntar las piezas: buscar la persona por correo,
-   verificar clave, exigir segundo factor, y el bloqueo por intentos fallidos. El
-   bloqueo cuenta por cuenta **y por origen**: solo por cuenta, cualquiera bloquea a
-   quien quiera con seis intentos malos a propósito.
-2. Tabla `intento_acceso` y tabla `codigo_recuperacion` en un nuevo
-   `db/schema/17-sesiones.sql`. Un código gastado **no se borra**: se marca, para que
-   quede constancia de cuál se usó y cuándo.
-3. `app/src/pantallas/entrada.ts` — las cuatro pantallas: ingreso, segundo factor,
+1. `app/src/dominio/sesion.ts` — juntar las piezas en un solo flujo: buscar la
+   persona por correo, `espera_requerida()`, verificar clave con `clave.ts`, exigir
+   segundo factor con `totp.ts`, abrir sesión y anotar el intento. El testigo de
+   sesión se genera con `randomBytes(32)` y en la base de datos solo va su huella.
+2. `app/src/pantallas/entrada.ts` — las cuatro pantallas: ingreso, segundo factor,
    recuperación e invitación aceptada.
 4. `app/src/dominio/sso.ts` — entrar con la cuenta de la empresa. Lo importante no es
    el botón: es que cuando la operadora da de baja al empleado, pierda el acceso.
@@ -55,7 +52,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento dieciséis reglas duras, el diccionario bilingüe y las cuarenta y dos pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las cuarenta y dos pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -85,6 +82,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/11-pagos.sql` | El pago parcial, el intento de pagar de más, y un extracto con tres movimientos de los que solo uno casa. |
 | `db/pruebas/12-activos.sql` | Cinco años de depreciación mes a mes, hasta agotar exactamente lo depreciable. |
 | `db/pruebas/13-reexpresion.sql` | Índice que se duplica en el año: qué se reexpresa, qué no, y que el balance vuelva a cuadrar. |
+| `db/pruebas/14-sesiones.sql` | Un atacante falla veinte veces contra un correo y **el dueño entra igual**. |
 | `app/pruebas/totp.test.ts` | Los cuatro vectores oficiales del RFC 6238, la tolerancia de reloj, y que un código de ayer no valga hoy. |
 | `app/pruebas/clave.test.ts` | Que la huella no contenga la clave, que dos iguales den huellas distintas, y que los acentos se normalicen. |
 | `app/pruebas/pantalla.test.ts` | Que el neto vaya aparte, que el texto se escape, que la página declare su idioma, y que sea una sola pantalla para las dos superficies. |
@@ -106,6 +104,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/herramientas/pintar.ts` | Genera una pantalla desde la base de datos real, sin desplegar nada. Para revisar diseño y para enseñar avance. |
 | `app/src/dominio/totp.ts` | Segundo factor, los códigos de seis dígitos del Authenticator. Escrito con la criptografía que trae Node, sin dependencias: son cuarenta líneas y el algoritmo está congelado desde 2011. Acepta el código del paso anterior y el siguiente, porque sin esa tolerancia quien tenga el reloj desfasado no entra nunca — y acaba pidiendo que le quiten el doble factor. |
 | `app/src/dominio/clave.ts` | scrypt con N=32.768, y códigos de recuperación de un solo uso. **GPS nunca ve una clave**: guarda la huella y la sal. Con Microsoft o Google, ni eso. Los códigos no llevan `0 O 1 I L`: se apuntan en papel, y un código mal transcrito en el peor momento es lo que hace que la gente desactive el doble factor. |
+| `db/schema/17-sesiones.sql` | Sesiones, intentos y códigos de recuperación. **El bloqueo cuenta por pareja de cuenta y origen, no por cuenta.** Bloquear la cuenta tras N fallos suena prudente y es un arma: si basta con fallar seis veces contra un correo, cualquiera deja fuera al gerente de la operadora la mañana de una aprobación. Y al dar de baja a una persona, sus sesiones se cierran solas — sin eso, entrar con la cuenta de la empresa no serviría de nada. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
