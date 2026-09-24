@@ -1,11 +1,11 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 5 de 141 sesiones · **4%**
+**Avance:** 6 de 141 sesiones · **4%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero y comprueba las veintitrés reglas duras. Ejecútalo antes de cada commit
+esquema entero y comprueba las treinta y dos reglas duras. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
 ---
@@ -21,9 +21,11 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/04-fiscal.sql` | IVA con alícuotas fechadas, retención del 75%, ISLR por concepto con sustraendo en UT, IGTF del 3%. Libros de ventas y compras **como vistas**: no se transcriben, se consultan. |
 | `db/schema/05-valuacion.sql` | Valuaciones. **No se guarda el neto a cobrar:** se guardan las piezas y el neto se calcula. Si el cliente objeta, se abre el cálculo línea por línea. Los porcentajes se congelan al crear la valuación: si el contrato cambia mañana, lo ya emitido no se mueve. |
 | `db/schema/06-generadores.sql` | **Nadie teclea un asiento.** Se le pide a un hecho que produzca el suyo, y el asiento queda apuntando a ese hecho. Incluye el reverso (un asiento no se corrige, se contrapone) y el libro mayor con enlace al documento de origen. Las cuentas no están escritas dentro del código: viven en `mapa_cuenta`, una por concepto. |
+| `db/schema/07-aislamiento.sql` | Dos cercas. **Qué filas:** un cliente solo ve sus contratos, y no porque la aplicación filtre, sino porque la base de datos no le devuelve las demás escriba la consulta que escriba. **Qué columnas:** el precio de compra no está oculto en la pantalla — el rol del cliente no tiene permiso de leer esa columna. La contabilidad entera queda fuera de su alcance. |
 | `db/pruebas/01-reglas-duras.sql` | Trece comprobaciones de que la base de datos **se niega** a lo que debe negarse. |
 | `db/pruebas/02-valuacion.sql` | La hoja de valuación contra un caso calculado a mano aparte, línea por línea. |
 | `db/pruebas/03-generadores.sql` | El asiento que sale de esa valuación, contra el asiento escrito a mano aparte. |
+| `db/pruebas/04-aislamiento.sql` | Se conecta **como un cliente de verdad** e intenta alcanzar lo que no le toca. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable. |
 
 ### Lo que las pruebas demuestran hoy
@@ -49,6 +51,11 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 17 | Si falta una cuenta en el mapa, el error dice cuál. No falla en silencio. |
 | 18 | El reverso deja el saldo en cero **y los dos asientos se quedan en el libro**. |
 | 19 | El libro mayor enlaza cada línea con el documento que la originó. |
+| 20 | Desde dentro se ven los tres contratos y el precio de compra. |
+| 21 | El cliente de A ve **un** contrato: el suyo vigente. Ni el de B, ni su propio borrador. |
+| 22 | Nombrando el contrato de B expresamente, para el cliente de A no existe. |
+| 23 | El cliente **no tiene permiso** sobre el precio de compra. Sí sobre el de venta. |
+| 24 | El cliente no tiene permiso sobre los asientos ni sobre las partidas. |
 
 ## Lo que sigue
 
@@ -56,9 +63,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
    emitido. El de valuación ya está y sirve de molde.
 2. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
    consulta hecha como cliente A no pueda devolver ni una fila de B.
-4. **Diccionario bilingüe** (`i18n/es.json`, `i18n/en.json`) con el vocabulario técnico
+3. **Diccionario bilingüe** (`i18n/es.json`, `i18n/en.json`) con el vocabulario técnico
    —valuación, retención de garantía, acta de recepción— revisado término a término.
-5. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
+4. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
 
 ## Bloqueado
 
