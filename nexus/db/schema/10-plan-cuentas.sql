@@ -137,7 +137,8 @@ begin
     (p_org,'fx_ganado',         '4.2.02'),
     (p_org,'gasto',             '5.2.01'),
     (p_org,'igtf_gasto',        '5.2.09'),
-    (p_org,'fx_perdido',        '5.2.10')
+    (p_org,'fx_perdido',        '5.2.10'),
+    (p_org,'reexpresion',       '3.1.05')
   on conflict do nothing;
 
   return n;
