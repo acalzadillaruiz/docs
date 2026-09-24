@@ -88,28 +88,7 @@ create policy valuacion_escritura on valuacion for all using (es_interna() and o
 create policy asiento_escritura   on asiento   for all using (es_interna() and organizacion_id = org_actual());
 create policy partida_escritura   on partida   for all using (es_interna() and organizacion_id = org_actual());
 
--- ----------------------------------------------------------------- columnas
-
-grant usage on schema public to nexus_interno, nexus_cliente;
-grant select on all tables in schema public to nexus_interno;
-grant insert, update, delete on all tables in schema public to nexus_interno;
-grant execute on all functions in schema public to nexus_interno, nexus_cliente;
-
--- Al cliente se le concede columna por columna, y se le niega lo que no le toca.
-grant select on contrato, valuacion, documento_fiscal, organizacion to nexus_cliente;
-
--- En renglon: todo menos el precio de compra. La columna no se concede, punto.
-grant select (id, contrato_id, numero, descripcion_es, descripcion_en,
-              cantidad, unidad, norma, especificacion, precio_unitario)
-  on renglon to nexus_cliente;
-
--- Las tablas de referencia si, y no es una concesion: son informacion publica.
--- La alicuota del IVA, el valor de la unidad tributaria y la tasa del BCV los publica
--- el Estado. El cliente ademas los necesita para entender su propia factura: sin la
--- tasa del dia, el importe en bolivares de una valuacion en dolares es un numero sin
--- explicacion. Ocultarlos no protegeria nada y haria opaco lo que debe ser claro.
-grant select on tasa_bcv, alicuota_iva, alicuota_igtf, concepto_islr, unidad_tributaria
-  to nexus_cliente;
-
--- La contabilidad no se concede en absoluto.
-revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;
+-- Los permisos por columna viven en 99-permisos.sql, que se carga el ultimo.
+-- Tienen que ir alli y no aqui: 'grant on all tables' solo alcanza a las tablas que
+-- existen en ese momento, asi que puesto a media carga se deja fuera todo lo que se
+-- cree despues. Ya paso una vez con las tablas de sesiones.
