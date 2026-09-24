@@ -1,11 +1,11 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 9 de 141 sesiones · **6%**
+**Avance:** 10 de 141 sesiones · **7%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las cuarenta y ocho reglas duras y revisa el diccionario
+esquema entero, comprueba las cincuenta y cinco reglas duras y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -29,8 +29,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/04-aislamiento.sql` | Se conecta **como un cliente de verdad** e intenta alcanzar lo que no le toca. |
 | `db/pruebas/05-estados.sql` | Que los estados cuadren con el libro y entre sí, y que el cierre respete el orden. |
 | `db/pruebas/06-cobros.sql` | El ciclo entero, de la valuación al cobro final, con cobro parcial por medio. |
+| `db/pruebas/07-plan-cuentas.sql` | Que el plan se instale, que la jerarquía sea coherente, que esté en los dos idiomas, y que instalarlo dos veces no duplique nada. |
 | `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
 | `db/schema/09-cobros.sql` | Cierra el ciclo: valuación → asiento → cobro → asiento. Cuando el cobro entra, la cuenta por cobrar queda en cero **sola**. El saldo no se guarda: se resta, porque un saldo guardado es un saldo que algún día dejará de ser cierto. El IGTF se causa aquí y no al facturar, porque grava el pago en divisa, no la factura. |
+| `db/schema/10-plan-cuentas.sql` | Plan de cuentas **propuesto** para servicios petroleros en Venezuela: 86 cuentas en los dos idiomas. Es una propuesta, no una imposición: nada del sistema depende de estos códigos, porque las cuentas se referencian por concepto. Los ingresos van separados por tipo de servicio, porque saber cuál de los cinco deja dinero es media decisión de negocio. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -75,15 +77,19 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 35 | Ya no aparece en la antigüedad de saldos. |
 | 36 | Avisa si se cobra de más, en vez de dejarlo pasar. |
 | 37 | El libro sigue cuadrando tras el ciclo completo. |
+| 38 | El plan de cuentas instala 86 cuentas con la jerarquía coherente. |
+| 39 | Ninguna cuenta con hijos recibe movimiento: solo las hojas. |
+| 40 | Las 86 cuentas están en los dos idiomas, y con nombres distintos. |
+| 41 | Los cinco tipos de servicio tienen cuenta de ingreso propia. |
+| 42 | Todos los conceptos apuntan a cuentas imputables que existen. |
+| 43 | Instalarlo dos veces no duplica nada. |
 | 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue
 
-1. **Plan de cuentas estándar** para servicios petroleros en Venezuela, como propuesta
-   que el CEO puede reemplazar por el suyo.
-2. **Los generadores que faltan:** factura de proveedor y pago emitido. Los de
+1. **Los generadores que faltan:** factura de proveedor y pago emitido. Los de
    valuación y cobro ya están y sirven de molde.
-3. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
+2. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
    consulta hecha como cliente A no pueda devolver ni una fila de B.
 3. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
 
@@ -125,3 +131,8 @@ Se arregla en https://claude.ai/connect-github
 6. Push a `claude/gps-web-tracking-contracts-z715gi`, reintentando a 2, 4, 8 y 16 segundos.
 7. Si el porcentaje cruza un múltiplo de 10 no avisado, escribirlo arriba del todo
    bajo el título **AVISAR AL CEO: xx%**.
+8. **No parar al terminar un trozo.** Instrucción expresa del CEO: si la sesión
+   acaba su trozo y todavía le quedan recursos, vuelve al punto 4 y hace el
+   siguiente. Se para cuando se agota la sesión, no cuando se acaba una tarea.
+   Cada trozo terminado se commitea y se empuja antes de empezar el siguiente,
+   para que nada se pierda si la sesión se corta a media faena.
