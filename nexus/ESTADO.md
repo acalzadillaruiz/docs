@@ -36,3 +36,26 @@ Se arregla en https://claude.ai/connect-github
 - Sin evidencia no hay avance. No existe campo de porcentaje editable a mano.
 - Nunca se reproduce una contraseña ni una credencial en ningún archivo.
 - La permisología está fuera de alcance.
+
+## Límites de cada sesión automatizada
+
+- NO desplegar en ningún servidor.
+- NO tocar grupoprimesupply.com, public_html, Hostinger, ni el portal /track/ actual.
+- NO usar ni contratar servicios de pago.
+- NO abrir pull requests.
+- NO tomar decisiones que le corresponden al CEO. Si una decisión de negocio bloquea,
+  se anota en `DECISIONES-PENDIENTES.md` y se sigue con otra cosa.
+
+## Cómo trabaja cada sesión
+
+1. Comprobar que el push funciona: `git push --dry-run origin HEAD`. Si da 403, **no trabajar**:
+   nada sobrevive al cierre del contenedor. Decirlo en una línea y terminar.
+2. Leer este archivo. Dice dónde se quedó la sesión anterior.
+3. Leer las respuestas del CEO con `ArtifactData` en
+   https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs, documento `contabilidad/v1`.
+   Si respondió algo nuevo, eso manda sobre lo que diga este archivo.
+4. Hacer un trozo pequeño de trabajo, con su commit y su mensaje en español.
+5. Actualizar este archivo: qué se hizo, cuántas sesiones de 141, el porcentaje, qué sigue.
+6. Push a `claude/gps-web-tracking-contracts-z715gi`, reintentando a 2, 4, 8 y 16 segundos.
+7. Si el porcentaje cruza un múltiplo de 10 no avisado, escribirlo arriba del todo
+   bajo el título **AVISAR AL CEO: xx%**.
