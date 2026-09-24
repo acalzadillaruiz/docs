@@ -117,3 +117,27 @@ select case when count(*) = 1 and max(credito_fiscal_ves) = 80000.00
             then 'OK · aparece en el libro de compras con su retención, sin transcribir'
             else 'FALLO · el libro de compras no lo refleja' end as resultado
   from libro_compras where organizacion_id = :org;
+
+-- ============================================================ factura sin control
+-- El reglamento manda retener el 100% cuando la factura del proveedor no cumple los
+-- requisitos. Aqui se detecta por la ausencia de numero de control.
+insert into documento_fiscal (id, organizacion_id, sentido, tipo, numero, contraparte_id,
+                              fecha, contrato_id, base_ves, base_usd, alicuota_iva_id,
+                              iva_ves, iva_usd, tasa_id, registrado_por)
+values ('0a0a0a0a-0000-0000-0000-0000000000dd', :org,'recibido','factura','F-00124', :pro,
+        '2026-09-18', :ctr, 200000.00, 5479.45,'0a0a0a0a-0000-0000-0000-000000000005',
+        32000.00, 876.71,'0a0a0a0a-0000-0000-0000-00000000000f', :yo);
+
+select retener_iva_proveedor('0a0a0a0a-0000-0000-0000-0000000000dd', :yo);
+
+select case when porcentaje = 100.00 and monto_ves = 32000.00
+            then 'OK · sin número de control retiene el 100%: 32.000,00'
+            else 'FALLO · retuvo ' || porcentaje::text || '%' end as resultado
+  from retencion where clase = 'iva' and documento_id = '0a0a0a0a-0000-0000-0000-0000000000dd';
+
+-- Y el correlativo sigue la secuencia, sin huecos ni repeticiones.
+select case when count(distinct comprobante) = 2
+                 and max(comprobante) = '20260900000002'
+            then 'OK · el correlativo sigue la secuencia: 000001 y 000002'
+            else 'FALLO · correlativos ' || string_agg(comprobante, ', ') end as resultado
+  from retencion where clase = 'iva' and organizacion_id = :org;

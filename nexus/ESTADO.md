@@ -1,11 +1,11 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 11 de 141 sesiones · **8%**
+**Avance:** 12 de 141 sesiones · **9%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las sesenta y cuatro reglas duras y revisa el diccionario
+esquema entero, comprueba las setenta y tres reglas duras y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -30,11 +30,13 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/05-estados.sql` | Que los estados cuadren con el libro y entre sí, y que el cierre respete el orden. |
 | `db/pruebas/06-cobros.sql` | El ciclo entero, de la valuación al cobro final, con cobro parcial por medio. |
 | `db/pruebas/08-egresos.sql` | Las retenciones emitidas, su asiento, y que el libro de compras las refleje sin transcribir. |
+| `db/pruebas/09-gerencia.sql` | Margen, rentabilidad, flujo de caja, y que el cliente ni siquiera pueda preguntar. |
 | `db/pruebas/07-plan-cuentas.sql` | Que el plan se instale, que la jerarquía sea coherente, que esté en los dos idiomas, y que instalarlo dos veces no duplique nada. |
 | `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
 | `db/schema/09-cobros.sql` | Cierra el ciclo: valuación → asiento → cobro → asiento. Cuando el cobro entra, la cuenta por cobrar queda en cero **sola**. El saldo no se guarda: se resta, porque un saldo guardado es un saldo que algún día dejará de ser cierto. El IGTF se causa aquí y no al facturar, porque grava el pago en divisa, no la factura. |
 | `db/schema/10-plan-cuentas.sql` | Plan de cuentas **propuesto** para servicios petroleros en Venezuela: 86 cuentas en los dos idiomas. Es una propuesta, no una imposición: nada del sistema depende de estos códigos, porque las cuentas se referencian por concepto. Los ingresos van separados por tipo de servicio, porque saber cuál de los cinco deja dinero es media decisión de negocio. |
 | `db/schema/11-egresos.sql` | **La mitad que hoy no está en ninguna pantalla.** GPS como agente de retención: retiene el IVA al 75% a sus proveedores y emite el comprobante con correlativo generado por la base de datos, no a mano — un correlativo llevado a mano acaba con huecos o repetido, y las dos cosas son un problema. Más el costo imputado al contrato, que es lo que permite ver el margen **mientras el contrato corre**. |
+| `db/schema/12-gerencia.sql` | **Nada de aquí lo alcanza un cliente jamás.** Margen por contrato (lo valuado contra lo que ha costado), rentabilidad por cliente y por tipo de servicio, ejecutado sin cobrar, y flujo de caja proyectado por semana. Todo sale del libro, así que el margen de esta pantalla y el resultado del estado financiero son el mismo número. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -93,13 +95,20 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 49 | El asiento de la factura de proveedor cuadra línea por línea. |
 | 50 | El costo queda imputado al contrato: visible mientras corre. |
 | 51 | Aparece en el libro de compras con su retención, **sin que nadie lo transcriba**. |
+| 52 | Sin número de control retiene el **100%**, no el 75%, como manda el reglamento. |
+| 53 | El correlativo sigue la secuencia: `...000001`, `...000002`. Sin huecos ni repeticiones. |
+| 54 | Margen del contrato: 500.000,00 (50,00%), avance 5,00%. |
+| 55 | La cartera, la rentabilidad por cliente y la rentabilidad por tipo de servicio cuadran. |
+| 56 | Ejecutado sin cobrar: 740.037,50. |
+| 57 | El flujo de caja proyecta cobro 740.037,50 y pago 495.037,50 (la factura menos lo retenido). |
+| 58 | **El cliente no tiene permiso ni para preguntar por el margen.** |
 | 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue
 
 1. **Los generadores que faltan:** factura de proveedor y pago emitido. Los de
    valuación y cobro ya están y sirven de molde.
-2. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
+3. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
    consulta hecha como cliente A no pueda devolver ni una fila de B.
 3. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
 
