@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 28 de 141 sesiones · **20%**
+**Avance:** 30 de 141 sesiones · **21%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -59,7 +59,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las setenta y nueve pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las noventa y nueve pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -90,6 +90,8 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/12-activos.sql` | Cinco años de depreciación mes a mes, hasta agotar exactamente lo depreciable. |
 | `db/pruebas/13-reexpresion.sql` | Índice que se duplica en el año: qué se reexpresa, qué no, y que el balance vuelva a cuadrar. |
 | `db/pruebas/14-sesiones.sql` | Un atacante falla veinte veces contra un correo y **el dueño entra igual**. |
+| `app/pruebas/rutas.test.ts` | El camino completo de la petición a la respuesta: que sin cookie todo redirija, que el testigo **solo** viaje en la cookie, y que salir cierre la sesión de verdad y no solo borre la cookie. |
+| `app/pruebas/cookies.test.ts` | Que una cookie con nombre parecido no se confunda con la nuestra, y que el idioma respete el orden de preferencia del navegador. |
 | `app/pruebas/empresa.test.ts` | Quince formas de presentar un testigo que parece válido y no lo es. |
 | `app/pruebas/entrada.test.ts` | Que el error no diga si falló el correo o la clave, que el desafío no viaje en la dirección, y que las seis pantallas estén completas en los dos idiomas. |
 | `app/pruebas/sesion.test.ts` | Nueve formas de intentar entrar sin poder: sin segundo factor, con la cuenta de baja, quemando el desafío, con un desafío inventado, midiendo el tiempo de respuesta. |
@@ -119,6 +121,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/99-permisos.sql` | Los permisos, cargados **los últimos**. `grant on all tables` solo alcanza a las tablas que ya existen, así que a media carga deja fuera todo lo que se cree después. Pasó exactamente eso con las tablas de sesiones. |
 | `app/src/pantallas/entrada.ts` | Las seis pantallas de entrada. Un solo campo cada una, porque quien entra lo hace de pie y con una mano. El campo del código saca el teclado numérico y el navegador lo rellena solo desde el mensaje de texto. El correo no se autocapitaliza — un teclado de móvil poniendo mayúscula inicial en un correo es el motivo más tonto por el que alguien no entra. Y la espera dice **cuántos segundos**: sin número, la gente recarga veinte veces y empeora su propia espera. |
 | `app/src/dominio/empresa.ts` | Entrar con la cuenta de la empresa. Lo que compra no es ahorrarle una clave al ingeniero: es que **cuando su empresa lo da de baja, pierde el acceso el mismo día**, sin que nadie de GPS tenga que acordarse. Cinco comprobaciones que no se pueden saltar, cada una con su prueba: emisor, destinatario, **inquilino**, caducidad y nonce. Sin la del inquilino, cualquiera con una cuenta personal de Microsoft entra en el portal del cliente — es el error clásico. |
+| `app/src/servidor/rutas.ts` | Las rutas de entrada, sobre `node:http` directo y sin armazón. No es purismo: el camino de entrada es la parte más atacada, y cada dependencia ahí es código de otro que hay que entender cuando algo falla a las tres de la madrugada. Cabeceras de seguridad en **toda** respuesta, incluidas las de error. |
+| `app/src/servidor/cookies.ts` | La cookie de sesión con los cuatro atributos que la hacen segura, y **sin caducidad dentro**: la caducidad de verdad vive en la base de datos, donde no se puede falsificar. |
+| `app/src/servidor/arrancar.ts` | El servidor de red, la capa más fina posible. Nunca devuelve el detalle de un error al navegador: un mensaje de la base de datos lleva dentro nombres de tablas y hasta valores. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
