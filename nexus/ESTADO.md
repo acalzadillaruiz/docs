@@ -4,6 +4,39 @@
 **Avance:** 20 de 141 sesiones · **14%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
+## RETOMAR AQUÍ
+
+**Lo último terminado:** la primera pantalla —la hoja de valuación— generada desde la
+base de datos real, en español e inglés, con sus siete pruebas. Commit `8375d85`.
+
+**Lo siguiente, en este orden exacto:**
+
+1. `app/src/dominio/autenticacion.ts` — verificar clave (Argon2id) y segundo factor
+   (TOTP de seis dígitos, ventana de ±1 paso de 30 segundos). Los códigos de
+   recuperación son de un solo uso: se marcan gastados al usarlos, no se borran, para
+   que quede constancia de cuál se usó y cuándo.
+2. `app/src/pantallas/entrada.ts` — las cuatro pantallas de entrada: ingreso, segundo
+   factor, recuperación, e invitación aceptada.
+3. `app/src/dominio/sso.ts` — entrar con la cuenta de la empresa. Lo importante no es
+   el botón: es que cuando la operadora da de baja al empleado, pierda el acceso.
+   `organizacion.metodos` e `idp_tenant` ya están en el esquema.
+
+**Cómo continuar, literalmente:**
+
+```bash
+cd /home/user/docs/nexus/db && ./probar.sh    # tiene que decir TODAS LAS PRUEBAS PASAN
+cd /home/user/docs/nexus/app && npx tsc --noEmit
+```
+
+`probar.sh` levanta un PostgreSQL desechable, carga el esquema, corre las pruebas de
+base de datos, el diccionario bilingüe y las de la aplicación. Si algo falla ahí, eso
+es lo primero, antes que cualquier cosa nueva.
+
+**Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
+137 comprobaciones hayan encontrado seis fallos reales, cuatro de ellos míos.
+
+---
+
 ## AVISAR AL CEO: 10%
 
 Primer décimo del proyecto. Lo que hay es el **motor contable completo y probado**:
@@ -232,3 +265,15 @@ Se arregla en https://claude.ai/connect-github
    siguiente. Se para cuando se agota la sesión, no cuando se acaba una tarea.
    Cada trozo terminado se commitea y se empuja antes de empezar el siguiente,
    para que nada se pierda si la sesión se corta a media faena.
+9. **Dejar el relevo antes de terminar.** Lo último que hace cualquier sesión es
+   reescribir la sección **RETOMAR AQUÍ** de arriba: qué quedó hecho, con qué
+   commit, y cuál es el siguiente paso concreto. Si una sesión se corta sin
+   hacerlo, la siguiente pierde tiempo averiguando dónde estaba. Por eso se
+   actualiza **al terminar cada trozo**, no solo al final.
+
+## Relevo automático
+
+Doce sesiones al día, de **22:00 a 09:00 hora de España**, una por hora. Cada una
+arranca de cero, lee este archivo y sigue donde quedó la anterior. El 25 de octubre
+una Routine las corre una hora sola, cuando España cambie a horario de invierno, y
+programa el ajuste de vuelta para marzo.
