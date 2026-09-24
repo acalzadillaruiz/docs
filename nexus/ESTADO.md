@@ -1,11 +1,11 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 8 de 141 sesiones · **6%**
+**Avance:** 9 de 141 sesiones · **6%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las treinta y ocho reglas duras y revisa el diccionario
+esquema entero, comprueba las cuarenta y ocho reglas duras y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -28,7 +28,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/03-generadores.sql` | El asiento que sale de esa valuación, contra el asiento escrito a mano aparte. |
 | `db/pruebas/04-aislamiento.sql` | Se conecta **como un cliente de verdad** e intenta alcanzar lo que no le toca. |
 | `db/pruebas/05-estados.sql` | Que los estados cuadren con el libro y entre sí, y que el cierre respete el orden. |
+| `db/pruebas/06-cobros.sql` | El ciclo entero, de la valuación al cobro final, con cobro parcial por medio. |
 | `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
+| `db/schema/09-cobros.sql` | Cierra el ciclo: valuación → asiento → cobro → asiento. Cuando el cobro entra, la cuenta por cobrar queda en cero **sola**. El saldo no se guarda: se resta, porque un saldo guardado es un saldo que algún día dejará de ser cierto. El IGTF se causa aquí y no al facturar, porque grava el pago en divisa, no la factura. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -66,13 +68,22 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 27 | Activo menos pasivo es igual al resultado: el balance cuadra con el estado. |
 | 28 | No se cierra un mes con el anterior abierto. |
 | 29 | Cerrados en orden, los dos meses quedan cerrados. |
+| 31 | Pendiente de cobro 740.037,50, y aparece en la antigüedad de saldos. |
+| 32 | Tras cobrar 400.000 quedan 340.037,50, y la valuación sigue aprobada. |
+| 33 | Cobrada del todo, pasa a *cobrada* **sola**, sin que nadie la marque. |
+| 34 | Cuentas por cobrar queda en cero **en el libro**, no solo en una consulta. |
+| 35 | Ya no aparece en la antigüedad de saldos. |
+| 36 | Avisa si se cobra de más, en vez de dejarlo pasar. |
+| 37 | El libro sigue cuadrando tras el ciclo completo. |
 | 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue
 
-1. **Los generadores que faltan:** factura, pago recibido, factura de proveedor y pago
-   emitido. El de valuación ya está y sirve de molde.
-2. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
+1. **Plan de cuentas estándar** para servicios petroleros en Venezuela, como propuesta
+   que el CEO puede reemplazar por el suyo.
+2. **Los generadores que faltan:** factura de proveedor y pago emitido. Los de
+   valuación y cobro ya están y sirven de molde.
+3. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
    consulta hecha como cliente A no pueda devolver ni una fila de B.
 3. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
 
