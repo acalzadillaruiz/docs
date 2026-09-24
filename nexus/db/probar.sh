@@ -17,16 +17,24 @@ if ! pg_isready -h /var/tmp -p "$PUERTO" -q 2>/dev/null; then
 fi
 
 P="psql -h /var/tmp -p $PUERTO -U nexus"
-$P -d postgres -q -c "drop database if exists nexus;" -c "create database nexus;"
 
-for f in "$AQUI"/schema/[0-9]*.sql; do
-  echo "cargando $(basename "$f")"
-  $P -d nexus -v ON_ERROR_STOP=1 -q -f "$f"
-done
+# Cada archivo de prueba corre contra una base recien creada. Asi ninguna prueba
+# depende de lo que dejo la anterior, ni la estorba.
+cargar_esquema() {
+  $P -d postgres -q -c "drop database if exists nexus;" -c "create database nexus;"
+  local sql
+  for sql in "$AQUI"/schema/[0-9]*.sql; do
+    $P -d nexus -v ON_ERROR_STOP=1 -q -f "$sql"
+  done
+}
 
+echo "esquema:"
+for sql in "$AQUI"/schema/[0-9]*.sql; do echo "  $(basename "$sql")"; done
 echo
+
 fallos=0
 for f in "$AQUI"/pruebas/[0-9]*.sql; do
+  cargar_esquema
   echo "== $(basename "$f") =="
   salida=$($P -d nexus -f "$f" 2>&1 | grep -E 'OK |FALLO|ERROR' | sed -E 's/^psql:[^:]+:[0-9]+: NOTICE:  //; s/^NOTICE:  //')
   echo "$salida"
