@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 19 de 141 sesiones · **13%**
+**Avance:** 20 de 141 sesiones · **14%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## AVISAR AL CEO: 10%
@@ -18,7 +18,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento dieciséis reglas duras, el diccionario bilingüe y las trece pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento dieciséis reglas duras, el diccionario bilingüe y las veinte pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -48,6 +48,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/11-pagos.sql` | El pago parcial, el intento de pagar de más, y un extracto con tres movimientos de los que solo uno casa. |
 | `db/pruebas/12-activos.sql` | Cinco años de depreciación mes a mes, hasta agotar exactamente lo depreciable. |
 | `db/pruebas/13-reexpresion.sql` | Índice que se duplica en el año: qué se reexpresa, qué no, y que el balance vuelva a cuadrar. |
+| `app/pruebas/pantalla.test.ts` | Que el neto vaya aparte, que el texto se escape, que la página declare su idioma, y que sea una sola pantalla para las dos superficies. |
 | `app/pruebas/aislamiento.test.ts` | Se conecta como cliente de A y **pide la valuación de B por su identificador**. |
 | `db/pruebas/07-plan-cuentas.sql` | Que el plan se instale, que la jerarquía sea coherente, que esté en los dos idiomas, y que instalarlo dos veces no duplique nada. |
 | `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
@@ -62,6 +63,8 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/db/conexion.ts` | **No se puede consultar sin declarar quién pregunta.** No se exporta el cliente de base de datos: solo `comoPersona()`, que fija la identidad dentro de una transacción y la suelta al salir. Olvidarlo no es un descuido posible: no hay otra puerta. |
 | `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
 | `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
+| `app/src/pantallas/valuacion.ts` | **La primera pantalla.** Una sola función para las dos superficies: en escritorio las líneas son una tabla, en el móvil tarjetas apiladas. No son dos pantallas, es la misma reacomodada por la hoja de estilos. No enseña un total: enseña el camino hasta el total. |
+| `app/herramientas/pintar.ts` | Genera una pantalla desde la base de datos real, sin desplegar nada. Para revisar diseño y para enseñar avance. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -171,6 +174,13 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 100 | El cliente de A pide la de B **por su identificador** y no la recibe. |
 | 101 | El error **no distingue** entre «no existe» y «no es tuya». |
 | 102 | La identidad **no se queda pegada** a la conexión entre peticiones. |
+| 103 | El neto va en su propio bloque, no como una línea más. |
+| 104 | Lo que resta se marca con una clase, no con el signo. |
+| 105 | Un nombre de cliente con `<` o `&` no rompe la página. |
+| 106 | La página declara su idioma, para el lector de pantalla y el traductor del navegador. |
+| 107 | Es **una sola pantalla** para escritorio y móvil, no dos plantillas. |
+| 108 | Funciona en modo oscuro sin que el usuario elija nada. |
+| 109 | El título de la pestaña dice de qué valuación se trata, en los dos idiomas. |
 | 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue
