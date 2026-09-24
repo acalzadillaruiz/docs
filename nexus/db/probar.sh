@@ -41,6 +41,12 @@ for f in "$AQUI"/pruebas/[0-9]*.sql; do
   if echo "$salida" | grep -qE 'FALLO|ERROR'; then fallos=$((fallos+1)); fi
 done
 
+# El diccionario bilingue se comprueba en la misma pasada: un texto sin traducir
+# es un fallo igual que un asiento descuadrado.
+echo
+echo "== diccionario bilingüe =="
+if python3 "$AQUI/../i18n/comprobar.py"; then :; else fallos=$((fallos+1)); fi
+
 echo
 if [ "$fallos" -gt 0 ]; then echo "HAY $fallos ARCHIVO(S) DE PRUEBA CON FALLOS"; exit 1; fi
 echo "TODAS LAS PRUEBAS PASAN"

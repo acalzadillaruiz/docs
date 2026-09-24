@@ -1,11 +1,12 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 6 de 141 sesiones · **4%**
+**Avance:** 7 de 141 sesiones · **5%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero y comprueba las treinta y dos reglas duras. Ejecútalo antes de cada commit
+esquema entero, comprueba las treinta y dos reglas duras y revisa el diccionario
+bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
 ---
@@ -26,7 +27,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/02-valuacion.sql` | La hoja de valuación contra un caso calculado a mano aparte, línea por línea. |
 | `db/pruebas/03-generadores.sql` | El asiento que sale de esa valuación, contra el asiento escrito a mano aparte. |
 | `db/pruebas/04-aislamiento.sql` | Se conecta **como un cliente de verdad** e intenta alcanzar lo que no le toca. |
-| `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable. |
+| `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
+| `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
+| `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
 
@@ -63,9 +66,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
    emitido. El de valuación ya está y sirve de molde.
 2. **Aislamiento entre empresas** con políticas de fila (RLS), y su prueba: que una
    consulta hecha como cliente A no pueda devolver ni una fila de B.
-3. **Diccionario bilingüe** (`i18n/es.json`, `i18n/en.json`) con el vocabulario técnico
-   —valuación, retención de garantía, acta de recepción— revisado término a término.
-4. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
+3. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
 
 ## Bloqueado
 
