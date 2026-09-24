@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 17 de 141 sesiones · **12%**
+**Avance:** 19 de 141 sesiones · **13%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## AVISAR AL CEO: 10%
@@ -18,7 +18,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento dieciséis reglas duras y revisa el diccionario
+esquema entero, comprueba las ciento dieciséis reglas duras, el diccionario bilingüe y las trece pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -48,6 +48,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/11-pagos.sql` | El pago parcial, el intento de pagar de más, y un extracto con tres movimientos de los que solo uno casa. |
 | `db/pruebas/12-activos.sql` | Cinco años de depreciación mes a mes, hasta agotar exactamente lo depreciable. |
 | `db/pruebas/13-reexpresion.sql` | Índice que se duplica en el año: qué se reexpresa, qué no, y que el balance vuelva a cuadrar. |
+| `app/pruebas/aislamiento.test.ts` | Se conecta como cliente de A y **pide la valuación de B por su identificador**. |
 | `db/pruebas/07-plan-cuentas.sql` | Que el plan se instale, que la jerarquía sea coherente, que esté en los dos idiomas, y que instalarlo dos veces no duplique nada. |
 | `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
 | `db/schema/09-cobros.sql` | Cierra el ciclo: valuación → asiento → cobro → asiento. Cuando el cobro entra, la cuenta por cobrar queda en cero **sola**. El saldo no se guarda: se resta, porque un saldo guardado es un saldo que algún día dejará de ser cierto. El IGTF se causa aquí y no al facturar, porque grava el pago en divisa, no la factura. |
@@ -58,6 +59,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/14-pagos.sql` | Pagos emitidos y **conciliación bancaria**. Lo que no casa **no se esconde**: un movimiento del banco sin documento, o un documento sin movimiento, queda señalado hasta que alguien lo explique por escrito. La propuesta de casamiento la hace la máquina; casar lo hace un humano, porque dos movimientos del mismo importe el mismo día son más frecuentes de lo que parece. |
 | `db/schema/15-activos.sql` | Activos fijos y depreciación. Para GPS no es contabilidad de adorno: **alquiler de equipos es uno de los cinco tipos de contrato**, y un equipo alquilado genera ingreso y se gasta al mismo tiempo. Si solo se mira el ingreso, el negocio parece mejor de lo que es. El desgaste se imputa al contrato donde se gana. |
 | `db/schema/16-reexpresion.sql` | Reexpresión por inflación (VEN-NIF / NIC 29). **Partida por partida**, cada una con el índice del día en que ocurrió — casi todos los programas lo hacen por saldos mensuales promedio porque es lo que permite una hoja de cálculo; aquí la fecha ya estaba en el libro, así que no cuesta más y es exacto. El resultado monetario no es un ajuste de cuadre: es lo que costó tener bolívares mientras se devaluaban. |
+| `app/src/db/conexion.ts` | **No se puede consultar sin declarar quién pregunta.** No se exporta el cliente de base de datos: solo `comoPersona()`, que fija la identidad dentro de una transacción y la suelta al salir. Olvidarlo no es un descuido posible: no hay otra puerta. |
+| `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
+| `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -160,6 +164,13 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 93 | Y el balance reexpresado cuadra: activo = pasivo + patrimonio. |
 | 94 | No se reexpresa dos veces el mismo mes. |
 | 95 | Sin índice publicado **se niega**, en vez de inventarse un factor. |
+| 96 | La hoja llega a la aplicación con el neto calculado en la base de datos. |
+| 97 | La misma hoja en inglés usa el vocabulario correcto y el formato anglosajón. |
+| 98 | Lo que resta viene marcado: la pantalla no interpreta signos. |
+| 99 | El cliente de A ve su propia valuación. |
+| 100 | El cliente de A pide la de B **por su identificador** y no la recibe. |
+| 101 | El error **no distingue** entre «no existe» y «no es tuya». |
+| 102 | La identidad **no se queda pegada** a la conexión entre peticiones. |
 | 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue

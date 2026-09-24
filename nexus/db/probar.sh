@@ -55,6 +55,24 @@ echo
 echo "== diccionario bilingüe =="
 if python3 "$AQUI/../i18n/comprobar.py"; then :; else fallos=$((fallos+1)); fi
 
+# Y la capa de aplicacion contra la base de datos de verdad. Deja el esquema recien
+# cargado para que las pruebas de integracion encuentren una base limpia.
+if [ -d "$AQUI/../app/node_modules" ]; then
+  echo
+  echo "== aplicación (TypeScript) =="
+  cargar_esquema
+  if (cd "$AQUI/../app" && npx tsc --noEmit); then :; else
+    echo "FALLO · los tipos no compilan"; fallos=$((fallos+1))
+  fi
+  app_salida=$(cd "$AQUI/../app" && node --test --experimental-strip-types pruebas/*.test.ts 2>&1 \
+                 | grep -E '^(ok|not ok|# (tests|pass|fail)) ' || true)
+  echo "$app_salida"
+  if echo "$app_salida" | grep -qE '^not ok|^# fail [1-9]'; then fallos=$((fallos+1)); fi
+else
+  echo
+  echo "(se omiten las pruebas de la aplicación: falta 'npm install' en nexus/app)"
+fi
+
 echo
 if [ "$fallos" -gt 0 ]; then echo "HAY $fallos ARCHIVO(S) DE PRUEBA CON FALLOS"; exit 1; fi
 echo "TODAS LAS PRUEBAS PASAN"

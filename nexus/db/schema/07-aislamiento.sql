@@ -103,5 +103,13 @@ grant select (id, contrato_id, numero, descripcion_es, descripcion_en,
               cantidad, unidad, norma, especificacion, precio_unitario)
   on renglon to nexus_cliente;
 
+-- Las tablas de referencia si, y no es una concesion: son informacion publica.
+-- La alicuota del IVA, el valor de la unidad tributaria y la tasa del BCV los publica
+-- el Estado. El cliente ademas los necesita para entender su propia factura: sin la
+-- tasa del dia, el importe en bolivares de una valuacion en dolares es un numero sin
+-- explicacion. Ocultarlos no protegeria nada y haria opaco lo que debe ser claro.
+grant select on tasa_bcv, alicuota_iva, alicuota_igtf, concepto_islr, unidad_tributaria
+  to nexus_cliente;
+
 -- La contabilidad no se concede en absoluto.
 revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;

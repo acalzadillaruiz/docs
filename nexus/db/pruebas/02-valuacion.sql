@@ -53,7 +53,7 @@ values ('aaaaaaaa-0000-0000-0000-000000000007','aaaaaaaa-0000-0000-0000-00000000
 
 \echo ''
 \echo '--- hoja de valuacion ---'
-select orden, concepto_es, porcentaje, to_char(monto,'FM999G999G999D00') as monto
+select orden, clave, porcentaje, to_char(monto,'FM999G999G999D00') as monto
   from hoja_valuacion('aaaaaaaa-0000-0000-0000-000000000007') order by orden;
 \echo ''
 

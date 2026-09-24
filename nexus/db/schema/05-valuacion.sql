@@ -59,11 +59,14 @@ create index valuacion_estado_ix   on valuacion (organizacion_id, estado);
 
 -- La hoja de valuacion. Cada linea es una pieza del calculo, en orden, con su signo.
 -- Es literalmente lo que ve el cliente en pantalla y lo que se imprime.
+-- Devuelve la CLAVE de cada concepto, no su texto. Si aquí hubiera texto, el mismo
+-- término viviría en dos sitios —la base de datos y el diccionario— y acabarían
+-- diciendo cosas distintas. De hecho ya pasó: la base decía "Retainage" donde el
+-- diccionario decía "Retention". Con una sola fuente eso no puede volver a ocurrir.
 create or replace function hoja_valuacion(p_valuacion uuid)
 returns table (
   orden       int,
-  concepto_es text,
-  concepto_en text,
+  clave       text,
   base        numeric(20,2),
   porcentaje  numeric(5,2),
   monto       numeric(20,2),
@@ -84,8 +87,17 @@ declare
   neto      numeric(20,2);
   fecha     date;
 begin
+  -- Si no aparece, NO se lanza excepcion: se devuelve vacio.
+  --
+  -- El motivo es de seguridad, no de estilo. Las politicas de fila hacen que esta
+  -- consulta no vea las valuaciones de otro cliente. Si aqui se lanzara 'no existe',
+  -- el mensaje distinguiria entre una valuacion que no existe y una que existe pero
+  -- es de otro — y eso ya es contar algo sobre el contrato ajeno. Ademas el mensaje
+  -- llevaria el identificador dentro, que es justo lo que no debe salir.
+  --
+  -- Quien llama convierte el vacio en el error que corresponda, igual en los dos casos.
   select * into v from valuacion where id = p_valuacion;
-  if v is null then raise exception 'La valuacion % no existe', p_valuacion; end if;
+  if v is null then return; end if;
 
   fecha := v.periodo_hasta;
   select a.porcentaje into iva_pct from alicuota_iva a where a.id = v.alicuota_iva_id;
@@ -114,15 +126,15 @@ begin
   end if;
 
   return query values
-    (1, 'Obra ejecutada del período',  'Work executed in period', v.obra,    null::numeric(5,2), v.obra,      true),
-    (2, 'IVA',                         'VAT',                     v.obra,    iva_pct,            iva,         true),
-    (3, 'Total facturado',             'Total invoiced',           null::numeric(20,2), null::numeric(5,2), v.obra + iva, true),
-    (4, 'Amortización de anticipo',    'Advance amortization',    v.obra,    v.amortiza_pct,     -amort,      true),
-    (5, 'Retención de garantía',       'Retainage',               v.obra,    v.garantia_pct,     -garantia,   true),
-    (6, 'Retención de IVA',            'VAT withholding',         iva,       v.ret_iva_pct,      -ret_iva,    true),
-    (7, 'Retención de ISLR',           'Income tax withholding',  v.obra,    null::numeric(5,2), -ret_islr,   true),
-    (8, 'IGTF',                        'FX transaction tax',      null::numeric(20,2), null::numeric(5,2), -igtf, true),
-    (9, 'Neto a cobrar',               'Net payable',             null::numeric(20,2), null::numeric(5,2), neto, true);
+    (1, 'valuacion.obra',            v.obra,              null::numeric(5,2), v.obra,       true),
+    (2, 'valuacion.iva',             v.obra,              iva_pct,            iva,          true),
+    (3, 'valuacion.total_facturado', null::numeric(20,2), null::numeric(5,2), v.obra + iva, true),
+    (4, 'valuacion.amortizacion',    v.obra,              v.amortiza_pct,     -amort,       true),
+    (5, 'valuacion.garantia',        v.obra,              v.garantia_pct,     -garantia,    true),
+    (6, 'valuacion.ret_iva',         iva,                 v.ret_iva_pct,      -ret_iva,     true),
+    (7, 'valuacion.ret_islr',        v.obra,              null::numeric(5,2), -ret_islr,    true),
+    (8, 'valuacion.igtf',            null::numeric(20,2), null::numeric(5,2), -igtf,        true),
+    (9, 'valuacion.neto',            null::numeric(20,2), null::numeric(5,2), neto,         true);
 end $$;
 
 -- El neto solo, para cuando no hace falta la hoja entera.
