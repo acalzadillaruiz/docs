@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 14 de 141 sesiones · **10%**
+**Avance:** 15 de 141 sesiones · **11%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## AVISAR AL CEO: 10%
@@ -18,7 +18,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ochenta y cinco reglas duras y revisa el diccionario
+esquema entero, comprueba las noventa y cinco reglas duras y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -45,6 +45,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/08-egresos.sql` | Las retenciones emitidas, su asiento, y que el libro de compras las refleje sin transcribir. |
 | `db/pruebas/09-gerencia.sql` | Margen, rentabilidad, flujo de caja, y que el cliente ni siquiera pueda preguntar. |
 | `db/pruebas/10-importacion.sql` | Una hoja con dos filas buenas y dos malas: que las detecte, que diga por qué, que se niegue a confirmar, y que tras corregirlas entre limpia. |
+| `db/pruebas/11-pagos.sql` | El pago parcial, el intento de pagar de más, y un extracto con tres movimientos de los que solo uno casa. |
 | `db/pruebas/07-plan-cuentas.sql` | Que el plan se instale, que la jerarquía sea coherente, que esté en los dos idiomas, y que instalarlo dos veces no duplique nada. |
 | `db/schema/08-estados.sql` | Balance de comprobación, estado de resultados y balance general. **No son informes que alguien arma: son el libro mirado de otra forma**, así que no pueden descuadrar respecto a él. Más el cierre de período, que se niega a cerrar un mes descuadrado o con el anterior abierto. |
 | `db/schema/09-cobros.sql` | Cierra el ciclo: valuación → asiento → cobro → asiento. Cuando el cobro entra, la cuenta por cobrar queda en cero **sola**. El saldo no se guarda: se resta, porque un saldo guardado es un saldo que algún día dejará de ser cierto. El IGTF se causa aquí y no al facturar, porque grava el pago en divisa, no la factura. |
@@ -52,6 +53,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/11-egresos.sql` | **La mitad que hoy no está en ninguna pantalla.** GPS como agente de retención: retiene el IVA al 75% a sus proveedores y emite el comprobante con correlativo generado por la base de datos, no a mano — un correlativo llevado a mano acaba con huecos o repetido, y las dos cosas son un problema. Más el costo imputado al contrato, que es lo que permite ver el margen **mientras el contrato corre**. |
 | `db/schema/12-gerencia.sql` | **Nada de aquí lo alcanza un cliente jamás.** Margen por contrato (lo valuado contra lo que ha costado), rentabilidad por cliente y por tipo de servicio, ejecutado sin cobrar, y flujo de caja proyectado por semana. Todo sale del libro, así que el margen de esta pantalla y el resultado del estado financiero son el mismo número. |
 | `db/schema/13-importacion.sql` | **Salir de Excel.** La hoja entra tal cual, fila por fila. La aplicación propone cómo entendió cada columna y **lo enseña**; el humano corrige. Se valida sin escribir nada. Solo entonces se confirma — y nunca a medias: si queda una fila con error, no entra ninguna, porque una carga a medias es peor que no haber cargado. El formato numérico se declara, no se adivina: `1.234` son mil doscientos treinta y cuatro en venezolano y uno coma dos en anglosajón. |
+| `db/schema/14-pagos.sql` | Pagos emitidos y **conciliación bancaria**. Lo que no casa **no se esconde**: un movimiento del banco sin documento, o un documento sin movimiento, queda señalado hasta que alguien lo explique por escrito. La propuesta de casamiento la hace la máquina; casar lo hace un humano, porque dos movimientos del mismo importe el mismo día son más frecuentes de lo que parece. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
@@ -127,6 +129,15 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 66 | Corregidas, entra limpia: las cuatro filas. |
 | 67 | Avisa de las columnas obligatorias que falten por mapear. |
 | 68 | La hoja original sigue guardada, fila por fila, por si algo sale mal después. |
+| 69 | Por pagar al proveedor: 495.037,50, y aparece en lo que toca pagar. |
+| 70 | Tras pagar 300.000 quedan 195.037,50. |
+| 71 | Avisa si se paga de más, en vez de dejarlo pasar. |
+| 72 | Propone el casamiento del pago: mismo día, mismo importe. |
+| 73 | Los dos movimientos sin explicar **quedan señalados**. |
+| 74 | No se da por conciliado un movimiento sin casarlo o explicarlo **por escrito**. |
+| 75 | Explicado, queda conciliado; el depósito sin identificar sigue señalado. |
+| 76 | Un mismo pago no se puede casar con dos movimientos del banco. |
+| 77 | El libro sigue cuadrando con los pagos dentro. |
 | 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
 
 ## Lo que sigue
