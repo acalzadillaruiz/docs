@@ -437,3 +437,80 @@ test('el anillo de foco de la cabecera es CLARO: la cabecera es azul marino', as
       `el anillo de la cabecera es ${color}, demasiado oscuro para el azul marino`)
   }
 })
+
+
+// ===========================================================================
+// Lo que se ve AL ABRIR.
+//
+// Esta clase de fallo no la cogía ninguna prueba, y salió mirando una captura: en un
+// teléfono, los diez enlaces de la cabecera de la cartera ocupaban 328 px de los 844
+// de la pantalla —un 39%— y dejaban ver contrato y medio de la página más usada del
+// sistema. Arreglada, la cabecera mide 90 px.
+//
+// Las pruebas de móvil medían anchos —que nada se saliera de lado— y los contrastes.
+// Ninguna miraba lo más básico: que al abrir haya ALGO ADEMÁS DE LA NAVEGACIÓN.
+//
+// Una pantalla donde hay que desplazarse para llegar al contenido es una pantalla que
+// en el patio, con una mano y guantes, se abandona.
+
+/** Lo primero que NO es cabecera, y a qué altura empieza. */
+const DONDE_EMPIEZA_LO_SUYO = `(() => {
+  const alto = window.innerHeight
+  let mejor = null
+  for (const e of Array.from(document.querySelectorAll('main *'))) {
+    if (e.closest('header')) continue
+    const c = e.getBoundingClientRect()
+    if (c.width < 40 || c.height < 12) continue
+    const texto = (e.textContent || '').trim()
+    if (texto.length < 3) continue
+    if (mejor === null || c.top < mejor.top) mejor = { top: c.top, que: texto.slice(0, 30) }
+  }
+  const cab = document.querySelector('header')
+  return {
+    alto,
+    cabecera: cab ? Math.round(cab.getBoundingClientRect().height) : 0,
+    empieza: mejor ? Math.round(mejor.top) : -1,
+    que: mejor ? mejor.que : '',
+  }
+})()`
+
+test('al abrir en un teléfono se ve algo MÁS que el menú', async () => {
+  const problemas: string[] = []
+  let miradas = 0
+
+  for (const ruta of PANTALLAS) {
+    const ctx = await nav.newContext({ viewport: TELEFONO })
+    await ctx.route('**://**', (r) => r.abort())
+    const page = await ctx.newPage()
+    await page.setContent((await pedir({ ruta, cookie: gps })).cuerpo ?? '',
+      { waitUntil: 'load' })
+    const m = await page.evaluate(DONDE_EMPIEZA_LO_SUYO) as {
+      alto: number; cabecera: number; empieza: number; que: string
+    }
+    await ctx.close()
+    miradas++
+
+    if (m.empieza < 0) {
+      problemas.push(`${ruta}: no hay nada que no sea cabecera`)
+      continue
+    }
+    // El umbral SALE DE MEDIR, no de una opinión. Con las once pantallas sanas, lo
+    // suyo empieza entre el 16% y el 35% de la pantalla; con el menú apilado, la
+    // cartera se iba al 48%. El 40% separa las dos cosas con margen por los dos
+    // lados.
+    //
+    // Dos intentos anteriores no valían, y conviene que quede escrito: medir el alto
+    // de la CABECERA daba por malas pantallas sanas —el título y su explicación son
+    // contenido, no navegación— y un umbral del 50% daba por bueno el estado roto.
+    // Esta prueba pasó con el fallo dentro antes de estar bien calibrada.
+    if (m.empieza > m.alto * 0.4) {
+      problemas.push(`${ruta}: lo suyo («${m.que}») empieza en ${m.empieza} px ` +
+        `de ${m.alto} — ${Math.round(m.empieza / m.alto * 100)}% de la pantalla es menú`)
+    }
+  }
+
+  // La red contra pasar en vano.
+  assert.equal(miradas, PANTALLAS.length)
+  assert.deepEqual(problemas, [],
+    `pantallas donde al abrir no se ve más que el menú:\n  ${problemas.join('\n  ')}`)
+})
