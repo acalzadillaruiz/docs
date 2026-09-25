@@ -64,6 +64,7 @@ const PAGINAS: Array<{ archivo: string; ruta: string; campos?: Record<string,str
   { archivo: 'proveedores', ruta: '/proveedores' },
   { archivo: 'banco', ruta: '/banco' },
   { archivo: 'caja', ruta: '/caja' },
+  { archivo: 'logistica', ruta: '/logistica' },
   { archivo: 'pagar', ruta: '/pagar', campos: { al: '2027-12-31' } },
   { archivo: 'importar', ruta: '/importar' },
   { archivo: 'contratos-nuevo', ruta: '/contratos/nuevo' },

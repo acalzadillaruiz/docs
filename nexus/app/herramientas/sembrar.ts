@@ -153,6 +153,72 @@ export async function sembrar(): Promise<void> {
 
   })
 
+  // Material en ruta: un contrato de procura con sus hitos a medio camino. Sin esto
+  // el tablero de «dónde está el material» sale vacío, y una pantalla vacía no
+  // enseña lo único que tiene que enseñar.
+  await comoPersona({ id: YO }, 'nexus_interno', async (q) => {
+    await q.unsafe(`
+      do $ruta$
+      declare
+        ctr uuid;
+        rg  uuid;
+        tsa uuid;
+      begin
+        if exists (select 1 from contrato
+                    where organizacion_id = '${G}' and codigo = 'GPS-2027-PROC') then
+          return;
+        end if;
+        select id into tsa from tasa_bcv
+         where vigente_el = '2027-03-01' and sustituida_por is null;
+
+        insert into contrato (organizacion_id, cliente_id, codigo, tipo, titulo_es,
+                              titulo_en, estado, moneda, monto, tasa_id, inicio,
+                              fin_previsto, creado_por)
+        values ('${G}','${C}','GPS-2027-PROC','procura',
+                'Cabezales de pozo 11" 5M','11" 5M wellheads','vigente','USD',
+                420000, tsa,'2027-01-15','2027-06-30','${YO}')
+        returning id into ctr;
+
+        insert into renglon (contrato_id, numero, descripcion_es, descripcion_en,
+                             cantidad, unidad, norma, precio_unitario, costo_unitario)
+        values (ctr, 1,'Cabezal 11" 5M','11" 5M wellhead', 4,'unidad','API 6A PSL-3',
+                80000, 51000),
+               (ctr, 2,'Árbol de navidad 5M','5M christmas tree', 2,'unidad',
+                'API 6A PSL-3', 50000, 33000)
+        ;
+
+        insert into hito (renglon_id, orden, clave, nombre_es, nombre_en, peso, exige,
+                          planificada)
+        select r.id, p.orden, p.clave, p.nombre_es, p.nombre_en, p.peso, p.exige,
+               date '2027-01-15' + (p.orden * 30)
+          from renglon r join plantilla_hito p on p.tipo = 'procura'
+         where r.contrato_id = ctr;
+
+        -- El primer renglón: pedido y fabricado con su certificado, esperando el
+        -- barco desde hace semanas. El segundo, solo pedido.
+        select id into rg from renglon where contrato_id = ctr and numero = 1;
+
+        insert into evidencia (hito_id, clase, huella, nombre, bytes, tipo_mime,
+                               subida_por, verificada_en, verificada_por)
+        select h.id, c, md5(h.id::text || c) || md5(c || h.id::text),
+               c || '.pdf', 24000,'application/pdf','${YO}', now(),'${YO}'
+          from hito h, unnest(h.exige) c
+         where h.renglon_id = rg and h.clave in ('orden','fabricado');
+
+        update hito set estado = 'verificado', ocurrido_en = '2027-02-02'
+         where renglon_id = rg and clave = 'orden';
+        update hito set estado = 'verificado', ocurrido_en = '2027-02-24'
+         where renglon_id = rg and clave = 'fabricado';
+
+        update hito set estado = 'verificado', ocurrido_en = '2027-02-10'
+         where renglon_id in (select id from renglon where contrato_id = ctr and numero = 2)
+           and clave = 'orden'
+           and exists (select 1 from hito h2 where h2.renglon_id = hito.renglon_id
+                        and h2.clave = 'orden' and cardinality(h2.exige) = 0);
+      end
+      $ruta$;`)
+  })
+
   // La caja chica va en su propia transacción y no dentro de la anterior: la de
   // arriba se corta en seco cuando los cuarenta contratos ya están sembrados, y
   // cualquier cosa escrita detrás de ese corte no se siembra nunca. Costó una
