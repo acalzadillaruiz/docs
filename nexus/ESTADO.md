@@ -1,36 +1,35 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 07:40 (España)
-**Avance:** 59 de 141 sesiones · **42%**
+**Última actualización:** 2026-09-25, 08:00 (España)
+**Avance:** 63 de 141 sesiones · **45%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **los avisos por correo**. Buzón de salida en la base de
-datos (el aviso se encola en la misma transacción que el hecho, así que si el hecho
-se deshace el aviso se deshace con él), redacción en el idioma de quien lo recibe,
-SMTP escrito contra el protocolo y probado contra un servidor de mentira que habla
-SMTP de verdad, y el proceso `herramientas/avisar.ts` que vacía la cola. Commit
-`310b121`. **425 comprobaciones.**
+**Lo último terminado:** **las tres medidas en pantalla**, **las cadenas de hitos de
+los cinco tipos de contrato**, y **el perfil** con las preferencias de aviso. De paso,
+la cerca que faltaba sobre `persona`: sin ella, dejar que el cliente leyera su propio
+perfil le habría dado la lista entera de personas del sistema. Commit `cbb9e87`.
+**472 comprobaciones.**
 
 Avisado al CEO el **40%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Las tres medidas, en pantalla.** `brecha_evidencia()`, `tiempo_hasta_la_verdad()`
-   y `cobertura()` existen y están probadas en la base de datos desde hace rato, pero
-   no las enseña ninguna pantalla. Es lo que ningún portal da y lo que más se va a
-   enseñar en una reunión. Solo para dentro: el cliente no ve ninguna de las tres.
-2. **Los hitos desde la plantilla.** `plantilla_hito` existe y está **vacía**: hoy los
-   hitos se insertan a mano, así que un contrato nuevo nace sin hitos y su avance es
-   cero para siempre. Falta sembrar las plantillas de los cinco tipos y crear los
-   hitos solos al dar de alta un renglón.
-3. **La pantalla de preferencias de aviso.** La tabla existe y se respeta, pero no hay
-   dónde decir que no quieres uno. Un aviso del que no puedes salir acaba en la
-   carpeta de correo no deseado, y con él todos los demás.
-4. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
-   (caja chica, y el importador atado a valuaciones de verdad).
+1. **Dar de alta un contrato desde la aplicación.** Es el agujero más grande que
+   queda: hoy un contrato solo entra por SQL o por el importador de Excel. Sin esto,
+   nada de lo construido se puede usar sin que alguien toque la base de datos a mano.
+   Al crear el renglón hay que llamar a `crear_hitos_desde_plantilla()`, que ya
+   existe y está probada.
+2. **El importador, atado a la aplicación.** `13-importacion.sql` está construido y
+   probado y no lo usa ninguna pantalla. Es lo que saca la contabilidad de Excel, que
+   es la prioridad que puso el CEO.
+3. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
+   (caja chica sobre todo).
+4. **Los avisos, en marcha de verdad:** hace falta que alguien llame a
+   `herramientas/avisar.ts` cada pocos minutos. Hoy la cola se llena y nadie la vacía
+   si no se lanza a mano.
 
 **Cómo continuar, literalmente:**
 
@@ -51,7 +50,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-425 comprobaciones hayan encontrado catorce fallos reales, doce de ellos míos.
+472 comprobaciones hayan encontrado diecisiete fallos reales, quince de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -205,6 +204,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/correo.ts` | SMTP contra el protocolo, sin dependencia. **Nunca manda la contraseña en claro:** si el servidor no ofrece STARTTLS y la conexión no era ya cifrada, se corta. Un servidor de correo sin cifrado no es algo con lo que negociar, es un error de configuración. Con el transporte al registro para poder arrancar el primer día sin buzón. |
 | `app/pruebas/correo.test.ts` | Levanta un servidor que **habla SMTP de verdad** y comprueba la conversación orden por orden. Encontró que el cliente leía solo la última línea de una respuesta de varias, y que lo que el servidor sabe hacer viene en las intermedias. |
 | `app/herramientas/avisar.ts` | Vacía la cola, aparte del servidor web: un servidor de correo lento no tiene por qué hacer lenta la aplicación. |
+| `db/schema/21-plantillas.sql` | Las cadenas de hitos de los cinco tipos de contrato. `plantilla_hito` existía desde el principio y estaba **vacía**, que es el peor estado posible: un contrato nuevo nacía sin hitos, su avance salía cero, y cero es lo que sale también cuando algo va mal. **El peso de cada hito es cuánto del trabajo está hecho, no cuánto se cobra** — mezclarlas es lo que hace que un contrato aparezca al 80% con el equipo todavía en el patio del proveedor. Y `renglones_sin_hitos()`, porque crear los hitos se puede olvidar y un renglón sin hitos se ve igual que uno que no ha empezado. |
+| `app/src/dominio/medidas.ts` · `pantallas/medidas.ts` | Las tres cifras, en pantalla. Cada bloque abre con **la pregunta que contesta**, en castellano normal: un cuadro de mando que hay que aprender a leer se mira el día que se instala y nunca más. **No se suman dólares con bolívares.** Y cuando no hay nada que señalar lo dice con palabras, porque una tabla vacía parece un error del programa. |
+| `app/src/dominio/perfil.ts` · `pantallas/perfil.ts` | Lo poco que cada quien decide sobre sí mismo. Las casillas vienen **marcadas**: un aviso que hay que activar es un aviso que nadie activa. Al cliente no se le ofrecen los avisos que son de dentro. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -380,6 +382,19 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 168 | Una cabecera de correo no puede llevar saltos de línea: no se cuela un destinatario oculto. |
 | 169 | Una línea que sea solo un punto no termina el mensaje a mitad. |
 | 170 | El registro no escribe la dirección de correo entera. |
+| 171 | Las cinco plantillas suman exactamente 100: un renglón terminado del todo llega al 100%. |
+| 172 | Las fechas planificadas se reparten dentro del plazo y en orden; sin plazo no se inventa ninguna. |
+| 173 | Volver a crear los hitos no duplica ni borra la fecha real que alguien puso. |
+| 174 | El renglón al que se le olvidaron los hitos **se ve**, con su importe, y deja de verse al crearlos. |
+| 175 | La brecha se calcula en dinero, y **no se suman dólares con bolívares**. |
+| 176 | Un cliente que pide las medidas choca contra un **permiso**, no contra un filtro. |
+| 177 | Cuando no hay nada que señalar se dice con palabras, no con una tabla vacía. |
+| 178 | El cliente no llega a `/medidas`: 404, igual que a un contrato ajeno, y la cartera ni se lo ofrece. |
+| 179 | Por omisión se reciben todos los avisos; desmarcar uno lo apaga **de verdad**: deja de encolarse. |
+| 180 | Desmarcarlo todo se guarda — guardar solo lo marcado dejaría imposible apagar nada. |
+| 181 | Un grupo de casillas repetidas no se queda en una sola. |
+| 182 | El cliente **no puede leer** la huella de la clave, el secreto del 2FA ni el sujeto del directorio. |
+| 183 | El cliente ve a los suyos y a nadie más; GPS ve a todos porque administra las cuentas. |
 
 ## Lo que sigue
 
