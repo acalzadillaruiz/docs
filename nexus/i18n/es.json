@@ -222,5 +222,16 @@
   "medida.sin_hitos": "Renglones sin hitos",
   "medida.sin_hitos_explica": "Su avance sale cero, el mismo cero que un renglón que no ha empezado. Hasta que se les creen los hitos, nadie puede distinguir una cosa de la otra.",
   "medida.crear_hitos": "Crear sus hitos",
-  "medida.solo_dentro": "Solo para GPS. Nada de esta pantalla sale al cliente."
+  "medida.solo_dentro": "Solo para GPS. Nada de esta pantalla sale al cliente.",
+  "perfil.titulo": "Tu perfil",
+  "perfil.avisos": "Avisos por correo",
+  "perfil.avisos_explica": "Por omisión se reciben todos. Un aviso que hay que activar es un aviso que nadie activa.",
+  "perfil.idioma": "Idioma",
+  "perfil.correo": "Correo",
+  "perfil.guardar": "Guardar",
+  "perfil.guardado": "Guardado",
+  "perfil.organizacion": "Empresa",
+  "perfil.espanol": "Español",
+  "perfil.ingles": "Inglés",
+  "perfil.solo_tuyo": "Esto solo lo cambias tú. Nadie más ve ni toca tus preferencias."
 }

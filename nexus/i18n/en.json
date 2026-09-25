@@ -222,5 +222,16 @@
   "medida.sin_hitos": "Line items with no milestones",
   "medida.sin_hitos_explica": "Their progress reads zero — the same zero as a line item that has not started. Until their milestones are created, nobody can tell the two apart.",
   "medida.crear_hitos": "Create its milestones",
-  "medida.solo_dentro": "GPS only. Nothing on this screen reaches the client."
+  "medida.solo_dentro": "GPS only. Nothing on this screen reaches the client.",
+  "perfil.titulo": "Your profile",
+  "perfil.avisos": "Email notices",
+  "perfil.avisos_explica": "You receive all of them by default. A notice you have to switch on is a notice nobody switches on.",
+  "perfil.idioma": "Language",
+  "perfil.correo": "Email",
+  "perfil.guardar": "Save",
+  "perfil.guardado": "Saved",
+  "perfil.organizacion": "Company",
+  "perfil.espanol": "Spanish",
+  "perfil.ingles": "English",
+  "perfil.solo_tuyo": "Only you change this. Nobody else sees or touches your preferences."
 }

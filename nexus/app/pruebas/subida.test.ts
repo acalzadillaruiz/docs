@@ -378,3 +378,45 @@ test('al cliente la cartera no le ofrece las medidas', async () => {
   const r = await pedir({ ruta: '/', cookie: cli })
   assert.equal(r.cuerpo!.includes('/medidas'), false)
 })
+
+test('el perfil se sirve, se guarda, y lo guardado se nota al volver', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const af = testigoAnti(cookie)
+
+  const antes = await pedir({ ruta: '/perfil', cookie })
+  assert.equal(antes.codigo, 200)
+  assert.match(antes.cuerpo!, /type="checkbox"/)
+
+  // Se mandan tres marcadas de las seis. Un formulario manda solo las marcadas.
+  const r = await pedir({
+    metodo: 'POST', ruta: '/perfil', cookie,
+    campos: { af, idioma: 'es' },
+    repetidos: { aviso: ['objecion_nueva', 'valuacion_presentada', 'hito_atrasado'] },
+  })
+  assert.equal(r.codigo, 200)
+  assert.match(r.cuerpo!, /Guardado/)
+  assert.equal((r.cuerpo!.match(/type="checkbox"[^>]* checked/g) ?? []).length, 3)
+
+  // Y al volver a entrar sigue igual: no era solo el eco del formulario.
+  const despues = await pedir({ ruta: '/perfil', cookie })
+  assert.equal((despues.cuerpo!.match(/type="checkbox"[^>]* checked/g) ?? []).length, 3)
+
+  // Se deja como estaba para no estorbar a las demás pruebas.
+  await pedir({
+    metodo: 'POST', ruta: '/perfil', cookie,
+    campos: { af, idioma: 'es' },
+    repetidos: { aviso: [
+      'objecion_nueva', 'objecion_respondida', 'valuacion_presentada',
+      'valuacion_aprobada', 'evidencia_sin_revisar', 'hito_atrasado',
+    ] },
+  })
+})
+
+test('guardar el perfil SIN el testigo antifalsificación no cambia nada', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const r = await pedir({
+    metodo: 'POST', ruta: '/perfil', cookie,
+    campos: { idioma: 'en' }, repetidos: { aviso: [] },
+  })
+  assert.equal(r.codigo, 403)
+})

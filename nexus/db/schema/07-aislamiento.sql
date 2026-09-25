@@ -82,6 +82,22 @@ create policy partida_vista on partida for select using (
   es_interna() and organizacion_id = org_actual()
 );
 
+-- Las personas. No estaba puesto y hacia falta en cuanto el cliente pudiera leer su
+-- propio perfil: sin esto, concederle 'persona' le daria la lista entera de personas
+-- del sistema, con los correos de todo el mundo dentro.
+--
+-- GPS ve a todos porque GPS administra las cuentas. Un cliente ve a los suyos y a
+-- nadie mas — a los suyos si, porque en el portal aparece quien firmo y quien objeto,
+-- y un nombre sin poder resolverlo deja la pantalla llena de identificadores.
+alter table persona enable row level security;
+
+create policy persona_vista on persona for select using (
+  es_interna() or organizacion_id = org_actual()
+);
+
+create policy persona_escritura on persona for all
+  using (es_interna()) with check (es_interna());
+
 -- Escribir es siempre de dentro.
 create policy contrato_escritura  on contrato  for all using (es_interna() and organizacion_id = org_actual());
 create policy valuacion_escritura on valuacion for all using (es_interna() and organizacion_id = org_actual());

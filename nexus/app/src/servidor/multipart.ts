@@ -160,6 +160,18 @@ export function campos(partes: readonly Parte[]): Record<string, string> {
   return r
 }
 
+/**
+ * Los campos que vinieron repetidos, por nombre.
+ *
+ * Un grupo de casillas manda el mismo nombre varias veces, y `campos` solo guarda el
+ * ultimo. Sin esto, marcar cinco casillas guardaria una.
+ */
+export function repetidos(partes: readonly Parte[]): Record<string, string[]> {
+  const r: Record<string, string[]> = {}
+  for (const p of partes) if (p.clase === 'campo') (r[p.nombre] ??= []).push(p.valor)
+  return r
+}
+
 /** El primer archivo con ese nombre de campo, si vino alguno con contenido. */
 export function archivo(partes: readonly Parte[], nombre: string):
   Extract<Parte, { clase: 'archivo' }> | null {

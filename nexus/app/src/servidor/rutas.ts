@@ -34,13 +34,16 @@ import {
 } from '../dominio/evidencia.ts'
 import { pintarPaginaAvance } from '../pantallas/evidencia.ts'
 import { medidas } from '../dominio/medidas.ts'
+import { perfil, guardarPerfil } from '../dominio/perfil.ts'
+import { pintarPerfil } from '../pantallas/perfil.ts'
 import { pintarMedidas } from '../pantallas/medidas.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
 import {
   almacen, tipoAceptado, DocumentoAusente, HuellaInvalida,
 } from './almacen.ts'
 import {
-  partir, campos as camposDe, archivo as archivoDe, frontera, LIMITES,
+  partir, campos as camposDe, repetidos as repetidosDe, archivo as archivoDe,
+  frontera, LIMITES,
 } from './multipart.ts'
 import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
@@ -52,6 +55,13 @@ export type Peticion = {
   readonly metodo: string
   readonly ruta: string
   readonly campos: Readonly<Record<string, string>>
+  /**
+   * Los campos que pueden venir repetidos, como las casillas de un grupo. Un
+   * formulario manda `aviso=a&aviso=b`, y `campos` solo guarda el último: leer las
+   * casillas de ahí dejaría marcada siempre una sola. Van aparte para que quien
+   * lee una casilla tenga que mirar aquí y no se equivoque en silencio.
+   */
+  readonly repetidos?: Readonly<Record<string, readonly string[]>>
   readonly cookie: string | null
   readonly idioma: Idioma
   readonly origen: string
@@ -215,6 +225,27 @@ export async function resolver(
     `)) as unknown as Array<{ organizacion_id: string }>
     const m = await comoQuien((q) => medidas(q, org!.organizacion_id, p.idioma))
     return html(200, pintarMedidas(m, p.idioma))
+  }
+
+  // El perfil. Poco, y lo que decide que los avisos sobrevivan: un aviso del que no
+  // puedes salir acaba marcado como correo no deseado, y con él todos los demás.
+  if (p.ruta === '/perfil' && p.metodo === 'GET') {
+    const datos = await comoQuien((q) => perfil(q, personaId, p.idioma, esCliente))
+    return html(200, pintarPerfil(datos, p.idioma, testigoAnti(testigo)))
+  }
+
+  if (p.ruta === '/perfil' && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    // Un formulario con casillas manda SOLO las marcadas. Lo que no viene está
+    // desmarcado, y eso hay que escribirlo: guardar solo lo que vino dejaría
+    // imposible quitarse un aviso de encima.
+    const marcados = p.repetidos?.['aviso'] ?? (p.campos['aviso'] ? [p.campos['aviso']] : [])
+    const idioma: Idioma = p.campos['idioma'] === 'en' ? 'en' : 'es'
+    await comoQuien((q) => guardarPerfil(q, personaId, idioma, marcados, esCliente))
+    const datos = await comoQuien((q) => perfil(q, personaId, idioma, esCliente))
+    return html(200, pintarPerfil(datos, idioma, testigoAnti(testigo), true))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
@@ -469,7 +500,9 @@ function noEncontrado(idioma: Idioma): Respuesta {
 import { huellaTestigo as huellaDe } from '../dominio/sesion.ts'
 
 /** Lee el cuerpo de un formulario, con tope. Sin tope, una petición gigante ahoga el proceso. */
-export async function leerCampos(req: IncomingMessage): Promise<Record<string, string>> {
+export async function leerCampos(
+  req: IncomingMessage,
+): Promise<{ campos: Record<string, string>; repetidos: Record<string, string[]> }> {
   const trozos: Buffer[] = []
   let total = 0
   for await (const t of req) {
@@ -479,8 +512,12 @@ export async function leerCampos(req: IncomingMessage): Promise<Record<string, s
   }
   const texto = Buffer.concat(trozos).toString('utf-8')
   const campos: Record<string, string> = {}
-  for (const [k, v] of new URLSearchParams(texto)) campos[k] = v
-  return campos
+  const repetidos: Record<string, string[]> = {}
+  for (const [k, v] of new URLSearchParams(texto)) {
+    campos[k] = v
+    ;(repetidos[k] ??= []).push(v)
+  }
+  return { campos, repetidos }
 }
 
 export class CuerpoDemasiadoGrande extends Error {
@@ -512,15 +549,19 @@ export async function desdeHttp(req: IncomingMessage): Promise<Peticion> {
   // otro. El de texto se queda como estaba: un formulario de entrada no pesa más.
   const limite = frontera(req.headers['content-type'])
   let campos: Record<string, string> = {}
+  let repetidos: Record<string, readonly string[]> = {}
   let archivo: Peticion['archivo'] = null
   if (req.method === 'POST') {
     if (limite) {
       const partes = partir(await leerBytes(req, LIMITES.maxBytes), limite)
       campos = camposDe(partes)
+      repetidos = repetidosDe(partes)
       const a = archivoDe(partes, 'documento')
       archivo = a ? { archivo: a.archivo, tipoMime: a.tipoMime, contenido: a.contenido } : null
     } else {
-      campos = await leerCampos(req)
+      const leido = await leerCampos(req)
+      campos = leido.campos
+      repetidos = leido.repetidos
     }
   }
 
@@ -528,6 +569,7 @@ export async function desdeHttp(req: IncomingMessage): Promise<Peticion> {
     metodo: req.method ?? 'GET',
     ruta: url.pathname,
     campos,
+    repetidos,
     archivo,
     cookie: leerCookie(req.headers.cookie),
     idioma: idiomaPedido(req.headers['accept-language']),

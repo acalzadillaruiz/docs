@@ -55,5 +55,17 @@ grant select (id, hito_id, clase, huella, nombre, bytes, tipo_mime,
               ocurrido_en, subida_en, verificada_en, rechazada_en, motivo_rechazo)
   on evidencia to nexus_cliente;
 
+-- Su propio perfil. Columna por columna, y las tres que no estan son las que
+-- importan: la huella de la clave, el secreto del segundo factor y el sujeto del
+-- directorio de su empresa. Ninguna de las tres hace falta para ensenar un perfil, y
+-- cualquiera de las tres concedida convierte una consulta cualquiera en un robo.
+grant select (id, organizacion_id, correo, nombre, idioma, activa, ultimo_acceso)
+  on persona to nexus_cliente;
+
+-- Sus preferencias de aviso: las lee y las escribe el, y solo el suyas. Que sean
+-- solo las suyas lo hacen las politicas de fila, no este permiso.
+grant select, insert, update, delete on preferencia_aviso to nexus_cliente;
+grant select on aviso to nexus_cliente;
+
 -- La contabilidad no se concede en absoluto.
 revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;
