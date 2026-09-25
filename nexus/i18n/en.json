@@ -356,5 +356,19 @@
   "facturar.error.sin_aprobar": "Only a progress payment approved by the client can be invoiced",
   "facturar.error.objecion": "It has an unanswered dispute. Invoicing something the client challenged in writing is how you lose an argument before it starts.",
   "facturar.numero": "Invoice",
-  "facturar.control": "Control number"
+  "facturar.control": "Control number",
+  "nota.titulo": "Correct the invoice",
+  "nota.explica": "An issued invoice is not modified or deleted: the client has it and it is already declared. It is corrected with a note that points to it and leaves both in the books.",
+  "nota.credito": "Credit note (subtracts)",
+  "nota.debito": "Debit note (adds)",
+  "nota.tipo": "Which note",
+  "nota.base": "Base to correct",
+  "nota.motivo": "Why",
+  "nota.emitir": "Issue the note",
+  "nota.vivo": "Still invoiced",
+  "nota.lista": "Notes on this invoice",
+  "nota.error.base": "The amount must be greater than zero",
+  "nota.error.motivo": "A note with no reason explains nothing, which is exactly what it is for",
+  "nota.error.pasa": "That note gives back more than is still invoiced. A negative taxable base means nothing in a tax return.",
+  "nota.error.sin_factura": "That progress payment has no invoice to correct yet"
 }

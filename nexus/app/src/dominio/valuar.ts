@@ -285,3 +285,118 @@ export async function facturar(
 
   return { hecho: true, numero: f!.numero, control: f!.numero_control }
 }
+
+export type Nota = {
+  readonly tipo: 'nota_credito' | 'nota_debito'
+  readonly numero: string
+  readonly base: string
+  readonly motivo: string
+  readonly fecha: string
+}
+
+export type FacturaViva = {
+  readonly id: string
+  readonly numero: string
+  readonly control: string
+  readonly base: string
+  readonly vivo: string
+  readonly notas: readonly Nota[]
+}
+
+/**
+ * La factura de una valuación, con lo que queda vivo después de sus notas.
+ *
+ * Lo vivo no se guarda: se resta. Un importe guardado es un importe que algún día
+ * dejará de ser cierto.
+ */
+export async function facturaDe(
+  q: Consulta, valuacionId: string, idioma: Idioma,
+): Promise<FacturaViva | null> {
+  const [f] = (await q`
+    select df.id, df.numero, df.numero_control, df.base_ves::text as base,
+           ct.moneda
+      from documento_fiscal df
+      join valuacion v on v.documento_id = df.id
+      join contrato ct on ct.id = v.contrato_id
+     where v.id = ${valuacionId}::uuid
+  `) as unknown as Array<{
+    id: string; numero: string; numero_control: string; base: string; moneda: 'VES' | 'USD'
+  }>
+  if (!f) return null
+
+  const [vivo] = (await q`
+    select base::text from neto_facturado(${f.id}::uuid)
+  `) as unknown as Array<{ base: string }>
+
+  const notas = (await q`
+    select tipo::text, numero, base_ves::text as base, motivo, fecha
+      from documento_fiscal where afecta_a = ${f.id}::uuid order by fecha, numero
+  `) as unknown as Array<{
+    tipo: 'nota_credito' | 'nota_debito'; numero: string; base: string
+    motivo: string; fecha: Date
+  }>
+
+  return {
+    id: f.id,
+    numero: f.numero,
+    control: f.numero_control,
+    base: moneda(idioma, Number(f.base), 'VES'),
+    vivo: moneda(idioma, Number(vivo?.base ?? f.base), 'VES'),
+    notas: notas.map((n): Nota => ({
+      tipo: n.tipo,
+      numero: n.numero,
+      base: moneda(idioma, Number(n.base), 'VES'),
+      motivo: n.motivo,
+      fecha: n.fecha.toISOString().slice(0, 10),
+    })),
+  }
+}
+
+export type NotaNueva = {
+  readonly facturaId: string
+  readonly tipo: 'nota_credito' | 'nota_debito'
+  readonly base: number
+  readonly motivo: string
+}
+
+export type NotaEmitida =
+  | { readonly hecho: true; readonly numero: string }
+  | { readonly hecho: false; readonly motivo: string }
+
+/**
+ * Emite la nota. Las condiciones se comprueban aquí antes de llamar: una excepción
+ * dentro de una transacción la aborta entera y no deja decir nada útil.
+ */
+export async function emitirNota(
+  q: Consulta, n: NotaNueva, personaId: string, esCliente: boolean, idioma: Idioma,
+): Promise<NotaEmitida> {
+  if (esCliente) return { hecho: false, motivo: t(idioma, 'nota.error.sin_factura') }
+  if (!(n.base > 0)) return { hecho: false, motivo: t(idioma, 'nota.error.base') }
+  if (n.motivo.trim() === '') return { hecho: false, motivo: t(idioma, 'nota.error.motivo') }
+
+  const [f] = (await q`
+    select base_ves::text as base, tipo::text, sentido::text
+      from documento_fiscal where id = ${n.facturaId}::uuid
+  `) as unknown as Array<{ base: string; tipo: string; sentido: string }>
+  if (!f || f.tipo !== 'factura' || f.sentido !== 'emitido') {
+    return { hecho: false, motivo: t(idioma, 'nota.error.sin_factura') }
+  }
+
+  if (n.tipo === 'nota_credito') {
+    const [vivo] = (await q`
+      select base::text from neto_facturado(${n.facturaId}::uuid)
+    `) as unknown as Array<{ base: string }>
+    if (n.base > Number(vivo?.base ?? 0) + 0.005) {
+      return { hecho: false, motivo: t(idioma, 'nota.error.pasa') }
+    }
+  }
+
+  const [nota] = (await q`
+    select emitir_nota(${n.facturaId}::uuid, ${n.tipo}, ${n.base.toFixed(2)},
+                       ${n.motivo.trim()}, ${personaId}::uuid) as id
+  `) as unknown as Array<{ id: string }>
+  const [d] = (await q`
+    select numero from documento_fiscal where id = ${nota!.id}::uuid
+  `) as unknown as Array<{ numero: string }>
+  return { hecho: true, numero: d!.numero }
+}

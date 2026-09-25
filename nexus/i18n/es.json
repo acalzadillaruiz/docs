@@ -356,5 +356,19 @@
   "facturar.error.sin_aprobar": "Solo se factura una valuación aprobada por el cliente",
   "facturar.error.objecion": "Tiene una objeción sin responder. Facturar algo que el cliente discutió por escrito es como se pierde una discusión antes de empezarla.",
   "facturar.numero": "Factura",
-  "facturar.control": "Número de control"
+  "facturar.control": "Número de control",
+  "nota.titulo": "Corregir la factura",
+  "nota.explica": "Una factura emitida no se modifica ni se borra: ya la tiene el cliente y ya está declarada. Se corrige con una nota que apunta a ella y deja las dos en el libro.",
+  "nota.credito": "Nota de crédito (resta)",
+  "nota.debito": "Nota de débito (suma)",
+  "nota.tipo": "Qué nota",
+  "nota.base": "Base a corregir",
+  "nota.motivo": "Por qué",
+  "nota.emitir": "Emitir la nota",
+  "nota.vivo": "Queda facturado",
+  "nota.lista": "Notas sobre esta factura",
+  "nota.error.base": "El importe tiene que ser mayor que cero",
+  "nota.error.motivo": "Una nota sin motivo no explica nada, que es justo para lo que sirve",
+  "nota.error.pasa": "Esa nota devuelve más de lo que queda facturado. Una base imponible negativa no significa nada en una declaración.",
+  "nota.error.sin_factura": "Esa valuación todavía no tiene factura que corregir"
 }

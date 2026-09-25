@@ -41,7 +41,7 @@ import {
 } from '../dominio/alta.ts'
 import { pintarAlta, type Traido } from '../pantallas/alta.ts'
 import {
-  proponer, emitir, presentar, facturar, ContratoNoValuable,
+  proponer, emitir, presentar, facturar, facturaDe, emitirNota, ContratoNoValuable,
 } from '../dominio/valuar.ts'
 import {
   cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, mapeoGuardado,
@@ -644,15 +644,8 @@ export async function resolver(
         const cab = await cabeceraDeValuacion(q, valuacion[1]!)
         const lineas = await hojaDeValuacion(q, valuacion[1]!, p.idioma, cab.moneda, esCliente)
         const objeciones = await objecionesDe(q, valuacion[1]!)
-        const [f] = (await q`
-          select df.numero, df.numero_control from documento_fiscal df
-            join valuacion v on v.documento_id = df.id
-           where v.id = ${valuacion[1]!}::uuid
-        `) as unknown as Array<{ numero: string; numero_control: string }>
-        return {
-          cab, lineas, objeciones,
-          factura: f ? { numero: f.numero, control: f.numero_control } : null,
-        }
+        const factura = await facturaDe(q, valuacion[1]!, p.idioma)
+        return { cab, lineas, objeciones, factura }
       })
       // El botón solo aparece si de verdad se puede pulsar. Enseñar uno que va a
       // rebotar enseña que la acción existe y esconde que no te corresponde.
@@ -682,6 +675,8 @@ export async function resolver(
         puedeFacturar: !esCliente && datos.cab.estado === 'aprobada' &&
           !datos.objeciones.some((o) => o.respondidaEn === null),
         factura: datos.factura,
+        // Corregir una factura es de dentro, y solo tiene sentido si existe.
+        puedeCorregir: !esCliente && datos.factura !== null,
         antifalsificacion: testigoAnti(testigo),
         objeciones: datos.objeciones.map((o) => ({
           id: o.id,
@@ -740,6 +735,28 @@ export async function resolver(
       facturar(q, facturarVal[1]!, personaId, esCliente, p.idioma))
     if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
     return aOtroSitio(`/valuaciones/${facturarVal[1]!}`)
+  }
+
+  // Corregir una factura con una nota. La factura no se toca: ya la tiene el cliente
+  // y ya está declarada.
+  const notaVal = /^\/valuaciones\/([0-9a-f-]{36})\/nota$/.exec(p.ruta)
+  if (notaVal && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    const f = await comoQuien((q) => facturaDe(q, notaVal[1]!, p.idioma))
+    if (!f) return noEncontrado(p.idioma)
+
+    const r = await comoQuien((q) => emitirNota(q, {
+      facturaId: f.id,
+      tipo: p.campos['tipo'] === 'nota_debito' ? 'nota_debito' : 'nota_credito',
+      base: Number((p.campos['base'] ?? '0').replace(',', '.')),
+      motivo: p.campos['motivo'] ?? '',
+    }, personaId, esCliente, p.idioma))
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    return aOtroSitio(`/valuaciones/${notaVal[1]!}`)
   }
 
   const responderObj = /^\/objeciones\/([0-9a-f-]{36})\/responder$/.exec(p.ruta)

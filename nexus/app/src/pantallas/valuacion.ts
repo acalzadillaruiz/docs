@@ -41,8 +41,23 @@ export type DatosValuacion = {
   readonly puedeCobrar?: boolean
   /** Solo de dentro, y solo una vez aprobada y sin objeciones abiertas. */
   readonly puedeFacturar?: boolean
-  /** Si ya tiene factura, su número y su número de control. */
-  readonly factura?: { readonly numero: string; readonly control: string } | null
+  /** Si ya tiene factura: sus números, lo que queda vivo, y sus notas. */
+  readonly factura?: {
+    readonly id: string
+    readonly numero: string
+    readonly control: string
+    readonly base: string
+    readonly vivo: string
+    readonly notas: readonly {
+      readonly tipo: 'nota_credito' | 'nota_debito'
+      readonly numero: string
+      readonly base: string
+      readonly motivo: string
+      readonly fecha: string
+    }[]
+  } | null
+  /** Corregir la factura es de dentro. */
+  readonly puedeCorregir?: boolean
   readonly antifalsificacion: string
   readonly objeciones: readonly ObjecionVista[]
 }
@@ -164,6 +179,21 @@ h2.sec{margin:30px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5p
   border-left:3px solid var(--grt);border-radius:11px;
   font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ik2)}
 .factura b{color:var(--ik);font-size:14.5px}
+.notas{margin-top:8px;display:grid;gap:6px}
+.nt{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  background:var(--cd);border:1px solid var(--ln);border-radius:9px;padding:9px 13px;
+  font-family:"JetBrains Mono",monospace;font-size:12px}
+.nt-m{margin-top:4px;font-family:Inter,system-ui,sans-serif;font-size:12.5px;color:var(--ik2)}
+/* El signo va delante del importe y con color: confundir una nota de credito con
+   una de debito invierte el signo de la declaracion del mes. */
+.nt .menos{color:var(--rj);font-weight:700;white-space:nowrap}
+.nt .mas{color:var(--grt);font-weight:700;white-space:nowrap}
+.corregir{margin-top:14px}
+.corregir summary{cursor:pointer;font-size:13.5px;color:var(--ik2)}
+.corregir label{display:block;margin-top:10px;font-size:12.5px;font-weight:650}
+.corregir select,.corregir input,.corregir textarea{width:100%;font:inherit;font-size:14px;
+  margin-top:5px;padding:8px 10px;border:1px solid var(--ln2);border-radius:9px;
+  background:var(--cd);color:var(--ik)}
 .obj-nueva{margin-top:16px;border-top:1px solid var(--ln);padding-top:14px}
 .obj-nueva summary{cursor:pointer;font-size:14px;color:var(--ik2);text-align:center;
   list-style:none}
@@ -246,7 +276,39 @@ ${filas}
 
   ${!d.factura ? '' : `
   <p class="factura"><b>${escapar(t('facturar.numero'))} ${escapar(d.factura.numero)}</b>
-    · ${escapar(t('facturar.control'))} ${escapar(d.factura.control)}</p>`}
+    · ${escapar(t('facturar.control'))} ${escapar(d.factura.control)}
+    ${d.factura.notas.length === 0 ? '' :
+      ` · ${escapar(t('nota.vivo'))} <b>${escapar(d.factura.vivo)}</b>`}</p>
+  ${d.factura.notas.length === 0 ? '' : `
+  <div class="notas">${d.factura.notas.map((n) => `
+    <div class="nt">
+      <div>
+        <b>${escapar(n.numero)}</b> · ${escapar(t(
+          n.tipo === 'nota_credito' ? 'nota.credito' : 'nota.debito'))}
+        <div class="nt-m">${escapar(n.motivo)}</div>
+      </div>
+      <span class="${n.tipo === 'nota_credito' ? 'menos' : 'mas'}">${
+        n.tipo === 'nota_credito' ? '−' : '+'}${escapar(n.base)}</span>
+    </div>`).join('')}</div>`}
+
+  ${!d.puedeCorregir ? '' : `
+  <details class="corregir">
+    <summary>${escapar(t('nota.titulo'))}</summary>
+    <p class="ayuda">${escapar(t('nota.explica'))}</p>
+    <form method="post" action="/valuaciones/${escapar(d.id)}/nota">
+      <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
+      <label for="nota-tipo">${escapar(t('nota.tipo'))}</label>
+      <select id="nota-tipo" name="tipo">
+        <option value="nota_credito">${escapar(t('nota.credito'))}</option>
+        <option value="nota_debito">${escapar(t('nota.debito'))}</option>
+      </select>
+      <label for="nota-base">${escapar(t('nota.base'))}</label>
+      <input id="nota-base" type="number" step="0.01" min="0.01" name="base" required>
+      <label for="nota-motivo">${escapar(t('nota.motivo'))}</label>
+      <textarea id="nota-motivo" name="motivo" rows="2" required></textarea>
+      <button type="submit" class="ob">${escapar(t('nota.emitir'))}</button>
+    </form>
+  </details>`}`}
 
   ${!d.puedeFacturar ? '' : `
   <section class="acc">
