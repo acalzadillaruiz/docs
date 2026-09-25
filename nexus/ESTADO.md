@@ -1,8 +1,21 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-26, 00:40 (España)
-**Avance:** 140 de 141 sesiones · **99%**
+**Sesiones gastadas:** 140 de las 141 del plan · **99% del PLAN, no del producto**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
+
+> **Qué mide ese 99% y qué no.** Mide las sesiones de trabajo previstas, que se han
+> gastado casi todas. **No** mide el producto terminado, y conviene decirlo antes de
+> que alguien lea «99%» y entienda otra cosa — este sistema entero existe para que el
+> avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
+> avance lo que el sistema impide hacer con el de un contrato.
+>
+> Lo que hay construido, contado: **38 direcciones que se pueden abrir** y 25
+> pantallas, sobre las 119 vistas del plan completo. Lo que está **entero y probado
+> de punta a punta** es la contabilidad —las 36 vistas que el CEO mandó primero— más
+> el núcleo de contratos, evidencia y valuaciones que la sostiene. Lo que **no está**
+> son las fases de logística y procura, calidad, el portal del cliente más allá de lo
+> básico, y la venta como servicio a otras empresas.
 
 ## RETOMAR AQUÍ
 
@@ -916,9 +929,35 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 
 ## Lo que sigue
 
-1. **Los generadores que faltan:** factura de proveedor y pago emitido. Los de
-   valuación y cobro ya están y sirven de molde.
-3. **Importador de Excel.** La pantalla que decide si esto se usa o se abandona.
+*(Esta lista estaba vieja: pedía los generadores de factura de proveedor y pago
+emitido, y el importador de Excel. Los tres están hechos. Esto es lo que queda de
+verdad, por orden de lo que más cambia las cosas.)*
+
+**Decisiones que no son mías:**
+
+1. **Dónde se despliega.** No hay servidor, ni dominio, ni base de datos de verdad.
+   Mientras no lo haya, esto se mira en la instantánea navegable y nada más. Es la
+   decisión que separa «funciona» de «se usa».
+2. **Funcionar sin conexión.** Se instala en el teléfono, pero necesita red. Sin
+   conexión pide un *service worker*, que es un archivo de JavaScript y obliga a
+   abrir `default-src 'none'`. Hoy no hay una sola línea de código en el navegador, y
+   eso vale mucho. Es un cambio, no un arreglo.
+3. **Las ocho preguntas de contabilidad.** Caja chica se construyó con seis supuestos
+   declarados en vez de esperarlas, y así debió hacerse desde el principio — pero los
+   supuestos siguen siendo supuestos hasta que alguien los confirme o los corrija.
+
+**Trabajo con valor propio, sin bloqueo:**
+
+4. **El techo de las medidas.** `/medidas` tarda 739 ms con mil contratos, y la mayor
+   parte se va en la política de fila de `hito`, que por cada hito comprueba si su
+   renglón se ve, y eso mira el contrato. Se puede bajar. Tocar una valla de
+   aislamiento por milisegundos **no se hace de paso**: pide su sesión y su barrido.
+5. **Las fases que no se han empezado:** logística y procura (embarque, aduana,
+   trazabilidad), calidad (MTR, colada, puntos de inspección), y el portal del cliente
+   más allá de aprobar y objetar. El diccionario ya tiene el vocabulario de las tres;
+   las pantallas no existen.
+6. **Un segundo par de ojos.** 927 comprobaciones automáticas no sustituyen a una
+   persona usando esto una semana con datos de verdad.
 
 ## Bloqueado
 
