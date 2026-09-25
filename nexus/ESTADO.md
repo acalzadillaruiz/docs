@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 00:40 (España)
-**Sesiones gastadas:** 140 de las 141 del plan · **99% del PLAN, no del producto**
+**Última actualización:** 2026-09-26, 01:20 (España)
+**Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 > **Qué mide ese 99% y qué no.** Mide las sesiones de trabajo previstas, que se han
@@ -19,7 +19,28 @@
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **ahora sí se instala en un teléfono.** El producto se
+**Lo último terminado:** **el techo de `/medidas`, investigado y NO tocado — con dos
+hallazgos que valen más que el arreglo.**
+
+La idea era copiar la regla del contrato dentro de la política de fila de `hito`
+para quitarse un nivel de subconsulta. Medido: **no sirve de nada.** Las tablas que
+se nombran dentro de una política **llevan la suya puesta**: la subconsulta contra
+`renglon` dispara la política de `renglon`, y esa la de `contrato`. No se quita un
+nivel copiando la regla; se añade una copia que mantener. El techo se queda donde
+está, y ahora se sabe por qué.
+
+Y el segundo, que es el que importa: **escribí seis pruebas de aislamiento y tres
+eran falsas.** Preguntaban por un hito uniendo con `renglon` y `contrato` — y esas
+dos tablas esconden la fila **antes** de que la política del hito opine. Lo
+comprobé abriendo la política a `true`: tres de las seis seguían en verde con la
+puerta abierta de par en par. Reescritas: la pregunta del cliente va a `hito` a
+secas, con los identificadores traídos desde dentro.
+
+Es la segunda vez en un día que una comprobación de seguridad mía no comprobaba
+nada. La regla, ya escrita abajo: **una prueba de aislamiento se valida rompiendo la
+valla a propósito, no leyéndola.**
+
+**Antes:** **ahora sí se instala en un teléfono.** El producto se
 describe desde el primer día como «aplicación web instalable» y **no lo era**: no
 había manifiesto ni icono. Quien abría la dirección en el móvil tenía una página
 web, no un icono en su pantalla de inicio — y un ingeniero en una locación no vuelve
@@ -335,7 +356,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**927 comprobaciones** (250 de SQL y diccionario + 677 de TypeScript), todas pasando.
+**933 comprobaciones** (250 de SQL y diccionario + 683 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -445,6 +466,12 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Una prueba de aislamiento que UNE con la tabla protegida no prueba nada.** Las
+  tablas que se nombran en una consulta —o dentro de una política— llevan su propia
+  política puesta, y esconden la fila antes de que la de la tabla que se quería
+  comprobar llegue a opinar. Se pregunta por la tabla a secas, con los
+  identificadores traídos desde dentro. Y se valida **abriendo la valla a propósito**.
 
 - **Un barrido de seguridad puede tener un punto ciego, y entonces miente.** El de
   aislamiento buscaba rutas con `[a-z/]`: cualquier ruta con un punto o un guion era
