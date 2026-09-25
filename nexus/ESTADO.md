@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 10:55 (España)
-**Avance:** 96 de 141 sesiones · **68%**
+**Última actualización:** 2026-09-25, 10:00 (España)
+**Avance:** 98 de 141 sesiones · **70%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -14,22 +14,29 @@ datos. Y **los meses contables** se abren y cierran desde la
 aplicación, que es lo que desbloquea el día 1 de cada mes. Y **la factura fiscal se emite** desde una
 valuación aprobada, con su correlativo puesto por la base de datos. Y **las notas de crédito y débito**, con su
 pantalla: una factura emitida no se toca, se corrige con una nota que deja las dos en
-el libro. Commit `8134db5`. **622 comprobaciones.**
+el libro. Y **la comprobación de firma del testigo de
+identidad**, que es la mitad de SSO que faltaba. Commit `9dd1984`. **636 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
+1. **Cerrar el SSO: las dos rutas.** La comprobación de firma (`servidor/jwks.ts`) y la
+   de afirmaciones (`dominio/empresa.ts`) están hechas y probadas. Falta:
+   `GET /entrar/empresa` (guarda estado y nonce, manda al proveedor) y
+   `GET /entrar/empresa/vuelta` (recibe el código, lo cambia por el testigo, comprueba
+   firma y afirmaciones, y abre la sesión). La configuración por organización ya existe
+   en `organizacion.metodos` e `idp_tenant`.
+2. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
+3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
    usa la primera semana y se abandona la tercera.
-3. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
-   falta la ruta que lo recibe y la pantalla que manda a la operadora.
 4. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
    no lo usa ninguna pantalla.
+5. **Retenciones de IVA e ISLR a proveedores, en pantalla.** `11-egresos.sql` las
+   calcula y emite el comprobante con su correlativo; no hay botón.
 
 **Cómo continuar, literalmente:**
 
@@ -50,7 +57,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-622 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
+636 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -218,6 +225,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/periodos.ts` · `pantallas/periodos.ts` | Los meses contables. **La pantalla más aburrida y de las que más bloquean.** Lo primero que se ve es abrir el siguiente, con su nombre ya escrito — no hay ni un desplegable. Solo se cierra el abierto **más antiguo**, y **no se reabre**: corregir un mes cerrado se hace con un asiento de reverso en el siguiente, que es como tiene que quedar el rastro. |
 | `db/schema/24-facturar.sql` (notas) | Notas de crédito y débito. **Una factura emitida no se modifica y no se borra:** ya estaba declarada, ya la tiene el cliente y ya lleva su número de control. Se corrige con una nota que apunta a ella y deja las dos en el libro — dentro de dos años hay que poder explicar por qué el importe cambió, y una factura reescrita no explica nada. La de crédito **resta** y la de débito **suma**: confundirlas invierte el signo de la declaración del mes. |
 | `db/schema/24-facturar.sql` | Emitir la factura. **El correlativo lo pone la base de datos**, con un bloqueo sobre la organización: dos personas facturando a la vez esperan una a la otra en vez de sacar el mismo número — que es lo que pasa el día que dos personas cierran el mes. Y **no genera otro asiento**: la cuenta por cobrar ya nació con la valuación, así que un asiento aquí duplicaría el ingreso. |
+| `app/src/servidor/jwks.ts` | La firma del testigo de identidad: **lo único que separa «entrar con la cuenta de la empresa» de «entrar diciendo que eres quien quieras»**. Solo RS256, decidido por quien verifica y no por quien firma — aceptar el algoritmo que venga dentro es el ataque clásico contra JWT. La clave se busca por su `kid`, y el juego de claves se guarda un rato pero **se vuelve a pedir ante un `kid` desconocido**: los proveedores rotan sin avisar. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -460,6 +468,12 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 235 | La pantalla enseña **lo que queda facturado** en cuanto hay una nota, no solo el original. |
 | 236 | El signo va delante y con color: la de crédito en rojo, la de débito en verde. |
 | 237 | El cliente **no corrige** la factura que recibe. |
+| 238 | `alg: none` **no pasa**: el algoritmo lo decide quien verifica. |
+| 239 | Cambiar RS256 por HS256 firmando con la **clave pública** tampoco pasa. |
+| 240 | Sin `kid` no pasa, y un `kid` desconocido tampoco. |
+| 241 | Cambiar una coma del cuerpo invalida la firma; otra clave RSA tampoco vale. |
+| 242 | El juego de claves se guarda, y **se vuelve a pedir ante un `kid` nuevo**. |
+| 243 | El error de firma **no lleva el testigo dentro**. |
 
 ## Lo que sigue
 
