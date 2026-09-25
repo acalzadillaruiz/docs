@@ -1,41 +1,33 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 07:15 (España)
-**Avance:** 53 de 141 sesiones · **38%**
+**Última actualización:** 2026-09-25, 07:50 (España)
+**Avance:** 56 de 141 sesiones · **40%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** la evidencia **de punta a punta**. Base de datos, dominio,
-pantallas y rutas. Ya se puede abrir un renglón y ver de dónde sale su porcentaje,
-hito por hito, hasta el documento y su huella. El cliente también lo ve — menos la
-factura del proveedor, que lleva dentro el precio de compra. Commit `aa0f848`.
+**Lo último terminado:** el circuito de la evidencia **se recorre desde un navegador**.
+Subir el archivo (multipart escrito a mano, sin armazón), guardarlo bajo su huella en
+`app/src/servidor/almacen.ts`, verificarlo o rechazarlo con motivo, descargarlo como
+descarga, y ver el avance subir y caer. Commit `8494efb`. **391 comprobaciones.**
 
-De paso se arregló una avería que ya estaba corriendo: los colores estaban escritos
-cuatro veces, una por pantalla, y habían derivado. Ahora hay una sola envoltura en
-`app/src/pantallas/base.ts`, y tres pruebas impiden que vuelva a pasar.
+Avisado al CEO el **40%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
+La pantalla de verdad: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Subir el archivo de verdad, por HTTP.** `subir()` existe y está probado, pero
-   ninguna ruta acepta todavía un `multipart/form-data`, así que el circuito no se
-   puede recorrer desde un navegador. Hace falta: leer el multipart sin armazón
-   (igual que el resto del servidor), un límite de tamaño, una lista blanca de tipos,
-   y decidir **dónde viven los bytes** — hoy solo se guarda la huella, el nombre, el
-   tamaño y el tipo. La huella es la identidad, así que el almacén puede cambiar
-   después sin tocar nada de esto.
-2. **Verificar y rechazar desde la pantalla.** Los dos botones, con su testigo
-   antifalsificación, en la cola de revisión de la cartera. Rechazar exige motivo:
-   el formulario tiene que pedirlo, no dejar que la base de datos sea quien diga que
-   no.
-3. **Avisar por correo** cuando algo entra en la bandeja, cuando una valuación queda
+1. **Avisar por correo.** Cuando algo entra en la bandeja, cuando una valuación queda
    presentada, o cuando un documento lleva días sin revisar. Hoy hay que abrir la
-   aplicación para enterarse, y eso deja el circuito dependiendo de que alguien se
-   acuerde de mirar.
-4. **Las tres medidas, en pantalla.** `brecha_evidencia()`, `tiempo_hasta_la_verdad()`
-   y `cobertura()` existen y están probadas en la base de datos, pero no las enseña
-   ninguna pantalla todavía. Solo para dentro.
-5. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
+   aplicación para enterarse, y eso deja el circuito entero dependiendo de que alguien
+   se acuerde de mirar. Sin esto, lo construido se usa la primera semana y se
+   abandona la tercera.
+2. **Las tres medidas, en pantalla.** `brecha_evidencia()`, `tiempo_hasta_la_verdad()`
+   y `cobertura()` existen y están probadas, pero no las enseña ninguna pantalla.
+   Solo para dentro; el cliente no ve ninguna de las tres.
+3. **Los hitos desde la plantilla.** `plantilla_hito` existe y está vacía: hoy los
+   hitos se insertan a mano. Falta sembrar las plantillas de los cinco tipos de
+   contrato y crearlos solos al dar de alta un renglón.
+4. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
    (caja chica, y el importador atado a valuaciones de verdad).
 
 **Cómo continuar, literalmente:**
@@ -49,8 +41,15 @@ cd /home/user/docs/nexus/app && npx tsc --noEmit
 base de datos, el diccionario bilingüe, el buscador de colisiones y las de la
 aplicación. Si algo falla ahí, eso es lo primero, antes que cualquier cosa nueva.
 
+Para mirar una pantalla sin desplegar nada:
+
+```bash
+NEXUS_PERSONA=<uuid> node --experimental-strip-types \
+  herramientas/pintar-avance.ts <renglon> es salida.html [cliente]
+```
+
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-355 comprobaciones hayan encontrado once fallos reales, nueve de ellos míos.
+391 comprobaciones hayan encontrado doce fallos reales, diez de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -195,6 +194,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/pruebas/base.test.ts` | Que ninguna pantalla declare sus colores, monte su propio documento ni tenga su propio `escapar`. **Dos versiones de escapar es como se cuela sin escapar el texto de un cliente por una de las dos.** |
 | `app/pruebas/evidencia.test.ts` · `pantalla-avance.test.ts` | Que el camino humano no abra ningún atajo que la base de datos ya había cerrado, y que la pantalla no se pueda leer como un porcentaje suelto. |
 | `db/colisiones.py` | Busca dos archivos de prueba que compartan prefijo de UUID o fecha de tasa del BCV. **Es el fallo más caro de los encontrados aquí, porque no se ve:** el segundo archivo se queda con las filas del primero y la prueba pasa o falla según el orden en que corran. |
+| `app/src/servidor/multipart.ts` | Leer un formulario con archivo, **sin armazón**. Es lo único del servidor que acepta bytes arbitrarios de fuera, y por eso está escrito aquí: son ciento y pico líneas y el día que algo falle a las tres de la madrugada conviene poder leerlo entero. Lo más fácil de estropear y lo más importante: **el CRLF que va antes de la frontera siguiente es de la frontera, no del contenido**; sin quitarlo, todo archivo saldría dos bytes más largo y con la huella cambiada. |
+| `app/src/servidor/almacen.ts` | Dónde viven los bytes. **Bajo su huella, no bajo su nombre.** El mismo certificado de colada acompaña a las cuatro válvulas del mismo lote y hoy se sube cuatro veces; así ocupa una. Comprobar que un documento no se ha cambiado es volver a calcular su huella, sin confiar en nadie. Es un almacén en disco a propósito: el día que haga falta S3 cambia ese archivo y nada más, porque el resto del sistema solo conoce huellas. |
+| `app/pruebas/subida.test.ts` | El circuito entero por HTTP: subir, verificar, ver el avance subir, rechazar con motivo, verlo caer, y todos los intentos de saltárselo. |
+| `app/herramientas/pintar-avance.ts` | Genera la pantalla del avance desde la base de datos real, como cliente o como GPS, sin desplegar nada. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -340,6 +343,18 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 138 | Un hito sin empezar se atenúa, no desaparece: si desapareciera, los pesos visibles no sumarían 100. |
 | 139 | Ninguna pantalla declara sus propios colores, ni monta su documento, ni repite `escapar`. |
 | 140 | El avance de un renglón se sirve en su ruta, y uno que no te toca devuelve 404, no 403. |
+| 141 | El CRLF de la frontera no se cuela en el archivo: la huella sale exacta con bytes crudos, nulos y 0xFF. |
+| 142 | Del nombre del archivo no queda ninguna ruta: de `../../etc/passwd` queda `passwd`. |
+| 143 | Un cuerpo por encima del techo, y uno con demasiadas partes, se rechazan los dos. |
+| 144 | El mismo documento dos veces ocupa una vez en el disco. |
+| 145 | Una huella que no es una huella no llega al disco: `..`, mayúsculas, 63 y 65 caracteres. |
+| 146 | Un documento cambiado por debajo **se delata**: `intacto()` lo dice. |
+| 147 | El circuito entero: subir → el avance sigue en 0 → verificar → sube al 40%. |
+| 148 | El documento se sirve como **descarga**, con `nosniff`, y los bytes salen exactos. |
+| 149 | Un SVG no entra: la lista de formatos es cerrada, y se filtra otra vez al salir. |
+| 150 | El cliente no puede subir, ni verificar, ni rechazar — y la pantalla ni le pinta los botones. |
+| 151 | Rechazar exige motivo también en la ruta, no solo en la base de datos. |
+| 152 | El destino de vuelta no puede sacarte del portal, tampoco al subir. |
 
 ## Lo que sigue
 
