@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 10:00 (España)
-**Avance:** 101 de 141 sesiones · **72%**
+**Avance:** 104 de 141 sesiones · **74%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -16,29 +16,31 @@ valuación aprobada, con su correlativo puesto por la base de datos. Y **las not
 pantalla: una factura emitida no se toca, se corrige con una nota que deja las dos en
 el libro. Y **la comprobación de firma del testigo de
 identidad**, que es la mitad de SSO que faltaba. Y **el camino entero de entrar con la cuenta
-de la empresa**, probado con testigos firmados de verdad. Commit `d38cc16`. **650 comprobaciones.**
+de la empresa**, probado con testigos firmados de verdad. Con **sus dos rutas HTTP** y el cambio de
+código por testigo: el circuito de entrada con la empresa se recorre entero.
+Commit `4b982ad`. **659 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Las dos rutas HTTP del SSO, y el cambio de código por testigo.** `dominio/sso.ts`
-   ya hace el camino entero y está probado con testigos firmados de verdad; lo que falta
-   es fino y concreto: `GET /entrar/empresa` y `GET /entrar/empresa/vuelta` en
-   `rutas.ts`, el `Cambiador` real (un POST al proveedor con el `client_secret`, que
-   sale de una variable de entorno), y el botón en la pantalla de entrada. El
-   `Cambiador` y el verificador se pasan desde fuera **a propósito**, para poder probar
-   todo lo demás sin red.
-2. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
+1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
+2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
    usa la primera semana y se abandona la tercera.
+3. **Retenciones de IVA e ISLR a proveedores, en pantalla.** `11-egresos.sql` las
+   calcula y emite el comprobante con su correlativo; no hay botón.
 4. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
    no lo usa ninguna pantalla.
-5. **Retenciones de IVA e ISLR a proveedores, en pantalla.** `11-egresos.sql` las
-   calcula y emite el comprobante con su correlativo; no hay botón.
+5. **Activos fijos y depreciación en pantalla.** Igual: `15-activos.sql` construido y
+   probado, sin pantalla. Importa más de lo que parece — alquiler de equipos es uno de
+   los cinco tipos de contrato.
+
+**Patrón que se repite y conviene ver entero:** hay cinco módulos de base de datos
+construidos y probados que **no usa ninguna pantalla**. El trabajo que queda es, en su
+mayor parte, ponerles la pantalla encima — no inventar nada nuevo.
 
 **Cómo continuar, literalmente:**
 
@@ -59,7 +61,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-650 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
+659 comprobaciones hayan encontrado veintiocho fallos reales, veinticinco de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -229,6 +231,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/24-facturar.sql` | Emitir la factura. **El correlativo lo pone la base de datos**, con un bloqueo sobre la organización: dos personas facturando a la vez esperan una a la otra en vez de sacar el mismo número — que es lo que pasa el día que dos personas cierran el mes. Y **no genera otro asiento**: la cuenta por cobrar ya nació con la valuación, así que un asiento aquí duplicaría el ingreso. |
 | `app/src/servidor/jwks.ts` | La firma del testigo de identidad: **lo único que separa «entrar con la cuenta de la empresa» de «entrar diciendo que eres quien quieras»**. Solo RS256, decidido por quien verifica y no por quien firma — aceptar el algoritmo que venga dentro es el ataque clásico contra JWT. La clave se busca por su `kid`, y el juego de claves se guarda un rato pero **se vuelve a pedir ante un `kid` desconocido**: los proveedores rotan sin avisar. |
 | `db/schema/25-sso.sql` · `app/src/dominio/sso.ts` | Entrar con la cuenta de la empresa. **El motivo entero: cuando la operadora da de baja al ingeniero, pierde el acceso el mismo día**, sin que nadie de GPS se acuerde. El estado y el nonce viven en la base de datos y **se queman al usarse** — en una cookie, quien pueda escribirla elige el nonce, y elegir el nonce es reutilizar un testigo viejo. La empresa se busca **por la persona**, no por el dominio del correo. Y no se crea la persona sola: tener cuenta en Microsoft no es tener acceso a este contrato. |
+| `app/src/servidor/proveedores.ts` | Microsoft y Google configurados. **El `client_secret` sale del entorno:** escribirlo en el código es escribirlo en el historial del repositorio para siempre, y un secreto que estuvo en un repositorio está quemado aunque se borre. **Medio configurado es peor que nada**, así que un cliente sin secreto no cuenta como configurado — se ofrecería el botón y fallaría al volver. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -483,6 +486,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 247 | Un correo sin verificar no entra: puede ser el de otra persona. |
 | 248 | Quien no tiene cuenta aquí **no se crea solo**, y **quien está de baja no entra**. |
 | 249 | La huella del sujeto manda sobre el correo: cambiar de correo sigue siendo la misma persona. |
+| 250 | Sin SSO configurado, entrar con la empresa responde **como un correo cualquiera**. |
+| 251 | Un cliente sin secreto **no cuenta como configurado**. |
+| 252 | Microsoft pone el inquilino en el emisor y Google no: confundirlos deja entrar cuentas personales. |
+| 253 | La vuelta sin estado, sin código o con un estado inventado **no llega a mirar nada**. |
 
 ## Lo que sigue
 
