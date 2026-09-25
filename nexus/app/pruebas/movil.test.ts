@@ -319,3 +319,121 @@ test('el color de enlace y el del botón verde CAMBIAN con el tema', async () =>
   assert.notEqual(claro[0], oscuro[0], 'el color de enlace no cambia con el tema')
   assert.notEqual(claro[1], oscuro[1], 'el color sobre el verde no cambia con el tema')
 })
+
+
+// ===========================================================================
+// El recorrido con el teclado.
+//
+// Hay gente que no usa el ratón: por costumbre, porque va más rápido rellenando un
+// formulario largo, o porque no puede. Todos necesitan lo mismo — ver DÓNDE están.
+//
+// Hasta esta prueba, casi toda la aplicación se fiaba del anillo que pone el
+// navegador por su cuenta: un trazo de 1 px casi negro, que sobre la cabecera azul
+// marino no se ve en absoluto. Y los tres campos de fecha del alta de contrato no
+// tenían ninguno: un campo de fecha se recorre por dentro —día, mes, año— y mientras
+// el foco está en una de sus partes el campo en sí no cuenta como enfocado, así que
+// su anillo no llega a pintarse. El que se ve es el de la etiqueta que lo envuelve.
+//
+// Nada de esto se ve leyendo el CSS. Hay que tabular de verdad.
+
+/** Dónde está el foco y si se ve, mirando también la etiqueta que envuelve. */
+const DONDE_ESTA_EL_FOCO = `(() => {
+  const a = document.activeElement
+  if (!a || a === document.body) return null
+  const anillo = (s) => s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 1
+  const eti = a.closest('label')
+  const c = a.getBoundingClientRect()
+  return {
+    etiqueta: a.tagName.toLowerCase(),
+    nombre: (a.getAttribute('name') || (a.textContent || '').trim()).slice(0, 24),
+    seVe: anillo(getComputedStyle(a)) || (eti ? anillo(getComputedStyle(eti)) : false),
+    visible: c.width > 0 && c.height > 0,
+  }
+})()`
+
+/** Tabula por una pantalla y devuelve cada parada. */
+async function tabular(ruta: string, cookie: string | null, saltos = 40) {
+  const ctx = await nav.newContext({ viewport: { width: 1100, height: 900 } })
+  await ctx.route('**://**', (r) => r.abort())
+  const page = await ctx.newPage()
+  await page.setContent((await pedir({ ruta, cookie })).cuerpo ?? '', { waitUntil: 'load' })
+  const paradas: Array<{ etiqueta: string; nombre: string; seVe: boolean; visible: boolean }> = []
+  for (let i = 0; i < saltos; i++) {
+    await page.keyboard.press('Tab')
+    const d = await page.evaluate(DONDE_ESTA_EL_FOCO) as typeof paradas[number] | null
+    if (!d) break
+    paradas.push(d)
+  }
+  await ctx.close()
+  return paradas
+}
+
+for (const ruta of ['/entrar', '/', '/contratos/nuevo', '/periodos', '/libros', '/perfil'] as const) {
+  test(`tabulando por ${ruta} siempre se ve dónde está el foco`, async () => {
+    const paradas = await tabular(ruta, ruta === '/entrar' ? null : gps)
+    // La red contra pasar en vano: una pantalla sin paradas no comprobó nada.
+    assert.ok(paradas.length >= 2, `${ruta} solo tuvo ${paradas.length} parada(s)`)
+
+    const ciegas = paradas.filter((p) => !p.seVe)
+      .map((p) => `${p.etiqueta}[${p.nombre}]`)
+    assert.deepEqual(ciegas, [],
+      `en ${ruta} el foco desaparece en: ${ciegas.join(', ')}`)
+
+    const escondidas = paradas.filter((p) => !p.visible)
+      .map((p) => `${p.etiqueta}[${p.nombre}]`)
+    assert.deepEqual(escondidas, [],
+      `en ${ruta} el foco para en algo que no se ve: ${escondidas.join(', ')}`)
+  })
+}
+
+test('se entra ENTERA con el teclado: correo, clave y enviar sin tocar el ratón', async () => {
+  // Es la primera pantalla y la que más se teclea. Si aquí hace falta el ratón, da
+  // igual lo bien que esté el resto.
+  const ctx = await nav.newContext({ viewport: { width: 1100, height: 900 } })
+  await ctx.route('**://**', (r) => r.abort())
+  const page = await ctx.newPage()
+  await page.setContent((await pedir({ ruta: '/entrar' })).cuerpo ?? '', { waitUntil: 'load' })
+
+  await page.keyboard.press('Tab')
+  await page.keyboard.type('alguien@ejemplo.test')
+  await page.keyboard.press('Tab')
+  await page.keyboard.type('una clave')
+  const escrito = await page.evaluate(`(() => {
+    const c = document.querySelector('input[name=correo]')
+    const v = document.querySelector('input[name=clave]')
+    return [c ? c.value : '', v ? v.value : '']
+  })()`) as string[]
+  await ctx.close()
+
+  assert.equal(escrito[0], 'alguien@ejemplo.test', 'el primer salto no llegó al correo')
+  assert.equal(escrito[1], 'una clave', 'el segundo salto no llegó a la clave')
+})
+
+test('los campos de FECHA también enseñan el foco al tabular', async () => {
+  // Es el caso que encontró este archivo, y merece su propia prueba con nombre: se
+  // recorren por dentro, y el anillo que se ve es el de la etiqueta.
+  const paradas = await tabular('/contratos/nuevo', gps)
+  const fechas = paradas.filter((p) => ['firmado_el', 'inicio', 'fin_previsto'].includes(p.nombre))
+  assert.ok(fechas.length >= 3, `solo se llegó a ${fechas.length} campo(s) de fecha`)
+  for (const f of fechas) assert.ok(f.seVe, `el campo ${f.nombre} no enseña el foco`)
+})
+
+test('el anillo de foco de la cabecera es CLARO: la cabecera es azul marino', async () => {
+  // La tinta oscura sobre el azul marino de la cabecera no se ve, y la cabecera es
+  // azul marino en los dos temas.
+  const ctx = await nav.newContext({ viewport: { width: 1100, height: 900 } })
+  await ctx.route('**://**', (r) => r.abort())
+  const page = await ctx.newPage()
+  await page.setContent((await pedir({ ruta: '/', cookie: gps })).cuerpo ?? '', { waitUntil: 'load' })
+  await page.keyboard.press('Tab')
+  const color = await page.evaluate(`(() => {
+    const a = document.activeElement
+    return a.closest('.hd') ? getComputedStyle(a).outlineColor : null
+  })()`) as string | null
+  await ctx.close()
+  if (color !== null) {
+    const claro = /(\d+)/.exec(color)
+    assert.ok(claro && Number(claro[1]) > 180,
+      `el anillo de la cabecera es ${color}, demasiado oscuro para el azul marino`)
+  }
+})

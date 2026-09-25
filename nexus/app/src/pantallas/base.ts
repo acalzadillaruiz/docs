@@ -55,6 +55,26 @@ body{margin:0;background:var(--bg);color:var(--ik);font-family:Inter,system-ui,s
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .m{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
 .wrap{max-width:760px;margin:0 auto;padding:0 18px}
+/* ------------------------------------------------------------------ el foco
+   Quien no usa ratón necesita ver DÓNDE está. Hasta ahora casi toda la aplicación
+   se fiaba del anillo que pone el navegador por su cuenta: un trazo de 1 px casi
+   negro, que sobre la cabecera azul marino no se ve en absoluto.
+
+   Va aquí y no en cada pantalla por lo de siempre: diez sitios con diez anillos
+   distintos son diez sitios donde se olvida uno.
+
+   El color es la propia tinta, que ya cambia con el tema: oscura sobre claro, clara
+   sobre oscuro. En la cabecera, que es azul marino en los dos temas, hace falta uno
+   claro a la fuerza. */
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{
+  outline:2px solid var(--ik);outline-offset:2px;border-radius:3px}
+/* Un campo de FECHA se recorre por dentro —día, mes, año—, y mientras el foco está
+   en una de sus partes el campo en sí no cuenta como enfocado: la pseudoclase de
+   foco no lo casa y el anillo no llega a pintarse. Quien tabula por un formulario con fechas no ve
+   nada. El que sí se pinta es el de su etiqueta, que envuelve al campo. */
+label:focus-within{outline:2px solid var(--ik);outline-offset:2px;border-radius:10px}
+.hd :where(a,button,input,select):focus-visible,.hd label:focus-within{
+  outline-color:#E9F0F6}
 .hd{background:var(--nv);color:#E9F0F6;padding-block:22px 34px}
 .volver{display:inline-block;color:#A2B7C9;text-decoration:none;font-size:13.5px;margin-bottom:16px}
 .volver:hover{color:#E9F0F6}
