@@ -17,6 +17,7 @@
  */
 
 import { traductor, type Idioma } from '../i18n/t.ts'
+import { pagina, escapar } from './base.ts'
 
 export type PasoEntrada =
   | { readonly paso: 'ingreso'; readonly correo?: string; readonly error?: 'rechazado' }
@@ -25,9 +26,6 @@ export type PasoEntrada =
   | { readonly paso: 'recuperacion'; readonly error?: 'rechazado' }
   | { readonly paso: 'empresa'; readonly metodo: 'microsoft' | 'google' }
   | { readonly paso: 'invitacion'; readonly nombre: string; readonly ficha: string }
-
-const escapar = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 const TEXTOS = {
   es: {
@@ -174,29 +172,10 @@ export function pintarEntrada(p: PasoEntrada, idioma: Idioma): string {
   const { titulo, html } = cuerpo(p, idioma)
   const saludo = p.paso === 'invitacion' ? escapar(p.nombre) : 'GPS Nexus'
 
-  return `<!doctype html>
-<html lang="${idioma}">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapar(titulo)} · GPS Nexus</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
-<style>
-:root{
-  --nv:#0B2137; --nv2:#123049; --nv3:#1B4364; --gr:#12B76A;
-  --cd:#FFFFFF; --ik:#16202B; --ik2:#55616D; --md:#8A939C;
-  --ln:#E3E4E1; --ln2:#D0D2CE; --rj:#A8323C;
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --cd:#0D2338; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
-  --ln:#1A3750; --ln2:#254B69; --rj:#E8737E;
-}}
-:root[data-theme="dark"]{
-  --cd:#0D2338; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
-  --ln:#1A3750; --ln2:#254B69; --rj:#E8737E;
-}
-*{box-sizing:border-box}
+  return pagina({
+    idioma,
+    titulo,
+    estilos: `
 body{margin:0;min-height:100dvh;background:var(--nv);color:var(--ik);
   font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.5;
   display:grid;place-items:center;padding:24px 18px;-webkit-font-smoothing:antialiased}
@@ -224,8 +203,9 @@ button.emp{background:var(--nv3)}
   color:var(--rj);border:1px solid var(--rj)}
 .cuenta{margin-top:22px;text-align:center;font-family:"JetBrains Mono",monospace;
   font-size:46px;font-weight:700;letter-spacing:-.04em;color:var(--nv3)}
-</style>
-<main class="caja">
+`,
+    cabecera: ``,
+    cuerpo: `<main class="caja">
   <div class="marca">${saludo}</div>
   <h1>${escapar(titulo)}</h1>
   ${html}
@@ -244,6 +224,6 @@ ${
 })();
 </script>`
     : ''
-}
-</html>`
+}`,
+  })
 }

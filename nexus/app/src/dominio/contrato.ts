@@ -22,6 +22,7 @@ import { moneda, numero, fecha as formatearFecha, t, type Clave, type Idioma } f
 import { ValuacionNoAlcanzable } from './valuacion.ts'
 
 export type Renglon = {
+  readonly id: string
   readonly numero: number
   readonly descripcion: string
   readonly cantidad: string
@@ -33,6 +34,13 @@ export type Renglon = {
   /** Solo para dentro. Nulo siempre que quien pregunta es un cliente. */
   readonly costoUnitario: string | null
   readonly margenPct: string | null
+  /**
+   * El avance del renglon, en puntos. Sale de los hitos verificados y de ningun
+   * otro sitio: no hay columna que lo guarde. `declarado` es lo que alguien dice
+   * que esta hecho, y la diferencia entre los dos es lo que no se podria demostrar.
+   */
+  readonly avance: number
+  readonly declarado: number
 }
 
 export type ValuacionBreve = {
@@ -118,13 +126,15 @@ export async function ficha(
   // con un hueco. Esa diferencia importa: un error es ruidoso y un hueco se cuela.
   const renglonesCrudos = verCostos
     ? (await q`
-        select numero, descripcion_es, descripcion_en, cantidad::text, unidad,
-               norma, especificacion, precio_unitario::text, costo_unitario::text
+        select id, numero, descripcion_es, descripcion_en, cantidad::text, unidad,
+               norma, especificacion, precio_unitario::text, costo_unitario::text,
+               avance_renglon(id)::text as avance, avance_declarado(id)::text as declarado
           from renglon where contrato_id = ${contratoId}::uuid order by numero
       `) as unknown as Array<Record<string, string | null>>
     : (await q`
-        select numero, descripcion_es, descripcion_en, cantidad::text, unidad,
-               norma, especificacion, precio_unitario::text, null as costo_unitario
+        select id, numero, descripcion_es, descripcion_en, cantidad::text, unidad,
+               norma, especificacion, precio_unitario::text, null as costo_unitario,
+               avance_renglon(id)::text as avance, avance_declarado(id)::text as declarado
           from renglon where contrato_id = ${contratoId}::uuid order by numero
       `) as unknown as Array<Record<string, string | null>>
 
@@ -155,6 +165,7 @@ export async function ficha(
       const precio = Number(r['precio_unitario'])
       const costo = r['costo_unitario'] === null ? null : Number(r['costo_unitario'])
       return {
+        id: r['id'] ?? '',
         numero: Number(r['numero']),
         descripcion: (idioma === 'es' ? r['descripcion_es'] : r['descripcion_en']) ?? '',
         cantidad: numero(idioma, cantidad, cantidad % 1 === 0 ? 0 : 2),
@@ -169,6 +180,8 @@ export async function ficha(
         margenPct: costo === null || precio === 0
           ? null
           : `${numero(idioma, Math.round(((precio - costo) / precio) * 1000) / 10, 1)} %`,
+        avance: Number(r['avance'] ?? 0),
+        declarado: Number(r['declarado'] ?? 0),
       }
     }),
     valuaciones: valuacionesCrudas.map((v): ValuacionBreve => ({

@@ -28,6 +28,10 @@ import {
   hojaDeValuacion, cabeceraDeValuacion, objecionesDe, ValuacionNoAlcanzable,
 } from '../dominio/valuacion.ts'
 import { aprobar, objetar, responder } from '../dominio/aprobacion.ts'
+import {
+  avanceDelRenglon, cabeceraDelRenglon, porRevisar, HitoNoAlcanzable,
+} from '../dominio/evidencia.ts'
+import { pintarPaginaAvance, pintarPorRevisar } from '../pantallas/evidencia.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
 import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
@@ -176,8 +180,12 @@ export async function resolver(
       lista: await cartera(q, p.idioma),
       // La bandeja solo tiene sentido desde dentro: es lo que espera a GPS.
       pendientes: esCliente ? [] : await bandeja(q, p.idioma),
+      // Revisar es de GPS. Al cliente no se le pide ni se le enseña.
+      cola: esCliente ? [] : await porRevisar(q, p.idioma),
     }))
-    return html(200, pintarCartera(datos.lista, p.idioma, esCliente, datos.pendientes))
+    return html(200, pintarCartera(
+      datos.lista, p.idioma, esCliente, datos.pendientes, datos.cola,
+    ))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
@@ -187,6 +195,23 @@ export async function resolver(
       return html(200, pintarContrato(f, p.idioma, esCliente))
     } catch (e) {
       if (e instanceof ContratoNoAlcanzable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
+  // El avance de un renglón, abierto: de dónde sale el número, hito por hito, hasta
+  // el documento. Se llega pulsando sobre la barra del renglón, que es la única
+  // razón por la que alguien querría entrar aquí.
+  const renglon = /^\/renglones\/([0-9a-f-]{36})$/.exec(p.ruta)
+  if (renglon && p.metodo === 'GET') {
+    try {
+      const datos = await comoQuien(async (q) => ({
+        cabecera: await cabeceraDelRenglon(q, renglon[1]!, p.idioma),
+        avance: await avanceDelRenglon(q, renglon[1]!, p.idioma),
+      }))
+      return html(200, pintarPaginaAvance(datos.avance, datos.cabecera, p.idioma))
+    } catch (e) {
+      if (e instanceof HitoNoAlcanzable) return noEncontrado(p.idioma)
       throw e
     }
   }

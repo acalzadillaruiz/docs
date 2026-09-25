@@ -66,8 +66,10 @@ test('funciona en modo oscuro sin que el usuario elija nada', () => {
 })
 
 test('el título de la pestaña dice de qué valuación se trata', () => {
-  assert.match(pintarValuacion(DATOS, 'es'), /<title>Valuación 1 · GPS-2026-001<\/title>/)
-  assert.match(pintarValuacion(DATOS, 'en'), /<title>Progress payment 1 · GPS-2026-001<\/title>/)
+  // El sufijo lo pone la envoltura común, igual en todas las pantallas. Antes esta
+  // era la única que no lo llevaba, y con veinte pestañas abiertas eso importa.
+  assert.match(pintarValuacion(DATOS, 'es'), /<title>Valuación 1 · GPS-2026-001 · GPS Nexus<\/title>/)
+  assert.match(pintarValuacion(DATOS, 'en'), /<title>Progress payment 1 · GPS-2026-001 · GPS Nexus<\/title>/)
 })
 
 test('los botones solo aparecen cuando se pueden pulsar de verdad', () => {

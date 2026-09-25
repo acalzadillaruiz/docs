@@ -23,7 +23,7 @@
 
 import { createHash } from 'node:crypto'
 import type { Consulta } from '../db/conexion.ts'
-import { t, numero, type Idioma } from '../i18n/t.ts'
+import { t, numero, fecha as formatearFecha, type Idioma } from '../i18n/t.ts'
 
 export type Clase =
   | 'foto' | 'acta' | 'certificado' | 'conocimiento'
@@ -99,14 +99,14 @@ type FilaHito = {
   id: string; renglon_id: string; orden: number; clave: string
   nombre: string; peso: string; estado: EstadoHito
   exige: Clase[]; falta: Clase[] | null
-  planificada: string | null; pronosticada: string | null
-  ocurrido_en: string | null; registrado_en: string | null
+  planificada: Date | null; pronosticada: Date | null
+  ocurrido_en: Date | null; registrado_en: Date | null
 }
 
 type FilaDoc = {
   id: string; hito_id: string; clase: Clase; huella: string; nombre: string
-  bytes: string; tipo_mime: string; ocurrido_en: string | null
-  subida_en: string
+  bytes: string; tipo_mime: string; ocurrido_en: Date | null
+  subida_en: Date
   verificada_en: string | null; rechazada_en: string | null
   motivo_rechazo: string | null
 }
@@ -125,7 +125,11 @@ const CAMPOS_DOC = [
 const columnas = (alias = '') =>
   CAMPOS_DOC.map((c) => (alias ? `${alias}.${c}` : c)).join(', ')
 
-function documento(f: FilaDoc): Documento {
+// Las fechas llegan de la base de datos como fechas, no como texto, y la pantalla
+// las escapa como si fueran texto. Se dan formato aqui, en el idioma de quien mira,
+// que ademas es donde tiene que hacerse: '10/09/2026' y '09/10/2026' son dos dias
+// distintos segun quien lo lea.
+function documento(f: FilaDoc, idioma: Idioma): Documento {
   return {
     id: f.id,
     clase: f.clase,
@@ -133,8 +137,8 @@ function documento(f: FilaDoc): Documento {
     nombre: f.nombre,
     bytes: Number(f.bytes),
     tipoMime: f.tipo_mime,
-    ocurridoEn: f.ocurrido_en,
-    subidaEn: f.subida_en,
+    ocurridoEn: f.ocurrido_en ? formatearFecha(idioma, f.ocurrido_en) : null,
+    subidaEn: formatearFecha(idioma, f.subida_en),
     estado: f.rechazada_en ? 'rechazada' : f.verificada_en ? 'verificada' : 'sin_revisar',
     motivoRechazo: f.motivo_rechazo ?? null,
   }
@@ -188,11 +192,11 @@ export async function avanceDelRenglon(
     estado: h.estado,
     exige: h.exige,
     falta: h.falta ?? [],
-    planificada: h.planificada,
-    pronosticada: h.pronosticada,
-    ocurridoEn: h.ocurrido_en,
-    registradoEn: h.registrado_en,
-    documentos: (porHito.get(h.id) ?? []).map(documento),
+    planificada: h.planificada ? formatearFecha(idioma, h.planificada) : null,
+    pronosticada: h.pronosticada ? formatearFecha(idioma, h.pronosticada) : null,
+    ocurridoEn: h.ocurrido_en ? formatearFecha(idioma, h.ocurrido_en) : null,
+    registradoEn: h.registrado_en ? formatearFecha(idioma, h.registrado_en) : null,
+    documentos: (porHito.get(h.id) ?? []).map((d) => documento(d, idioma)),
   }))
 
   // Los dos porcentajes se suman aquí desde los mismos hitos que se acaban de
@@ -212,6 +216,42 @@ export async function avanceDelRenglon(
     declarado: Math.round(declarado * 100) / 100,
     brecha: Math.round((declarado - verificado) * 100) / 100,
     hitos: salida,
+  }
+}
+
+/**
+ * De que renglon es este avance, para poder titular la pagina y volver al contrato.
+ *
+ * Va aparte de `avanceDelRenglon` y no dentro: el avance se pinta tambien incrustado
+ * en la ficha del contrato, donde esta cabecera ya esta puesta arriba y repetirla
+ * seria decir dos veces lo mismo en la misma pantalla.
+ */
+export async function cabeceraDelRenglon(
+  q: Consulta, renglonId: string, idioma: Idioma,
+): Promise<{
+  contratoId: string; contrato: string; renglon: string; cantidad: string; norma: string | null
+}> {
+  const [f] = (await q`
+    select ct.id as contrato_id, ct.codigo as contrato,
+           case when ${idioma} = 'es' then rg.descripcion_es else rg.descripcion_en end as renglon,
+           rg.cantidad::text as cantidad, rg.unidad, rg.norma
+      from renglon rg join contrato ct on ct.id = rg.contrato_id
+     where rg.id = ${renglonId}::uuid
+  `) as unknown as Array<{
+    contrato_id: string; contrato: string; renglon: string
+    cantidad: string; unidad: string; norma: string | null
+  }>
+  // Vacio significa las dos cosas a la vez — no existe, o no es tuyo — y las dos se
+  // responden igual. Distinguirlas convertiria la direccion en un buscador.
+  if (!f) throw new HitoNoAlcanzable()
+
+  const cantidad = Number(f.cantidad)
+  return {
+    contratoId: f.contrato_id,
+    contrato: f.contrato,
+    renglon: f.renglon,
+    cantidad: `${numero(idioma, cantidad, cantidad % 1 === 0 ? 0 : 2)} ${f.unidad}`,
+    norma: f.norma,
   }
 }
 
@@ -242,7 +282,7 @@ export type ResultadoSubida = {
  * huella y no una ruta.
  */
 export async function subir(
-  q: Consulta, s: Subida, personaId: string,
+  q: Consulta, s: Subida, personaId: string, idioma: Idioma = 'es',
 ): Promise<ResultadoSubida> {
   if (s.contenido.length === 0) throw new DocumentoVacio()
 
@@ -264,7 +304,7 @@ export async function subir(
     // El mismo archivo, otra vez. Se devuelve el que ya estaba en vez de crear un
     // duplicado: quien lo sube de nuevo casi siempre es alguien que no sabía.
     const estado = await recalcular(q, s.hitoId)
-    return { documento: documento(ya), yaEstaba: true, estadoHito: estado }
+    return { documento: documento(ya, idioma), yaEstaba: true, estadoHito: estado }
   }
 
   const [fila] = (await q`
@@ -291,7 +331,7 @@ export async function subir(
   }
 
   const estado = await recalcular(q, s.hitoId)
-  return { documento: documento(fila!), yaEstaba: false, estadoHito: estado }
+  return { documento: documento(fila!, idioma), yaEstaba: false, estadoHito: estado }
 }
 
 export type Revision =

@@ -13,10 +13,10 @@
 import type { ResumenContrato } from '../dominio/cartera.ts'
 import type { Pendiente } from '../dominio/bandeja.ts'
 import { pintarBandeja, ESTILOS_BANDEJA } from './bandeja.ts'
+import { pintarPorRevisar, ESTILOS_AVANCE } from './evidencia.ts'
+import type { PorRevisar } from '../dominio/evidencia.ts'
 import { traductor, type Idioma } from '../i18n/t.ts'
-
-const escapar = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+import { pagina, escapar } from './base.ts'
 
 const TEXTOS = {
   es: {
@@ -56,6 +56,13 @@ export function pintarCartera(
   idioma: Idioma,
   esCliente: boolean,
   pendientes: readonly Pendiente[] = [],
+  /**
+   * Los documentos esperando revisión. Van aquí y no en una pantalla aparte por el
+   * mismo motivo que la bandeja: mientras un papel está sin revisar, el avance que
+   * sostiene no cuenta y el contrato parece más atrasado de lo que está. Una cola
+   * que hay que acordarse de mirar es una cola que no se mira.
+   */
+  porRevisar: readonly PorRevisar[] = [],
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -97,37 +104,10 @@ export function pintarCartera(
 </a>`
       }).join('\n')
 
-  return `<!doctype html>
-<html lang="${idioma}">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapar(titulo)} · GPS Nexus</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
-<style>
-:root{
-  --nv:#0B2137; --nv2:#123049; --nv3:#1B4364; --gr:#12B76A; --grt:#07734A;
-  --bg:#F1F2F0; --cd:#FFFFFF; --cd2:#FAFAF8;
-  --ik:#16202B; --ik2:#55616D; --md:#8A939C; --ln:#E3E4E1; --ln2:#D0D2CE;
-  --am:#946307; --amb:#FDF3DF; --rj:#A8323C;
-  --sh:0 1px 2px rgba(22,32,43,.05);
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#071726; --cd:#0D2338; --cd2:#102A42; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
-  --ln:#1A3750; --ln2:#254B69; --grt:#3FE0A5; --am:#EFC167; --amb:#33280C; --rj:#E8737E;
-  --sh:0 1px 2px rgba(0,0,0,.45);
-}}
-:root[data-theme="dark"]{
-  --bg:#071726; --cd:#0D2338; --cd2:#102A42; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
-  --ln:#1A3750; --ln2:#254B69; --grt:#3FE0A5; --am:#EFC167; --amb:#33280C; --rj:#E8737E;
-  --sh:0 1px 2px rgba(0,0,0,.45);
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ik);font-family:Inter,system-ui,sans-serif;
-  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.wrap{max-width:760px;margin:0 auto;padding:0 18px}
-.hd{background:var(--nv);color:#E9F0F6;padding-block:26px 40px}
+  return pagina({
+    idioma,
+    titulo,
+    estilos: `
 .hd .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
 .hd h1{margin:0;font-size:clamp(23px,5.4vw,32px);font-weight:800;letter-spacing:-.035em}
 .hd form{margin:0}
@@ -139,7 +119,6 @@ main{margin-top:-26px;padding-bottom:70px}
 .ct:hover{border-color:var(--ln2)}
 .ct.pide{border-left:3px solid var(--am)}
 .cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.cod{font-family:"JetBrains Mono",monospace;font-size:14px;font-weight:700;letter-spacing:-.01em}
 .cli{font-size:13px;color:var(--ik2);margin-top:2px}
 .est{font-family:"JetBrains Mono",monospace;font-size:9px;font-weight:700;letter-spacing:.13em;
   text-transform:uppercase;color:var(--md);padding:4px 9px;border:1px solid var(--ln);
@@ -159,24 +138,26 @@ main{margin-top:-26px;padding-bottom:70px}
 .plazo{font-size:11.5px;color:var(--md)}
 .nada{margin-top:30px;text-align:center;color:var(--ik2)}
 ${ESTILOS_BANDEJA}
+${ESTILOS_AVANCE}
 @media(max-width:520px){
   .ct{padding:15px 15px}
   .pie{flex-direction:column;align-items:stretch;gap:10px}
   .der{flex-direction:row;justify-content:space-between;align-items:baseline;text-align:left}
 }
-</style>
-<header class="hd"><div class="wrap">
+`,
+    cabecera: `<header class="hd"><div class="wrap">
   <h1>${escapar(titulo)}</h1>
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
-</div></header>
-<main class="wrap">
+</div></header>`,
+    cuerpo: `<main class="wrap">
 ${/*
    * La segunda cerradura: la ruta ya no le pasa pendientes a un cliente, pero si
    * algún día otro sitio llamara a esta función pasándoselos, la bandeja saldría.
    * Aquí no sale, pase lo que pase. Una prueba lo comprueba llamándola a propósito
    * con pendientes y esCliente a la vez.
    */''}${pintarBandeja(esCliente ? [] : pendientes, idioma)}
+${pintarPorRevisar(esCliente ? [] : porRevisar, idioma)}
 ${tarjetas}
-</main>
-</html>`
+</main>`,
+  })
 }

@@ -11,37 +11,45 @@
 
 import type { FichaContrato } from '../dominio/contrato.ts'
 import { traductor, type Idioma } from '../i18n/t.ts'
-
-const escapar = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+import { porcentaje } from '../dominio/evidencia.ts'
+import { pagina, escapar } from './base.ts'
 
 const TEXTOS = {
   es: { volver: 'Todos los contratos', renglones: 'Qué se contrató',
         valuaciones: 'Valuaciones', sinValuaciones: 'Todavía no hay ninguna valuación.',
         firmado: 'Firmado', inicio: 'Inicio', fin: 'Fin previsto',
         anticipo: 'Anticipo', garantia: 'Retención de garantía',
-        total: 'Total', ver: 'Ver la hoja', cant: 'Cantidad', margen: 'Margen', costo: 'Costo' },
+        total: 'Total', ver: 'Ver la hoja', cant: 'Cantidad', margen: 'Margen', costo: 'Costo',
+        verAvance: 'Ver de dónde sale', sinRespaldo: 'sin demostrar' },
   en: { volver: 'All contracts', renglones: 'What was contracted',
         valuaciones: 'Progress payments', sinValuaciones: 'No progress payments yet.',
         firmado: 'Awarded', inicio: 'Start', fin: 'Planned completion',
         anticipo: 'Advance', garantia: 'Retention',
-        total: 'Total', ver: 'Open the sheet', cant: 'Quantity', margen: 'Margin', costo: 'Cost' },
+        total: 'Total', ver: 'Open the sheet', cant: 'Quantity', margen: 'Margin', costo: 'Cost',
+        verAvance: 'See where it comes from', sinRespaldo: 'unproven' },
 } as const
 
 export function pintarContrato(f: FichaContrato, idioma: Idioma, esCliente: boolean): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
+  const pct = (n: number) => porcentaje(idioma, n)
 
   const dato = (etiqueta: string, valor: string | null) =>
     valor === null ? '' : `<div class="d"><span>${escapar(etiqueta)}</span><b>${escapar(valor)}</b></div>`
 
-  const renglones = f.renglones.map((r) => `
+  const renglones = f.renglones.map((r) => {
+    // Los dos tramos, también aquí: el sólido es lo verificado y el rayado lo que
+    // alguien declaró y todavía no se puede demostrar. Enseñar solo el primero
+    // escondería el problema; enseñar solo el segundo lo exageraría.
+    const v = Math.max(0, Math.min(100, r.avance))
+    const d = Math.max(0, Math.min(100 - v, r.declarado - r.avance))
+    return `
 <div class="rg">
   <div class="rg-n">${r.numero}</div>
   <div class="rg-c">
     <div class="rg-d">${escapar(r.descripcion)}</div>
     ${r.norma || r.especificacion ? `<div class="norma">${
-      [r.norma, r.especificacion].filter(Boolean).map((v) => escapar(v!)).join(' · ')
+      [r.norma, r.especificacion].filter(Boolean).map((v2) => escapar(v2!)).join(' · ')
     }</div>` : ''}
     <div class="rg-m">
       <span>${escapar(r.cantidad)} ${escapar(r.unidad)}</span>
@@ -50,9 +58,16 @@ export function pintarContrato(f: FichaContrato, idioma: Idioma, esCliente: bool
       ${r.costoUnitario ? `<span class="int">${escapar(x.costo)} ${escapar(r.costoUnitario)}</span>` : ''}
       ${r.margenPct ? `<span class="int">${escapar(x.margen)} ${escapar(r.margenPct)}</span>` : ''}
     </div>
+    <a class="rg-a" href="/renglones/${escapar(r.id)}">
+      <span class="rg-bar"><i class="rg-bv" style="width:${v}%"></i><i class="rg-bd" style="width:${d}%"></i></span>
+      <span class="rg-pv">${escapar(pct(r.avance))}</span>
+      ${d > 0 ? `<span class="rg-pd">+${escapar(pct(r.declarado - r.avance))} ${escapar(x.sinRespaldo)}</span>` : ''}
+      <span class="rg-vm">${escapar(x.verAvance)} →</span>
+    </a>
   </div>
   <div class="rg-t">${escapar(r.total)}</div>
-</div>`).join('\n')
+</div>`
+  }).join('\n')
 
   const valuaciones = f.valuaciones.length === 0
     ? `<p class="nada">${escapar(x.sinValuaciones)}</p>`
@@ -68,43 +83,10 @@ export function pintarContrato(f: FichaContrato, idioma: Idioma, esCliente: bool
   </div>
 </a>`).join('\n')
 
-  return `<!doctype html>
-<html lang="${idioma}">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escapar(f.codigo)} · GPS Nexus</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
-<style>
-:root{
-  --nv:#0B2137; --nv3:#1B4364; --grt:#07734A;
-  --bg:#F1F2F0; --cd:#FFFFFF; --cd2:#FAFAF8;
-  --ik:#16202B; --ik2:#55616D; --md:#8A939C; --ln:#E3E4E1; --ln2:#D0D2CE;
-  --am:#946307; --amb:#FDF3DF; --sh:0 1px 2px rgba(22,32,43,.05);
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#071726; --cd:#0D2338; --cd2:#102A42; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
-  --ln:#1A3750; --ln2:#254B69; --grt:#3FE0A5; --am:#EFC167; --amb:#33280C;
-  --sh:0 1px 2px rgba(0,0,0,.45);
-}}
-:root[data-theme="dark"]{
-  --bg:#071726; --cd:#0D2338; --cd2:#102A42; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
-  --ln:#1A3750; --ln2:#254B69; --grt:#3FE0A5; --am:#EFC167; --amb:#33280C;
-  --sh:0 1px 2px rgba(0,0,0,.45);
-}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ik);font-family:Inter,system-ui,sans-serif;
-  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-.wrap{max-width:760px;margin:0 auto;padding:0 18px}
-.hd{background:var(--nv);color:#E9F0F6;padding-block:22px 34px}
-.volver{display:inline-block;color:#A2B7C9;text-decoration:none;font-size:13.5px;margin-bottom:16px}
-.volver:hover{color:#E9F0F6}
-.cod{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;letter-spacing:.16em;
-  color:#7691A8}
-.hd h1{margin:9px 0 0;font-size:clamp(22px,5.2vw,31px);font-weight:800;letter-spacing:-.035em;
-  line-height:1.15}
-.sub{margin-top:9px;color:#A2B7C9;font-size:14px}
+  return pagina({
+    idioma,
+    titulo: f.codigo,
+    estilos: `
 .kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;
   margin-top:22px;background:var(--nv3)}
 .kp .d{background:var(--nv);padding:11px 13px}
@@ -112,11 +94,6 @@ body{margin:0;background:var(--bg);color:var(--ik);font-family:Inter,system-ui,s
   letter-spacing:.13em;text-transform:uppercase;color:#7691A8}
 .kp .d b{display:block;margin-top:5px;font-family:"JetBrains Mono",monospace;font-size:14px;
   font-weight:700;letter-spacing:-.02em}
-main{margin-top:-20px;padding-bottom:70px}
-h2{margin:26px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:700;
-  letter-spacing:.16em;text-transform:uppercase;color:var(--md)}
-.caja{background:var(--cd);border:1px solid var(--ln);border-radius:15px;box-shadow:var(--sh);
-  overflow:hidden}
 .rg{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:12px;padding:14px 17px;
   border-top:1px solid var(--ln)}
 .rg:first-child{border-top:0}
@@ -129,6 +106,17 @@ h2{margin:26px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;fo
 .rg-m .int{color:var(--am);background:var(--amb);padding:1px 7px;border-radius:99px;font-size:10.5px}
 .rg-t{font-family:"JetBrains Mono",monospace;font-size:14.5px;font-weight:700;
   letter-spacing:-.02em;text-align:right;white-space:nowrap}
+.rg-a{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:9px;
+  text-decoration:none;color:inherit}
+.rg-a:hover .rg-vm{color:var(--ik)}
+.rg-bar{display:flex;height:6px;width:96px;border-radius:99px;overflow:hidden;background:var(--ln)}
+.rg-bv{background:var(--grt)}
+.rg-bd{background:repeating-linear-gradient(135deg,var(--am) 0 3px,transparent 3px 6px);
+  background-color:var(--amb)}
+.rg-pv{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:700;color:var(--grt)}
+.rg-pd{font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:700;color:var(--am);
+  background:var(--amb);padding:1px 7px;border-radius:99px}
+.rg-vm{font-size:11.5px;color:var(--md);margin-left:auto}
 .vl{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 17px;
   border-top:1px solid var(--ln);text-decoration:none;color:inherit}
 .vl:first-child{border-top:0}
@@ -140,13 +128,12 @@ h2{margin:26px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;fo
 .vl-e{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;letter-spacing:.12em;
   text-transform:uppercase;color:var(--md)}
 .vl-o{font-family:"JetBrains Mono",monospace;font-size:14px;font-weight:700;letter-spacing:-.02em}
-.nada{margin:0;padding:22px 17px;color:var(--ik2);text-align:center}
 @media(max-width:520px){
   .rg{grid-template-columns:24px minmax(0,1fr);row-gap:7px}
   .rg-t{grid-column:2;text-align:left}
 }
-</style>
-<header class="hd"><div class="wrap">
+`,
+    cabecera: `<header class="hd"><div class="wrap">
   <a class="volver" href="/">← ${escapar(x.volver)}</a>
   <div class="cod">${escapar(f.codigo)} · ${escapar(f.tipo)}${esCliente ? '' : ` · ${escapar(f.cliente)}`}</div>
   <h1>${escapar(f.titulo)}</h1>
@@ -160,11 +147,12 @@ h2{margin:26px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;fo
     ${dato(x.garantia, f.garantiaPct)}
   </div>
 </div></header>
-<main class="wrap">
+`,
+    cuerpo: `<main class="wrap">
   <h2>${escapar(x.renglones)}</h2>
   <section class="caja">${renglones || `<p class="nada">—</p>`}</section>
   <h2>${escapar(x.valuaciones)}</h2>
   <section class="caja">${valuaciones}</section>
-</main>
-</html>`
+</main>`,
+  })
 }

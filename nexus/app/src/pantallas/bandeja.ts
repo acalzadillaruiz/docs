@@ -8,9 +8,7 @@
 
 import type { Pendiente } from '../dominio/bandeja.ts'
 import type { Idioma } from '../i18n/t.ts'
-
-const escapar = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+import { escapar } from './base.ts'
 
 const TEXTOS = {
   es: {

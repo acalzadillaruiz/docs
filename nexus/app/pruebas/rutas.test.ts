@@ -350,3 +350,81 @@ test('un destino de vuelta hacia fuera se ignora y se vuelve a la raíz', async 
     }
   }
 })
+
+test('el avance de un renglón se sirve en su ruta, abierto hito por hito', async () => {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+  // Un renglón con un hito verificado y otro declarado sin respaldo.
+  const RG = '0f1a2b3c-3333-0000-0000-00000000000a'
+  await comoPersona({ id: YO }, 'nexus_interno', async (q) => {
+    await q.unsafe('set local role none')
+    await q`insert into organizacion (id, tipo, nombre, rif)
+            values ('0f1a2b3c-0000-0000-0000-00000000000b','operadora','Op Rutas','J-967777777-7')
+            on conflict do nothing`
+    await q`insert into tasa_bcv (id, vigente_el, ves_por_usd, fuente)
+            values ('0f1a2b3c-1111-0000-0000-00000000000a','2026-09-07', 36.50,'carga_manual')
+            on conflict (id) do update set vigente_el = excluded.vigente_el`
+    await q`insert into contrato (id, organizacion_id, cliente_id, codigo, tipo, titulo_es,
+              titulo_en, estado, moneda, monto, tasa_id, creado_por)
+            values ('0f1a2b3c-2222-0000-0000-00000000000a', ${ORG},
+              '0f1a2b3c-0000-0000-0000-00000000000b','RUT-001','procura','Cabezales',
+              'Wellheads','vigente','USD', 200000.00,'0f1a2b3c-1111-0000-0000-00000000000a', ${YO})
+            on conflict (id) do update set codigo = excluded.codigo`
+    await q`insert into renglon (id, contrato_id, numero, descripcion_es, descripcion_en,
+              cantidad, unidad, norma, precio_unitario, costo_unitario)
+            values (${RG},'0f1a2b3c-2222-0000-0000-00000000000a', 1,'Cabezal de pozo','Wellhead',
+              2,'unidad','API 6A', 100000.0000, 62000.0000)
+            on conflict (id) do update set norma = excluded.norma`
+    await q`delete from hito where renglon_id = ${RG}::uuid`
+    await q`insert into hito (id, renglon_id, orden, clave, nombre_es, nombre_en, peso, exige,
+              estado, ocurrido_en, registrado_en)
+            values ('0f1a2b3c-4444-0000-0000-000000000001', ${RG}, 1,'orden','Orden colocada',
+                    'PO placed', 40.00,'{}','verificado','2026-09-01', now()),
+                   ('0f1a2b3c-4444-0000-0000-000000000002', ${RG}, 2,'fabricado','Fabricado',
+                    'Manufactured', 30.00,'{certificado}','declarado','2026-09-10', now())`
+  })
+
+  const r = await pedir({ ruta: `/renglones/${RG}`, cookie: testigo })
+  assert.equal(r.codigo, 200)
+  // El número, y de dónde sale.
+  assert.match(r.cuerpo!, /class="ba-v" style="width:40%"/)
+  assert.match(r.cuerpo!, /class="ba-d" style="width:30%"/)
+  assert.match(r.cuerpo!, /Falta: Certificado/)
+  assert.match(r.cuerpo!, /No hay ninguna casilla donde escribirlo/)
+  // Y se puede volver al contrato del que cuelga.
+  assert.match(r.cuerpo!, /href="\/contratos\/0f1a2b3c-2222-0000-0000-00000000000a"/)
+})
+
+test('un renglón que no te corresponde devuelve 404, no 403', async () => {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+  const r = await pedir({
+    ruta: '/renglones/99999999-9999-9999-9999-99999999999a', cookie: testigo,
+  })
+  assert.equal(r.codigo, 404)
+})
+
+test('sin sesión, el avance de un renglón ni se mira', async () => {
+  const r = await pedir({ ruta: '/renglones/99999999-9999-9999-9999-99999999999a' })
+  assert.equal(r.codigo, 303)
+})
