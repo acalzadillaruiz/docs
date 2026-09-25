@@ -23,6 +23,7 @@ import { resolver, type Peticion } from '../src/servidor/rutas.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
+import { pantallasDelCodigo, AL_MENOS } from './pantallas.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = '7d8e9f0a-0000-0000-0000-00000000000a'
@@ -51,17 +52,28 @@ async function entrar(correo: string): Promise<string> {
   return new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
 }
 
-/** Todo lo que un interno puede abrir sin haber creado nada todavía. */
-const PANTALLAS = [
-  '/', '/medidas', '/perfil', '/contratos/nuevo', '/importar',
-  '/periodos', '/proveedores', '/banco', '/activos', '/reexpresion',
-] as const
+/**
+ * Lo que nunca puede ver el cliente.
+ *
+ * Sale del código igual que la lista de pantallas: es todo, salvo lo poco que es
+ * suyo. Así una pantalla nueva entra sola por el lado que le toque.
+ */
+const DEL_CLIENTE = new Set(['/', '/perfil'])
 
-/** Lo que nunca puede ver el cliente: la contabilidad entera. */
-const SOLO_DENTRO = [
-  '/medidas', '/contratos/nuevo', '/importar', '/periodos', '/proveedores',
-  '/banco', '/activos', '/reexpresion',
-] as const
+const PANTALLAS = await pantallasDelCodigo()
+const SOLO_DENTRO = PANTALLAS.filter((r) => !DEL_CLIENTE.has(r))
+
+test('el barrido mira TODAS las pantallas, no las que alguien copió a mano', async () => {
+  // La afirmación que falla si el barrido dejó de mirar. La copia a mano tenía diez
+  // y la aplicación ya iba por dieciocho: ocho pantallas sin probar en una empresa
+  // vacía, y nadie se habría enterado hasta que un cliente nuevo las abriera.
+  assert.ok(PANTALLAS.length >= AL_MENOS,
+    `el barrido solo encontró ${PANTALLAS.length} pantallas: ${PANTALLAS.join(', ')}`)
+  for (const nueva of ['/gerencia', '/estados', '/diario', '/mayor', '/libros',
+                       '/caja', '/pagar', '/logistica']) {
+    assert.ok(PANTALLAS.includes(nueva), `${nueva} se quedó fuera del barrido`)
+  }
+})
 
 let gps = ''
 let cli = ''

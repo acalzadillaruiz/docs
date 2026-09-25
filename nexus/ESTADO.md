@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 02:05 (España)
+**Última actualización:** 2026-09-26, 02:50 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,24 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **dónde está el material** — la primera pantalla de la fase
+**Lo último terminado:** **tres barridos que llevaban días mirando media
+aplicación.** La misma lista de pantallas estaba **copiada a mano en tres sitios** —el
+día 1, los formularios y el móvil— y las tres se habían quedado con diez u once
+pantallas cuando la aplicación ya iba por **dieciocho**.
+
+Es decir: el cuadro de mando, los estados, el diario, el mayor, la caja chica, lo que
+toca pagar y el tablero de material **nunca se habían abierto en una empresa vacía,
+ni se les había mandado un formulario en blanco o con basura dentro, ni se habían
+dibujado en un teléfono de 360 px**. Los tres barridos decían que todo estaba bien.
+
+Ahora la lista sale del código, de un solo sitio (`pruebas/pantallas.ts`), y cada uno
+de los tres lleva **la afirmación que falla si deja de mirar**. Las pruebas subieron
+de 693 a 726 sin añadir una pantalla: son las que faltaban.
+
+*(Las siete pantallas aguantaron las tres pasadas a la primera. Eso no quita nada al
+fallo: llevaban días sin comprobarse y nadie lo sabía.)*
+
+**Antes:** **dónde está el material** — la primera pantalla de la fase
 de logística, y la pregunta que hace un cliente de procura y que no contesta ningún
 portal de seguimiento: «¿dónde está mi cabezal?».
 
@@ -396,7 +413,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**943 comprobaciones** (250 de SQL y diccionario + 693 de TypeScript), todas pasando.
+**976 comprobaciones** (250 de SQL y diccionario + 726 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -506,6 +523,10 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Una lista de pantallas escrita a mano se queda vieja en dos días.** Estaba
+  copiada en tres barridos y los tres miraban media aplicación. Sale de `rutas.ts`,
+  desde `pruebas/pantallas.ts`, y cada barrido lleva su afirmación de cobertura.
 
 - **Una prueba de aislamiento que UNE con la tabla protegida no prueba nada.** Las
   tablas que se nombran en una consulta —o dentro de una política— llevan su propia

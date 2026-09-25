@@ -22,6 +22,7 @@ import { resolver, type Peticion } from '../src/servidor/rutas.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
+import { pantallasDelCodigo, AL_MENOS } from './pantallas.ts'
 import { readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -57,10 +58,19 @@ function buscarChrome(): string {
   return candidatos[0]!
 }
 
-const PANTALLAS = [
-  '/', '/medidas', '/perfil', '/contratos/nuevo', '/importar',
-  '/periodos', '/proveedores', '/banco', '/activos', '/reexpresion', '/libros',
-] as const
+// La lista sale del código, no de una copia a mano: la de aquí tenía once pantallas
+// cuando la aplicación ya iba por dieciocho, y las siete que faltaban nunca habían
+// pasado por este barrido.
+const PANTALLAS = await pantallasDelCodigo()
+
+test('el barrido mira TODAS las pantallas, no las que alguien copió a mano', () => {
+  // La afirmación que falla cuando el barrido deja de mirar. La copia a mano tenía
+  // once pantallas y la aplicación ya iba por dieciocho: las siete que faltaban
+  // nunca habían pasado por aquí.
+  assert.ok(PANTALLAS.length >= AL_MENOS,
+    `solo encontró ${PANTALLAS.length}: ${PANTALLAS.join(', ')}`)
+})
+
 
 const pedir = (p: Partial<Peticion>) => resolver({
   metodo: 'GET', ruta: '/', campos: {}, cookie: null, idioma: 'es', archivo: null,
