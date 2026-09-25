@@ -120,3 +120,43 @@ select case when cuota_depreciacion(:act, 2031, 1) = 0
 select case when ves = 0 then 'OK · el libro cuadra con cinco años de depreciación dentro'
             else 'FALLO · descuadre de ' || ves::text end as resultado
   from descuadre(:org,'2031-12-31');
+
+-- ============================================================ rehacer un mes
+-- El error de «mes ya depreciado» dice «reversa su asiento». Si reversarlo no sirve de
+-- nada, la instruccion es una burla: quien la sigue al pie de la letra choca con el
+-- mismo error y sin salida. Aqui se comprueba que si sirve.
+
+-- Repetir un mes ya depreciado no pasa.
+do $$
+begin
+  perform depreciar_mes('0e0e0e0e-0000-0000-0000-00000000000a', 2026, 3,
+                        '0e0e0e0e-0000-0000-0000-00000000000d');
+  raise exception 'FALLO · dejo depreciar dos veces el mismo mes';
+exception when sqlstate 'P0001' then
+  if SQLERRM like 'FALLO%' then raise; end if;
+  raise notice 'OK · el mismo mes no se deprecia dos veces: %', SQLERRM;
+end $$;
+
+-- Se reversa el de marzo, como dice el mensaje.
+select reversar_asiento(id,'0e0e0e0e-0000-0000-0000-00000000000d','cuota mal calculada')
+  from asiento
+ where organizacion_id = :org and origen_tipo = 'depreciacion'
+   and anio = 2026 and mes = 3 and reversa_a is null;
+
+-- Y ahora si se puede rehacer. El asiento viejo y su reverso se quedan en el libro:
+-- el error tambien es un hecho que ocurrio.
+select case when depreciar_mes(:org, 2026, 3,'0e0e0e0e-0000-0000-0000-00000000000d') is not null
+            then 'OK · reversado el asiento, el mes se puede rehacer'
+            else 'FALLO · no rehizo nada' end as resultado;
+
+-- Lo importante: no se duplico la cuota. La depreciacion de marzo sigue siendo una.
+select case when count(*) = 1 and sum(monto_ves) = 50000.00
+            then 'OK · rehacer no duplica la cuota del mes: sigue siendo 50.000,00'
+            else 'FALLO · quedaron ' || count(*)::text || ' cuotas por '
+                 || coalesce(sum(monto_ves),0)::text end as resultado
+  from depreciacion where activo_id = :act and anio = 2026 and mes = 3;
+
+-- Y el libro sigue cuadrando con el asiento viejo, su reverso y el nuevo dentro.
+select case when ves = 0 then 'OK · el libro cuadra con el mes rehecho dentro'
+            else 'FALLO · descuadre de ' || ves::text end as resultado
+  from descuadre(:org,'2031-12-31');

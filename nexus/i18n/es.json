@@ -405,5 +405,22 @@
   "banco.ver": "Ver",
   "banco.error.nota": "Aceptar un movimiento sin casarlo exige decir por qué. Por escrito.",
   "banco.error.ya": "Ese movimiento ya está conciliado",
-  "banco.error.tomado": "Ese cobro o pago ya está casado con otro movimiento"
+  "banco.error.tomado": "Ese cobro o pago ya está casado con otro movimiento",
+  "activo.titulo": "Equipos",
+  "activo.explica": "Un equipo alquilado genera ingreso y se gasta al mismo tiempo. Si solo se mira el ingreso, el negocio parece mejor de lo que es.",
+  "activo.en_libros": "En libros",
+  "activo.costo": "Costo",
+  "activo.en_servicio": "En servicio desde",
+  "activo.alquilado": "Alquilado a",
+  "activo.depreciar": "Depreciar el mes",
+  "activo.depreciado": "Ya depreciado",
+  "activo.rendimiento": "Lo que deja",
+  "activo.ingreso": "Facturado",
+  "activo.desgaste": "Desgaste",
+  "activo.deja": "Deja",
+  "activo.nada": "No hay equipos dados de alta.",
+  "activo.de_baja": "De baja",
+  "activo.error.mes": "Ese mes ya está depreciado",
+  "activo.error.periodo": "Ese mes no tiene su periodo contable abierto",
+  "activo.error.nada": "No hay nada que depreciar en ese mes"
 }

@@ -405,5 +405,22 @@
   "banco.ver": "Show",
   "banco.error.nota": "Accepting an unmatched movement requires saying why. In writing.",
   "banco.error.ya": "That movement is already reconciled",
-  "banco.error.tomado": "That payment is already matched to another movement"
+  "banco.error.tomado": "That payment is already matched to another movement",
+  "activo.titulo": "Equipment",
+  "activo.explica": "Rented equipment earns and wears out at the same time. Looking only at the income makes the business look better than it is.",
+  "activo.en_libros": "Book value",
+  "activo.costo": "Cost",
+  "activo.en_servicio": "In service since",
+  "activo.alquilado": "Rented on",
+  "activo.depreciar": "Depreciate the month",
+  "activo.depreciado": "Already depreciated",
+  "activo.rendimiento": "What it leaves",
+  "activo.ingreso": "Invoiced",
+  "activo.desgaste": "Wear",
+  "activo.deja": "Leaves",
+  "activo.nada": "No equipment registered.",
+  "activo.de_baja": "Retired",
+  "activo.error.mes": "That month is already depreciated",
+  "activo.error.periodo": "That month has no open accounting period",
+  "activo.error.nada": "There is nothing to depreciate that month"
 }

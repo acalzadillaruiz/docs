@@ -60,6 +60,8 @@ import {
 import { pintarProveedores } from '../pantallas/proveedores.ts'
 import { conciliacion, casar, aceptarConNota } from '../dominio/banco.ts'
 import { pintarBanco } from '../pantallas/banco.ts'
+import { equipos, depreciarMes } from '../dominio/activos.ts'
+import { pintarActivos } from '../pantallas/activos.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
@@ -576,6 +578,33 @@ export async function resolver(
       conciliacion(q, org!.organizacion_id, desde, hasta, p.idioma))
     return html(errores.length === 0 ? 200 : 400,
       pintarBanco(c, p.idioma, testigoAnti(testigo), errores))
+  }
+
+  // Los equipos. Alquiler es uno de los cinco tipos de contrato, y un equipo
+  // alquilado genera ingreso y se gasta al mismo tiempo.
+  if (p.ruta === '/activos' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date()
+    const anio = Number(p.campos['anio'] ?? 0) || hoy.getUTCFullYear()
+    const mes = Number(p.campos['mes'] ?? 0) || hoy.getUTCMonth() + 1
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const r = await comoQuien((q) =>
+        depreciarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    }
+
+    const lista = await comoQuien((q) => equipos(q, org!.organizacion_id, p.idioma))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarActivos(lista, p.idioma, testigoAnti(testigo), anio, mes, errores))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)

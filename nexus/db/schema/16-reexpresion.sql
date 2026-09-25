@@ -123,9 +123,13 @@ declare
   reme   numeric(20,2);
   fx     uuid;
 begin
-  if exists (select 1 from asiento
-              where organizacion_id = p_org and origen_tipo = 'reexpresion'
-                and anio = p_anio and mes = p_mes and reversa_a is null) then
+  -- El mensaje dice «reversa su asiento», asi que reversarlo tiene que servir de algo:
+  -- un asiento ya reversado no cuenta. Sin la segunda condicion, quien seguia la
+  -- instruccion al pie de la letra se encontraba con el mismo error y sin salida.
+  if exists (select 1 from asiento asi
+              where asi.organizacion_id = p_org and asi.origen_tipo = 'reexpresion'
+                and asi.anio = p_anio and asi.mes = p_mes and asi.reversa_a is null
+                and not exists (select 1 from asiento rev where rev.reversa_a = asi.id)) then
     raise exception 'El mes %-% ya está reexpresado. Para rehacerlo, reversa su asiento.', p_anio, p_mes;
   end if;
 

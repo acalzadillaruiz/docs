@@ -116,14 +116,28 @@ declare
   total  numeric(20,2) := 0;
   fx     uuid;
 begin
-  if exists (select 1 from asiento
-              where organizacion_id = p_org and origen_tipo = 'depreciacion'
-                and anio = p_anio and mes = p_mes and reversa_a is null) then
+  -- El mensaje dice «reversa su asiento», asi que reversarlo tiene que servir de algo:
+  -- un asiento ya reversado no cuenta. Sin la segunda condicion, quien seguia la
+  -- instruccion al pie de la letra se encontraba con el mismo error y sin salida.
+  if exists (select 1 from asiento asi
+              where asi.organizacion_id = p_org and asi.origen_tipo = 'depreciacion'
+                and asi.anio = p_anio and asi.mes = p_mes and asi.reversa_a is null
+                and not exists (select 1 from asiento rev where rev.reversa_a = asi.id)) then
     raise exception 'El mes %-% ya está depreciado. Para rehacerlo, reversa su asiento.', p_anio, p_mes;
   end if;
 
   fx := tasa_del_dia(fin);
   if fx is null then raise exception 'No hay tasa BCV vigente al %', fin; end if;
+
+  -- Lo que quedo de un intento reversado. El asiento se queda en el libro para siempre
+  -- — eso es la contabilidad — pero esta tabla no es el libro: es el registro de cuanto
+  -- se ha depreciado cada equipo, y una cuota reversada no se ha depreciado. Si se
+  -- quedara, la cuota del mes se calcularia sobre una acumulada que no ocurrio.
+  delete from depreciacion d
+   using asiento asi
+   where d.asiento_id = asi.id and asi.organizacion_id = p_org
+     and d.anio = p_anio and d.mes = p_mes
+     and exists (select 1 from asiento rev where rev.reversa_a = asi.id);
 
   insert into asiento (id, organizacion_id, numero, ocurrido_en, anio, mes,
                        descripcion_es, descripcion_en, origen_tipo, origen_id, creado_por)
