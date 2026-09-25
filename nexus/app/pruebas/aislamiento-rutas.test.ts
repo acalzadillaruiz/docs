@@ -49,6 +49,23 @@ const PERMITIDAS = new Set([
   '/perfil',                  // lo suyo: su idioma y sus avisos
 ])
 
+/**
+ * Lo público que NO lleva datos de nadie: el manifiesto y los iconos.
+ *
+ * Van en una lista aparte y no engordando la de arriba, porque no son lo mismo. La
+ * de arriba es **la superficie con datos dentro** —lo que hay que justificar una por
+ * una—, y esta es un dibujo y un archivo de texto iguales para todo el mundo. El
+ * navegador los pide SIN cookies, y contestarles 404 hace que no ofrezca instalar la
+ * aplicación.
+ *
+ * Lo que sí hay que vigilar de esta lista es que solo entren cosas así. Por eso hay
+ * una prueba que las pide como cliente y comprueba que lo que devuelven no cambia
+ * según quién pregunte.
+ */
+const PUBLICAS = new Set([
+  '/manifest.webmanifest', '/icono.svg', '/icono-180.png', '/icono-512.png',
+])
+
 const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
   comoPersona<T>({ id: YO }, 'nexus_interno', f)
 
@@ -74,7 +91,12 @@ async function entrar(correo: string): Promise<string> {
 /** Las rutas tal como están escritas en el servidor. No una copia a mano. */
 async function rutasDelCodigo(): Promise<string[]> {
   const fuente = await readFile(new URL('../src/servidor/rutas.ts', import.meta.url), 'utf8')
-  const encontradas = [...fuente.matchAll(/p\.ruta === '(\/[a-z/]*)'/g)].map((m) => m[1]!)
+  // El juego de caracteres lleva el punto y el guion, y no es un detalle: con solo
+  // letras y barras, '/manifest.webmanifest' y '/icono.svg' eran INVISIBLES para este
+  // barrido. Se añadieron tres rutas públicas y el barrido dijo que todo estaba bien.
+  // Una comprobación de seguridad con un punto ciego es peor que no tenerla: da
+  // tranquilidad sin darla.
+  const encontradas = [...fuente.matchAll(/p\.ruta === '(\/[a-z0-9./-]*)'/g)].map((m) => m[1]!)
   return [...new Set(encontradas)].sort()
 }
 
@@ -133,7 +155,7 @@ test('un cliente recibe 404 en TODA ruta que no sea suya', async () => {
   let miradas = 0
 
   for (const ruta of rutas) {
-    if (PERMITIDAS.has(ruta)) continue
+    if (PERMITIDAS.has(ruta) || PUBLICAS.has(ruta)) continue
     miradas++
     const r = await pedir({ ruta, cookie: cli })
     if (r.codigo !== 404) abiertas.push(`${ruta} → ${r.codigo}`)
@@ -157,7 +179,7 @@ test('tampoco entra por POST: el 404 no es solo de la puerta de delante', async 
   const rutas = await rutasDelCodigo()
   const abiertas: string[] = []
   for (const ruta of rutas) {
-    if (PERMITIDAS.has(ruta)) continue
+    if (PERMITIDAS.has(ruta) || PUBLICAS.has(ruta)) continue
     const r = await pedir({ metodo: 'POST', ruta, cookie: cli, campos: {} })
     // 403 vale aquí: es el testigo antifalsificación parando la petición ANTES de
     // mirar quién es. Lo que no puede salir es un 200.
@@ -187,4 +209,22 @@ test('y la lista de lo permitido es corta: cada línea hay que justificarla', as
   // Es la superficie que ve alguien de fuera de GPS. Si esta prueba empieza a fallar
   // porque la lista creció, la pregunta no es cómo arreglarla: es por qué creció.
   assert.ok(PERMITIDAS.size <= 9, `la superficie del cliente creció a ${PERMITIDAS.size}`)
+})
+
+test('lo público no cambia según quién pregunte: por eso puede ser público', async () => {
+  // Es lo que hace que el manifiesto y los iconos puedan servirse sin sesión. Si
+  // alguno devolviera algo distinto según la cookie, llevaría datos dentro y esta
+  // lista dejaría de ser inocente.
+  for (const ruta of PUBLICAS) {
+    const sin = await pedir({ ruta })
+    const con = await pedir({ ruta, cookie: cli })
+    assert.equal(sin.codigo, 200, `${ruta} no se sirve sin sesión`)
+    assert.equal(con.codigo, 200, `${ruta} no se sirve al cliente`)
+    assert.equal(sin.cuerpo ?? '', con.cuerpo ?? '', `${ruta} cambia según quién pregunte`)
+    assert.equal(
+      Buffer.from(sin.bytes ?? new Uint8Array()).toString('base64'),
+      Buffer.from(con.bytes ?? new Uint8Array()).toString('base64'),
+      `${ruta} cambia sus bytes según quién pregunte`,
+    )
+  }
 })

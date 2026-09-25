@@ -66,6 +66,7 @@ import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
 import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
          anotarVale, reponer, cerrar as cerrarCaja, abrirCaja } from '../dominio/caja.ts'
 import { pintarCaja } from '../pantallas/caja.ts'
+import { iconoPng, iconoSvg } from './icono.ts'
 import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
 import { pintarPagar } from '../pantallas/pagar.ts'
 import { pintarReexpresion } from '../pantallas/reexpresion.ts'
@@ -164,6 +165,9 @@ export const CABECERAS_BASE: Readonly<Record<string, string>> = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     'font-src https://fonts.gstatic.com; ' +
     "img-src 'self' data:; " +
+    // El manifiesto hace falta declararlo aparte: con 'default-src none' el
+    // navegador lo pide y se lo niega a si mismo, sin decir por que.
+    "manifest-src 'self'; " +
     "form-action 'self'; " +
     "frame-ancestors 'none'; " +
     "base-uri 'none'",
@@ -304,6 +308,72 @@ export async function resolver(
       })
     }
     return aOtroSitio('/entrar', { 'Set-Cookie': borrarCookie(seguro) })
+  }
+
+  // ------------------------------------------------------------ instalable
+  //
+  // Las tres piezas que convierten esto en algo que se instala en un telefono. Van
+  // ANTES de cualquier comprobacion de sesion a proposito: el navegador pide el
+  // manifiesto y el icono sin cookies, y si se le contesta 404 no ofrece instalar.
+  if (p.ruta === '/manifest.webmanifest' && p.metodo === 'GET') {
+    const es = p.idioma === 'es'
+    const manifiesto = {
+      name: es ? 'GPS Nexus · ejecución de contratos' : 'GPS Nexus · contract execution',
+      short_name: 'GPS Nexus',
+      description: es
+        ? 'El avance sale de lo que se puede demostrar, no de lo que alguien escribe.'
+        : 'Progress comes from what can be proven, not from what somebody types.',
+      lang: p.idioma,
+      dir: 'ltr',
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      orientation: 'any',
+      background_color: '#F1F2F0',
+      theme_color: '#0B2137',
+      icons: [
+        { src: '/icono.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        { src: '/icono-180.png', sizes: '180x180', type: 'image/png', purpose: 'any' },
+        { src: '/icono-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    }
+    return {
+      codigo: 200,
+      cabeceras: {
+        ...CABECERAS_BASE,
+        'Content-Type': 'application/manifest+json; charset=utf-8',
+        // Esto no lleva nada de nadie dentro: se puede guardar.
+        'Cache-Control': 'public, max-age=86400',
+      },
+      cuerpo: JSON.stringify(manifiesto, null, 2),
+    }
+  }
+
+  if (p.ruta === '/icono.svg' && p.metodo === 'GET') {
+    return {
+      codigo: 200,
+      cabeceras: {
+        ...CABECERAS_BASE,
+        'Content-Type': 'image/svg+xml; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      },
+      cuerpo: iconoSvg(),
+    }
+  }
+
+  const png = /^\/icono-(180|512)\.png$/.exec(p.ruta)
+  if (png && p.metodo === 'GET') {
+    const bytes = iconoPng(Number(png[1]))
+    return {
+      codigo: 200,
+      cabeceras: {
+        ...CABECERAS_BASE,
+        'Content-Type': 'image/png',
+        'Content-Length': String(bytes.length),
+        'Cache-Control': 'public, max-age=86400',
+      },
+      bytes,
+    }
   }
 
   // --------------------------------------------------------------- con sesión

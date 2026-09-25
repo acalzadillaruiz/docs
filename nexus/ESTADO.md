@@ -1,12 +1,42 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 23:35 (España)
-**Avance:** 137 de 141 sesiones · **97%**
+**Última actualización:** 2026-09-26, 00:40 (España)
+**Avance:** 140 de 141 sesiones · **99%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **se acabaron las páginas en blanco.** Eran **diez rutas**
+**Lo último terminado:** **ahora sí se instala en un teléfono.** El producto se
+describe desde el primer día como «aplicación web instalable» y **no lo era**: no
+había manifiesto ni icono. Quien abría la dirección en el móvil tenía una página
+web, no un icono en su pantalla de inicio — y un ingeniero en una locación no vuelve
+a escribir una dirección larga cada mañana.
+
+Y se consigue **sin una línea de JavaScript**, que es lo que permite seguir con
+`default-src 'none'`. Lo único que **no** se puede hacer sin JavaScript es funcionar
+sin conexión: eso pide un *service worker*, que es un archivo de código y cambia la
+política de seguridad. **Es una decisión del CEO, no un olvido**, y está aquí escrita.
+
+El icono no es un archivo binario metido en el repositorio: es **código que produce
+los píxeles** (`src/servidor/icono.ts`), con su PNG escrito a mano —firma, IHDR,
+IDAT comprimido y su CRC— porque un PNG en git es un objeto que nadie puede revisar.
+Y el dibujo **es la tesis del producto**: la misma barra de cada contrato, el tramo
+sólido es lo verificado y el rayado lo que alguien declaró y no se puede demostrar.
+
+**Y de aquí salió el fallo más serio del día, que era mío y estaba en una prueba de
+seguridad.** El barrido de aislamiento saca la lista de rutas del código fuente con
+un patrón… que solo aceptaba letras y barras. **`/manifest.webmanifest` y
+`/icono.svg` eran invisibles para él.** Añadí tres rutas públicas y el barrido dijo
+que todo estaba bien. Una comprobación de seguridad con un punto ciego es peor que
+no tenerla: da tranquilidad sin darla. Arreglado el patrón, y comprobado quitando
+una ruta de la lista de permitidas a propósito para verlo fallar.
+
+Lo público va ahora en su propia lista, aparte de la superficie con datos: son un
+dibujo y un archivo de texto iguales para todos, y hay una prueba que **los pide con
+cookie y sin cookie y compara byte a byte** — si alguno cambiara según quién
+pregunte, dejaría de ser inocente.
+
+**Antes:** **se acabaron las páginas en blanco.** Eran **diez rutas**
 que contestaban con el cuerpo vacío cuando la acción no se podía hacer, y **dos las
 ve el cliente**: aprobar y objetar una valuación. El caso real no es raro — el
 cliente tiene la hoja abierta desde ayer, GPS la mueve, él pulsa «Aprobar» y se
@@ -292,7 +322,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**918 comprobaciones** (250 de SQL y diccionario + 668 de TypeScript), todas pasando.
+**927 comprobaciones** (250 de SQL y diccionario + 677 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -402,6 +432,10 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Un barrido de seguridad puede tener un punto ciego, y entonces miente.** El de
+  aislamiento buscaba rutas con `[a-z/]`: cualquier ruta con un punto o un guion era
+  invisible. Al añadir o tocar un barrido, comprobar **qué NO está mirando**.
 
 - **Una medición sobre cero filas mide el recorrido, no el trabajo.** `brecha_evidencia`
   «tardaba 536 ms» con 500 contratos… y devolvía cero filas, porque el sembrado no

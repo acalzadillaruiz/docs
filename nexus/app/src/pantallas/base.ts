@@ -110,6 +110,33 @@ export const FUENTES = `<link rel="preconnect" href="https://fonts.googleapis.co
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">`
 
+/**
+ * Lo que hace que esto se pueda INSTALAR en un teléfono.
+ *
+ * El producto se describe desde el primer día como «aplicación web instalable», y
+ * no lo era: no había manifiesto ni icono. Quien abría la dirección en el móvil
+ * tenía una página web, no un icono en su pantalla de inicio — y un ingeniero en
+ * una locación no vuelve a escribir una dirección larga cada mañana.
+ *
+ * Y se consigue **sin una línea de JavaScript**, que es lo que permite mantener
+ * `default-src 'none'`: el manifiesto lo lee el navegador solo, y las etiquetas de
+ * Apple son eso, etiquetas. Lo único que NO se puede hacer sin JavaScript es
+ * funcionar sin conexión: eso pide un «service worker», que es un archivo de código
+ * y cambia la política de seguridad. Es una decisión, y está escrita en ESTADO.
+ *
+ * El color de la barra del sistema va en dos: uno para el tema claro y otro para el
+ * oscuro. Con uno solo, media flota de teléfonos enseña una barra que no pega con
+ * nada.
+ */
+const INSTALABLE = `<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#F1F2F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#071726" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icono-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GPS Nexus">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`
+
 export type Pagina = {
   readonly idioma: Idioma
   /** Lo que sale en la pestaña. Dice de qué va esta página, no solo el producto. */
@@ -131,6 +158,7 @@ export function pagina(p: Pagina): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapar(p.titulo)} · GPS Nexus</title>
+${INSTALABLE}
 ${FUENTES}
 <style>${ESTILOS_BASE}${p.estilos}</style>
 ${p.cabecera}
