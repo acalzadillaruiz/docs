@@ -77,12 +77,17 @@ export type Mes = {
   readonly pyg: readonly LineaPyG[]
   /** La cartera contrato por contrato, ordenada por lo que más duele. */
   readonly contratos: readonly Contrato[]
+  /** Las que quedan detrás de las que se enseñan. Se dicen, no se esconden. */
+  readonly contratosOcultos: number
   /** Si el libro no cuadra, todo lo de arriba vale menos. Se dice antes que nada. */
   readonly descuadre: string
   readonly cuadra: boolean
 }
 
 const n = (v: unknown) => Number(v ?? 0)
+
+/** Cuántos contratos se enseñan en la cartera del cuadro de mando. */
+const CUANTAS = 25
 
 export async function mes(
   q: Consulta, orgId: string, anio: number, mesN: number, idioma: Idioma,
@@ -128,6 +133,11 @@ export async function mes(
 
   // Y la cartera contrato por contrato. `margen_cartera` ya viene ordenada por el
   // margen ascendente: lo que más duele, primero. Eso es deliberado y se respeta.
+  //
+  // Se enseñan las primeras CUANTAS y se dice cuántas quedan. Con mil contratos esta
+  // pantalla pesaba 255 KB y tardaba 2,7 s —medido, no supuesto— y nadie lee mil
+  // filas de una tabla: se miran las peores. Los totales de arriba NO salen de aquí,
+  // salen de `estado_resultados`, así que siguen calculados sobre todos.
   const cartera = (await q`
     select contrato, cliente, estado::text, valuado::text, costo::text,
            margen::text, margen_pct::text
@@ -169,7 +179,7 @@ export async function mes(
       cuenta: (idioma === 'es' ? f['cuenta_es'] : f['cuenta_en'])!,
       monto: moneda(idioma, n(f['monto_ves']), 'VES'),
     })),
-    contratos: cartera.map((f): Contrato => ({
+    contratos: cartera.slice(0, CUANTAS).map((f): Contrato => ({
       contrato: f['contrato']!,
       cliente: f['cliente']!,
       estado: f['estado']!,
@@ -178,6 +188,7 @@ export async function mes(
       margen: moneda(idioma, n(f['margen']), 'VES'),
       margenPct: n(f['margen_pct']),
     })),
+    contratosOcultos: Math.max(0, cartera.length - CUANTAS),
     descuadre: moneda(idioma, n(d?.ves), 'VES'),
     cuadra: Math.abs(n(d?.ves)) < 0.005,
   }

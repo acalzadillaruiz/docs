@@ -184,3 +184,33 @@ test('con el mes vacío no se pintan las tablas nuevas', async () => {
   assert.doesNotMatch(h, /De dónde sale ese resultado/)
   assert.doesNotMatch(h, /Contrato por contrato/)
 })
+
+test('la cartera del cuadro enseña las peores y DICE cuántas quedan', async () => {
+  // Con mil contratos esta pantalla pesaba 255 KB y tardaba 2,7 s. Medido, no
+  // supuesto: herramientas/medir.ts. Y nadie lee mil filas de una tabla.
+  //
+  // Lo que NO se recorta son los totales: salen de `estado_resultados`, no de esta
+  // lista, así que siguen calculados sobre todos los contratos. Esa es la diferencia
+  // entre recortar una tabla y mentir.
+  const muchos = 30
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    for (let i = 0; i < muchos; i++) {
+      await q`
+        insert into contrato (organizacion_id, cliente_id, codigo, tipo, titulo_es,
+                              titulo_en, estado, moneda, monto, tasa_id, creado_por)
+        values (${G}::uuid, ${C}::uuid, ${`GER-M-${String(i).padStart(3, '0')}`},
+                'servicio','Relleno','Filler','vigente','VES', 100000, ${TASA}::uuid,
+                ${YO}::uuid)
+        on conflict (organizacion_id, codigo) do nothing`
+    }
+  })
+
+  const c = await dentro((q) => mes(q, G, 2026, 10, 'es'))
+  assert.equal(c.contratos.length, 25, 'se enseñan las peores, no todas')
+  assert.ok(c.contratosOcultos > 0, `y se dice cuántas quedan, y quedaban ${c.contratosOcultos}`)
+
+  const h = pintarGerencia(c, 'es', 'af')
+  assert.match(h, new RegExp(String(c.contratosOcultos)))
+  assert.equal(h.includes('‹falta:'), false)
+})

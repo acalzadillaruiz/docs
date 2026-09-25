@@ -16,10 +16,18 @@
  */
 
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
+import { cifrarClave } from '../src/dominio/clave.ts'
+import { resolver, type Peticion } from '../src/servidor/rutas.ts'
+import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
+import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
 
 const ORG = 'd9e0f1a2-0000-0000-0000-00000000000a'
 const CLI = 'd9e0f1a2-0000-0000-0000-00000000000b'
 const YO = 'd9e0f1a2-0000-0000-0000-00000000000d'
+
+const CORREO = 'medir@prueba.test'
+const CLAVE = 'una clave razonable'
+const SECRETO = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'
 
 const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
   comoPersona<T>({ id: YO }, 'nexus_interno', f)
@@ -39,10 +47,14 @@ export async function sembrarCarga(contratos: number): Promise<void> {
         ('${ORG}','gps','GPS Medición','J-907700000-0'),
         ('${CLI}','operadora','Operadora Medición','J-907800000-0')
         on conflict (id) do nothing;`)
+    // Con clave y segundo factor de verdad: sin poder entrar no se puede medir lo
+    // que tarda una PANTALLA, que es lo que se quería medir.
+    const hash = await cifrarClave(CLAVE)
     await q`insert into persona (id, organizacion_id, correo, nombre, metodo,
                                  clave_hash, totp_secreto)
-            values (${YO}, ${ORG},'medir@prueba.test','Medición','clave_2fa','(h)','(s)')
-            on conflict (id) do nothing`
+            values (${YO}, ${ORG}, ${CORREO},'Medición','clave_2fa', ${hash}, ${SECRETO})
+            on conflict (id) do update set clave_hash = excluded.clave_hash,
+              totp_secreto = excluded.totp_secreto`
     await q.unsafe(`
       insert into tasa_bcv (vigente_el, ves_por_usd, fuente)
       select '2027-06-01'::date, 60.00,'carga_manual'
@@ -111,6 +123,50 @@ async function cuanto(nombre: string, sql: string, veces = 5): Promise<void> {
   )
 }
 
+/** Entra como la persona de medición y devuelve su cookie. */
+async function entrar(): Promise<string> {
+  const origen = `o-medir-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: CORREO, clave: CLAVE }, archivo: null,
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoEnPaso(desdeBase32(SECRETO), pasoDe(new Date())) },
+    archivo: null,
+  }, YO, false)
+  return new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+}
+
+/** Lo que tarda una PANTALLA entera, y lo que pesa. Es lo que ve la persona. */
+async function pantalla(
+  nombre: string, cookie: string, ruta: string, campos: Record<string, string> = {},
+  veces = 3,
+): Promise<void> {
+  const tiempos: number[] = []
+  let bytes = 0
+  let codigo = 0
+  for (let i = 0; i < veces; i++) {
+    const t0 = performance.now()
+    const r = await resolver({
+      metodo: 'GET', ruta, cookie, idioma: 'es', campos, archivo: null,
+      origen: `o-${Math.random().toString(36).slice(2)}`,
+    } as Peticion, YO, false)
+    tiempos.push(performance.now() - t0)
+    bytes = (r.cuerpo ?? '').length
+    codigo = r.codigo
+  }
+  tiempos.sort((a, b) => a - b)
+  const mediana = tiempos[Math.floor(tiempos.length / 2)]!
+  console.log(
+    nombre.padEnd(22),
+    `${mediana.toFixed(0).padStart(6)} ms`,
+    `${(bytes / 1024).toFixed(0).padStart(6)} KB`,
+    codigo === 200 ? '' : `· ${codigo}`,
+  )
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const contratos = Number(process.argv[2] ?? '500')
   conectar(process.env['NEXUS_BD']
@@ -133,6 +189,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     `select * from tiempo_hasta_la_verdad('${ORG}','2027-01-01','2027-12-31')`)
   await cuanto('cobertura', `select * from cobertura('${ORG}')`)
   await cuanto('renglones_sin_hitos', `select * from renglones_sin_hitos('${ORG}')`)
+
+  console.log('\nlas pantallas, enteras, como las ve una persona:')
+  const cookie = await entrar()
+  await pantalla('cartera', cookie, '/')
+  await pantalla('medidas', cookie, '/medidas')
+  await pantalla('gerencia', cookie, '/gerencia', { anio: '2027', mes: '6' })
+  await pantalla('estados', cookie, '/estados', { al: '2027-06-30' })
+  await pantalla('diario', cookie, '/diario', { anio: '2027', mes: '6' })
+  await pantalla('libros', cookie, '/libros', { cual: 'ventas', anio: '2027', mes: '6' })
+  await pantalla('pagar', cookie, '/pagar', { al: '2027-12-31' })
+  await pantalla('caja', cookie, '/caja')
+  await pantalla('activos', cookie, '/activos')
+  await pantalla('periodos', cookie, '/periodos')
 
   await cerrar()
 }

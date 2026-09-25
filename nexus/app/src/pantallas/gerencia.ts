@@ -142,6 +142,8 @@ export function pintarGerencia(m: Mes, idioma: Idioma, antifalsificacion: string
       </tr>`).join('')}
     </tbody>
   </table></div></div>
+  ${m.contratosOcultos === 0 ? '' : `<p class="expl">${
+    escapar(t('medida.ocultas').replace('{n}', String(m.contratosOcultos)))}</p>`}
   <p class="expl">${escapar(t('ger.cartera_explica'))}</p>`}
 
   <h2>${escapar(t('ger.flujo'))}</h2>
