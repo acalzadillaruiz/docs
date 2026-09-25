@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 09:30 (España)
-**Avance:** 85 de 141 sesiones · **60%**
+**Última actualización:** 2026-09-25, 09:50 (España)
+**Avance:** 88 de 141 sesiones · **62%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -10,7 +10,8 @@
 proveedor asentada; y valuación → asiento → cobro → asiento, con la cuenta por cobrar
 bajando sola. La prueba de circuito llega ahora hasta el final: contrato → hito
 verificado → valuación → aprobada → **cobrada**, todo por HTTP y sin tocar la base de
-datos. Commit `5906cac`. **583 comprobaciones.**
+datos. Y **los meses contables** se abren y cierran desde la
+aplicación, que es lo que desbloquea el día 1 de cada mes. Commit `108177c`. **598 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
@@ -25,10 +26,7 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
    (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — sin contestar).
 3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos.
-4. **Abrir y cerrar periodos contables desde la aplicación.** Hoy se abren por SQL, y
-   sin periodo abierto no entra ni una factura ni un cobro. Es un agujero pequeño que
-   bloquea todo lo demás el día 1 de cada mes.
-5. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
+4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
    falta la ruta que lo recibe y la pantalla que manda a la operadora.
 
 **Cómo continuar, literalmente:**
@@ -50,7 +48,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-583 comprobaciones hayan encontrado veintiséis fallos reales, veintitrés de ellos míos.
+598 comprobaciones hayan encontrado veintiséis fallos reales, veintitrés de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -215,6 +213,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/importar.ts` · `pantallas/importar.ts` | El camino de cuatro pasos. La aplicación **propone y enseña**; el humano corrige. El formato se propone mirando el **dato**, que es lo único que lo dice. Y la pantalla enseña la **cabecera original** y un **ejemplo de la hoja** al lado de cada columna: sin el ejemplo no hay forma de saber si «Base» es la base o el total con IVA, y esa confusión mete un 16% de error. |
 | `db/schema/23-importar-facturas.sql` | Lo que hacía falta para que el importador **cree algo**: antes `confirmar_lote` ponía un sello y nada más. **Un proveedor que no existe no se crea solo** — se niega el lote entero y se dice cuál falta. El importe en dólares se calcula con la tasa del día **de la factura**, no con la de hoy. |
 | `app/src/dominio/cobrar.ts` · `pantallas/cobrar.ts` | Registrar un cobro. **La cuenta por cobrar baja sola** — un saldo que alguien marca es un saldo que algún día se queda sin marcar — y el saldo no se guarda, se resta. No se cobra de más: un saldo negativo no significa nada en un libro. El cobro se asienta en la misma transacción en que se registra. |
+| `app/src/dominio/periodos.ts` · `pantallas/periodos.ts` | Los meses contables. **La pantalla más aburrida y de las que más bloquean.** Lo primero que se ve es abrir el siguiente, con su nombre ya escrito — no hay ni un desplegable. Solo se cierra el abierto **más antiguo**, y **no se reabre**: corregir un mes cerrado se hace con un asiento de reverso en el siguiente, que es como tiene que quedar el rastro. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -438,6 +437,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 216 | El cobro queda **asentado**, y su asiento cuadra. |
 | 217 | El cliente no ve la caja de quien le factura. |
 | 218 | **El circuito hasta el final**, por HTTP: contrato → evidencia → valuación → aprobada → cobrada. |
+| 219 | De diciembre se pasa a enero del año siguiente al ofrecer el mes que toca. |
+| 220 | Solo se cierra el mes abierto **más antiguo**, y no se cierra uno descuadrado. |
+| 221 | Un mes cerrado **no admite un asiento más**. |
+| 222 | La pantalla dice que un mes cerrado no se reabre, **y qué hacer en su lugar**. |
 
 ## Lo que sigue
 
