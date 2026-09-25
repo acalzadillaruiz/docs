@@ -205,7 +205,9 @@ h2{margin:26px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;
   color:var(--md);border-bottom:1px solid var(--ln);white-space:nowrap}
 .gt th.n,.gt td.n{text-align:right;font-family:"JetBrains Mono",monospace;white-space:nowrap}
 .gt td{padding:9px 12px;border-top:1px solid var(--ln)}
-.gt td.m{font-family:"JetBrains Mono",monospace;font-size:12px}
+/* El codigo de contrato no se parte: «GPS-2027-007» en tres lineas no se lee, y es
+   la columna por la que se busca. */
+.gt td.m{font-family:"JetBrains Mono",monospace;font-size:12px;white-space:nowrap}
 /* El ingreso y el gasto se distinguen sin leer el signo. */
 .gt tr.ingresos td:first-child{border-left:3px solid var(--grt)}
 .gt tr.gastos td:first-child{border-left:3px solid var(--ln2)}

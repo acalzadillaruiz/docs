@@ -215,3 +215,32 @@ test('el nombre del cliente se escapa también en la bandeja', () => {
   assert.match(h, /Operadora &lt;A&gt; &amp; Cía/)
   assert.equal(h.includes('<A>'), false)
 })
+
+test('los días que algo lleva esperando NUNCA son negativos', async () => {
+  // Salió mirando una captura de pantalla: decía «Aprobada hace -184 días». Una
+  // fecha de aprobación en el futuro es un dato malo —un año mal tecleado, una zona
+  // horaria— pero la pantalla no puede contestar eso.
+  //
+  // La comprobación va contra la CONSULTA, que es donde se hace la resta y el único
+  // sitio donde se puede arreglar para todas las pantallas a la vez. Fabricar aquí
+  // un contrato de mentira comprobaría que la prueba sabe sumar, no que el sistema
+  // sepa restar.
+  const futura = await comoPersona({ id: YO }, 'nexus_interno', async (q) => {
+    await q.unsafe('set local role none')
+    await q`update valuacion set aprobada_el = current_date + 200
+             where organizacion_id = ${G}::uuid and estado in ('aprobada','facturada')`
+    const c = await cartera(q, 'es')
+    await q`update valuacion set aprobada_el = current_date - 5
+             where organizacion_id = ${G}::uuid and estado in ('aprobada','facturada')`
+    return c
+  })
+  let mirados = 0
+  for (const c of futura) {
+    if (c.espera === null) continue
+    mirados++
+    assert.ok(c.espera.desdeDias >= 0,
+      `el contrato ${c.codigo} lleva ${c.espera.desdeDias} días esperando`)
+  }
+  // Sin esto la prueba pasaría aunque no hubiera ni un contrato esperando.
+  assert.ok(mirados > 0, 'no se miró ningún contrato en espera')
+})

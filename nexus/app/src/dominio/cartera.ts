@@ -99,11 +99,16 @@ export async function cartera(q: Consulta, idioma: Idioma): Promise<readonly Res
            case when c.fin_previsto is null or c.estado <> 'vigente' then null
                 else (current_date - c.fin_previsto) end as dias_tarde,
            coalesce(v.por_aprobar, 0)::int as por_aprobar,
+           -- Recortado a cero: los dias que algo LLEVA esperando no pueden ser
+           -- negativos. Una fecha de aprobacion en el futuro es un dato malo —un año
+           -- mal tecleado, una zona horaria— pero la pantalla no puede contestar
+           -- «esperando desde hace -184 dias», que es lo que decia. Se corta aqui, en
+           -- el unico sitio donde se hace la resta, y no en cada pantalla que la use.
            case when v.desde_aprobar is null then null
-                else (current_date - v.desde_aprobar) end as por_aprobar_dias,
+                else greatest(0, current_date - v.desde_aprobar) end as por_aprobar_dias,
            coalesce(v.por_cobrar, 0)::int as por_cobrar,
            case when v.desde_cobrar is null then null
-                else (current_date - v.desde_cobrar) end as por_cobrar_dias
+                else greatest(0, current_date - v.desde_cobrar) end as por_cobrar_dias
       from contrato c
       join organizacion o on o.id = c.cliente_id
       left join v on v.contrato_id = c.id

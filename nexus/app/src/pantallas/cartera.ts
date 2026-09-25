@@ -147,6 +147,17 @@ main{margin-top:-26px;padding-bottom:70px}
 .nada{margin-top:30px;text-align:center;color:var(--ik2)}
 ${ESTILOS_BANDEJA}
 ${ESTILOS_AVANCE}
+/* En un telefono, diez enlaces apilados se comian la PRIMERA PANTALLA ENTERA de la
+   pagina mas usada: abrias la cartera y solo veias el menu. Aqui el menu se recoge
+   en dos lineas que se deslizan de lado, y los contratos —que es a lo que se entra—
+   aparecen enseguida. Sin JavaScript: es desbordamiento con arrastre, nada mas. */
+@media(max-width:620px){
+  .menu{flex-wrap:nowrap;overflow-x:auto;gap:0;padding-bottom:4px;
+    -webkit-overflow-scrolling:touch}
+  .menu .medidas{white-space:nowrap}
+  .hd .wrap{flex-wrap:nowrap;align-items:center;gap:10px}
+  .hd h1{font-size:clamp(20px,5.4vw,26px)}
+}
 @media(max-width:520px){
   .ct{padding:15px 15px}
   .pie{flex-direction:column;align-items:stretch;gap:10px}
