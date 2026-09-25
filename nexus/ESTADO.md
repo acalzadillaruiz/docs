@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 09:50 (España)
-**Avance:** 88 de 141 sesiones · **62%**
+**Última actualización:** 2026-09-25, 10:00 (España)
+**Avance:** 91 de 141 sesiones · **65%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -11,23 +11,26 @@ proveedor asentada; y valuación → asiento → cobro → asiento, con la cuent
 bajando sola. La prueba de circuito llega ahora hasta el final: contrato → hito
 verificado → valuación → aprobada → **cobrada**, todo por HTTP y sin tocar la base de
 datos. Y **los meses contables** se abren y cierran desde la
-aplicación, que es lo que desbloquea el día 1 de cada mes. Commit `108177c`. **598 comprobaciones.**
+aplicación, que es lo que desbloquea el día 1 de cada mes. Y **la factura fiscal se emite** desde una
+valuación aprobada, con su correlativo puesto por la base de datos. Commit `c95606e`. **609 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Emitir la factura fiscal desde una valuación aprobada.** Hoy se cobra contra la
-   valuación; falta el documento fiscal emitido con su número de control, que es lo
-   que el cliente necesita para pagar. `correlativo_retencion()` ya enseña el patrón:
-   el correlativo lo pone la base de datos, no una persona.
-2. **Caja chica**, que depende de las ocho respuestas del CEO
-   (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — sin contestar).
-3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
-   lanza `herramientas/avisar.ts` cada pocos minutos.
+1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
+   del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
+2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
+   lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
+   usa la primera semana y se abandona la tercera.
+3. **Notas de crédito y débito.** `documento_fiscal` ya las contempla (`afecta_a` es
+   obligatorio para ellas) y no hay forma de emitir una. Es lo único que permite
+   corregir una factura ya emitida, y corregir facturas pasa todos los meses.
 4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
    falta la ruta que lo recibe y la pantalla que manda a la operadora.
+5. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
+   no lo usa ninguna pantalla.
 
 **Cómo continuar, literalmente:**
 
@@ -48,7 +51,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-598 comprobaciones hayan encontrado veintiséis fallos reales, veintitrés de ellos míos.
+609 comprobaciones hayan encontrado veintiséis fallos reales, veintitrés de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -214,6 +217,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/23-importar-facturas.sql` | Lo que hacía falta para que el importador **cree algo**: antes `confirmar_lote` ponía un sello y nada más. **Un proveedor que no existe no se crea solo** — se niega el lote entero y se dice cuál falta. El importe en dólares se calcula con la tasa del día **de la factura**, no con la de hoy. |
 | `app/src/dominio/cobrar.ts` · `pantallas/cobrar.ts` | Registrar un cobro. **La cuenta por cobrar baja sola** — un saldo que alguien marca es un saldo que algún día se queda sin marcar — y el saldo no se guarda, se resta. No se cobra de más: un saldo negativo no significa nada en un libro. El cobro se asienta en la misma transacción en que se registra. |
 | `app/src/dominio/periodos.ts` · `pantallas/periodos.ts` | Los meses contables. **La pantalla más aburrida y de las que más bloquean.** Lo primero que se ve es abrir el siguiente, con su nombre ya escrito — no hay ni un desplegable. Solo se cierra el abierto **más antiguo**, y **no se reabre**: corregir un mes cerrado se hace con un asiento de reverso en el siguiente, que es como tiene que quedar el rastro. |
+| `db/schema/24-facturar.sql` | Emitir la factura. **El correlativo lo pone la base de datos**, con un bloqueo sobre la organización: dos personas facturando a la vez esperan una a la otra en vez de sacar el mismo número — que es lo que pasa el día que dos personas cierran el mes. Y **no genera otro asiento**: la cuenta por cobrar ya nació con la valuación, así que un asiento aquí duplicaría el ingreso. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -441,6 +445,12 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 220 | Solo se cierra el mes abierto **más antiguo**, y no se cierra uno descuadrado. |
 | 221 | Un mes cerrado **no admite un asiento más**. |
 | 222 | La pantalla dice que un mes cerrado no se reabre, **y qué hacer en su lugar**. |
+| 223 | La serie de facturas sigue **sin huecos**, y el número de control lleva su propio formato. |
+| 224 | La base y el IVA de la factura **se leen de la hoja**, no se vuelven a calcular. |
+| 225 | Emitir la factura **no genera otro asiento**: no duplica el ingreso. |
+| 226 | No se factura sin aprobar, ni dos veces, ni con una objeción sin responder. |
+| 227 | Las facturas salen en el libro de ventas **sin transcribir nada**. |
+| 228 | El cliente no factura: una factura que emite quien la recibe no es una factura. |
 
 ## Lo que sigue
 
