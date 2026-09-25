@@ -39,6 +39,8 @@ import {
   crearContrato, clientes, TIPOS, type ContratoNuevo, type RenglonNuevo, type TipoContrato,
 } from '../dominio/alta.ts'
 import { pintarAlta, type Traido } from '../pantallas/alta.ts'
+import { proponer, emitir, ContratoNoValuable } from '../dominio/valuar.ts'
+import { pintarValuar } from '../pantallas/valuar.ts'
 import { pintarPerfil } from '../pantallas/perfil.ts'
 import { pintarMedidas } from '../pantallas/medidas.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
@@ -424,6 +426,55 @@ export async function resolver(
     }
   }
 
+  // Proponer una valuación desde lo verificado. Solo de dentro: GPS factura.
+  const valuar = /^\/contratos\/([0-9a-f-]{36})\/valuar$/.exec(p.ruta)
+  if (valuar && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    try {
+      const hoy = new Date().toISOString().slice(0, 10)
+      const prop = await comoQuien((q) => proponer(q, valuar[1]!, hoy, p.idioma))
+      return html(200, pintarValuar(prop, p.idioma, testigoAnti(testigo),
+        primeroDelMes(hoy), hoy))
+    } catch (e) {
+      if (e instanceof ContratoNoValuable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
+  if (valuar && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    const hoy = new Date().toISOString().slice(0, 10)
+    const desde = p.campos['desde'] || primeroDelMes(hoy)
+    const hasta = p.campos['hasta'] || hoy
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    try {
+      const r = await comoQuien((q) => emitir(q, {
+        contratoId: valuar[1]!,
+        desde,
+        hasta,
+        retieneIva: p.campos['ret_iva'] === '1',
+        pagaEnDivisa: p.campos['divisa'] === '1',
+      }, personaId, org!.organizacion_id, p.idioma))
+
+      if (!r.hecho) {
+        const prop = await comoQuien((q) => proponer(q, valuar[1]!, hasta, p.idioma))
+        return html(400, pintarValuar(prop, p.idioma, testigoAnti(testigo),
+          desde, hasta, r.errores))
+      }
+      return aOtroSitio(`/valuaciones/${r.valuacionId}`)
+    } catch (e) {
+      if (e instanceof ContratoNoValuable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
   const valuacion = /^\/valuaciones\/([0-9a-f-]{36})$/.exec(p.ruta)
   if (valuacion && p.metodo === 'GET') {
     try {
@@ -523,6 +574,11 @@ function destinoSeguro(pedido: string | undefined): string {
   if (pedido.includes(':')) return '/'
   if (pedido.includes('\\')) return '/'
   return pedido
+}
+
+/** El primero del mes de una fecha. El periodo por omisión es el mes en curso. */
+function primeroDelMes(fecha: string): string {
+  return `${fecha.slice(0, 7)}-01`
 }
 
 /**

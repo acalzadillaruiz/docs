@@ -28,7 +28,9 @@ CARPETAS = [AQUI.parent / 'app' / 'pruebas']
 # El primer bloque de un UUID escrito en el codigo. Se descartan los que son de
 # relleno ('00000000') porque se usan a proposito para nombrar lo que no existe.
 PREFIJO = re.compile(r"'([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'")
-TASA = re.compile(r"tasa_bcv[^;]*?'(\d{4}-\d{2}-\d{2})'", re.S)
+# La fecha puede venir escrita, o ser 'current_date'. Las dos formas chocan igual:
+# la base de datos solo admite una tasa por dia, se escriba como se escriba.
+TASA = re.compile(r"tasa_bcv[^;]*?('\d{4}-\d{2}-\d{2}'|current_date)", re.S)
 
 RELLENO = {'00000000', 'ffffffff'}
 

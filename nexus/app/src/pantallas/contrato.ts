@@ -117,6 +117,9 @@ export function pintarContrato(f: FichaContrato, idioma: Idioma, esCliente: bool
 .rg-pd{font-family:"JetBrains Mono",monospace;font-size:10.5px;font-weight:700;color:var(--am);
   background:var(--amb);padding:1px 7px;border-radius:99px}
 .rg-vm{font-size:11.5px;color:var(--md);margin-left:auto}
+.nueva{display:inline-block;margin-top:14px;font:inherit;font-size:14.5px;font-weight:650;
+  padding:10px 18px;border-radius:11px;background:var(--nv);color:#E9F0F6;text-decoration:none}
+.nueva:hover{background:var(--nv3)}
 .vl{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 17px;
   border-top:1px solid var(--ln);text-decoration:none;color:inherit}
 .vl:first-child{border-top:0}
@@ -153,6 +156,8 @@ export function pintarContrato(f: FichaContrato, idioma: Idioma, esCliente: bool
   <section class="caja">${renglones || `<p class="nada">—</p>`}</section>
   <h2>${escapar(x.valuaciones)}</h2>
   <section class="caja">${valuaciones}</section>
+  ${esCliente ? '' : `<a class="nueva" href="/contratos/${escapar(f.id)}/valuar">${
+    escapar(t('valuar.titulo'))} →</a>`}
 </main>`,
   })
 }
