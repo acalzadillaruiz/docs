@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 112 de 141 sesiones · **79%**
+**Avance:** 113 de 141 sesiones · **80%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -30,7 +30,16 @@ vueltas, con su unidad de systemd hecha en `operar/`. Era el punto 2 de esta lis
 no era un detalle de instalación: la cola se llenaba y nadie la vaciaba. El bucle va
 aparte y probado con un reloj de mentira — uno que se prueba esperando de verdad es
 uno que nadie vuelve a probar. Commits `632b9b0` y `ac7cb5a`.
-**714 comprobaciones** (246 de SQL y diccionario + 468 de TypeScript), todas pasando.
+Y **la reexpresión por inflación, en pantalla**: el resultado monetario del ejercicio
+arriba y grande, y el ajuste cuenta por cuenta. **De los tres módulos construidos y
+sin pantalla queda uno.** Commits `632b9b0`, `ac7cb5a` y `913314b`.
+**725 comprobaciones** (246 de SQL y diccionario + 479 de TypeScript), todas pasando.
+
+**Trampa cara, apuntada aquí porque se va a volver a leer mal:** el signo del
+resultado monetario (REME) se lee **al revés** de lo que parece. **Positivo es
+pérdida** — es lo que costó tener bolívares mientras se devaluaban. La primera
+versión de la pantalla lo pintaba en verde por ser positivo, diciendo exactamente lo
+contrario de lo que había pasado.
 
 Avisado al CEO el **70%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
@@ -39,13 +48,10 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **Reexpresión por inflación en pantalla.** `16-reexpresion.sql` construido y
-   probado, sin pantalla. El patrón está hecho: mirar `src/pantallas/activos.ts` y
-   `src/dominio/activos.ts`, que son exactamente el mismo caso resuelto ayer — una
-   función de base de datos que cierra un mes, con sus comprobaciones previas en
-   TypeScript para que el error salga explicado antes de pulsar.
-3. **La importación de destinos que no sean facturas de proveedor**, también sin
-   pantalla.
+2. **La importación de destinos que no sean facturas de proveedor.** Es el último
+   módulo construido y probado que no usa ninguna pantalla. El patrón está hecho tres
+   veces ya: mirar `src/dominio/reexpresion.ts` y `src/pantallas/reexpresion.ts`, que
+   son el caso más reciente y el más parecido.
 
 **Trampa que se acaba de pagar dos veces, y que se va a volver a pagar:** dentro de una
 función `plpgsql`, un alias de tabla que se llame igual que una variable declarada
@@ -263,6 +269,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/banco.ts` · `pantallas/banco.ts` | Conciliación bancaria. **La máquina propone; casar lo hace una persona** — dos movimientos del mismo importe el mismo día son más frecuentes de lo que parece, y una conciliación automática que se equivoca una vez al mes es peor que ninguna. **Lo que no casa no se esconde**, a los dos lados, y queda señalado hasta que alguien lo explique por escrito. La nota solo se ofrece en los movimientos del banco: un cobro que el banco no tiene no se arregla con una nota. |
 | `app/src/dominio/activos.ts` · `pantallas/activos.ts` | Los equipos. Cada uno con lo que queda en libros y, si está alquilado, **lo que deja**: lo facturado del contrato menos el desgaste del periodo. Un equipo que deja menos de lo que se gasta no es una pérdida contable abstracta: es **una máquina que habría salido más barata parada**, y esa cifra no estaba en ningún sitio. Depreciar el mes se hace desde aquí, y las tres cosas que lo impedirían se comprueban **antes** de pulsar, no después. |
 | `app/src/servidor/bucle.ts` · `herramientas/avisar.ts` · `operar/` | Los avisos saliendo solos. La espera se cuenta **desde que termina** la vuelta, no desde que empieza: contándola desde el principio, un servidor de correo lento arranca la vuelta siguiente encima de la anterior. Un fallo no mata el bucle, pero fallo tras fallo espera más cada vez. Se para con SIGTERM **terminando la vuelta**: cortar a mitad de un envío deja avisos tomados y sin mandar. Probado con un reloj de mentira — un bucle que se prueba esperando de verdad es un bucle que nadie vuelve a probar. |
+| `app/src/dominio/reexpresion.ts` · `pantallas/reexpresion.ts` | Reexpresión por inflación (VEN-NIF / NIC 29). El **resultado monetario del ejercicio arriba y grande**: es lo que costó tener bolívares mientras perdían valor, y es lo que un CFO mira primero. **Positivo es pérdida** — el signo se lee al revés de lo que parece. El ajuste se ve **cuenta por cuenta**, porque un ajuste global que nadie puede abrir es un número que nadie se cree. Las monetarias, marcadas y con el ajuste **en blanco, no en cero**: cero se lee como «se calculó y dio cero». |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
