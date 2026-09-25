@@ -54,6 +54,10 @@ import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
 import { estadoDeCobro, registrarCobro, NoCobrable, type Medio } from '../dominio/cobrar.ts'
 import { pintarCobrar } from '../pantallas/cobrar.ts'
 import { meses, abrirMes, cerrarMes } from '../dominio/periodos.ts'
+import {
+  facturasDeProveedor, conceptosIslr, retener, esAgenteDeRetencion,
+} from '../dominio/proveedores.ts'
+import { pintarProveedores } from '../pantallas/proveedores.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
@@ -505,6 +509,36 @@ export async function resolver(
     const m = await comoQuien((q) => meses(q, org!.organizacion_id, p.idioma))
     return html(errores.length === 0 ? 200 : 400,
       pintarPeriodos(m, p.idioma, testigoAnti(testigo), errores))
+  }
+
+  // Las retenciones a proveedores. GPS es agente de retención: no retener cuando
+  // toca lo paga GPS de su bolsillo, con multa.
+  if (p.ruta === '/proveedores' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const doc = p.campos['documento'] ?? ''
+      if (!/^[0-9a-f-]{36}$/.test(doc)) return noEncontrado(p.idioma)
+      const r = await comoQuien((q) => retener(q, doc,
+        p.campos['clase'] === 'islr' ? 'islr' : 'iva',
+        p.campos['concepto'] ?? '', personaId, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    }
+
+    const datos = await comoQuien(async (q) => ({
+      lista: await facturasDeProveedor(q, org!.organizacion_id, p.idioma),
+      conceptos: await conceptosIslr(q, p.idioma),
+      esAgente: await esAgenteDeRetencion(q, org!.organizacion_id),
+    }))
+    return html(errores.length === 0 ? 200 : 400, pintarProveedores(
+      datos.lista, datos.conceptos, p.idioma, testigoAnti(testigo), errores, datos.esAgente))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)

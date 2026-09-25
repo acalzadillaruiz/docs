@@ -370,5 +370,20 @@
   "nota.error.base": "El importe tiene que ser mayor que cero",
   "nota.error.motivo": "Una nota sin motivo no explica nada, que es justo para lo que sirve",
   "nota.error.pasa": "Esa nota devuelve más de lo que queda facturado. Una base imponible negativa no significa nada en una declaración.",
-  "nota.error.sin_factura": "Esa valuación todavía no tiene factura que corregir"
+  "nota.error.sin_factura": "Esa valuación todavía no tiene factura que corregir",
+  "proveedor.titulo": "Facturas de proveedor",
+  "proveedor.pendientes": "Sin retener",
+  "proveedor.explica": "GPS es agente de retención: retiene el IVA y el ISLR a sus proveedores y emite el comprobante. El correlativo lo pone el sistema.",
+  "proveedor.retener_iva": "Retener IVA",
+  "proveedor.retener_islr": "Retener ISLR",
+  "proveedor.concepto": "Concepto de ISLR",
+  "proveedor.sin_control": "Sin número de control",
+  "proveedor.sin_control_aviso": "Sin número de control la retención de IVA es del 100%, no del 75%. Es la ley y es lo primero que se discute con un proveedor.",
+  "proveedor.comprobante": "Comprobante",
+  "proveedor.retenido": "Retenido",
+  "proveedor.nada": "No hay facturas de proveedor sin retener.",
+  "proveedor.error.ya": "Esa factura ya tiene esa retención",
+  "proveedor.error.sin_iva": "Esa factura no tiene IVA que retener",
+  "proveedor.error.concepto": "Hay que decir por qué concepto se retiene el ISLR",
+  "proveedor.no_agente": "Esta empresa no consta como agente de retención de IVA en esta fecha, así que no corresponde retener. Si lo es, hay que registrarlo en su régimen de IVA."
 }
