@@ -40,7 +40,9 @@ import {
   type ContratoNuevo, type RenglonNuevo, type TipoContrato,
 } from '../dominio/alta.ts'
 import { pintarAlta, type Traido } from '../pantallas/alta.ts'
-import { proponer, emitir, presentar, ContratoNoValuable } from '../dominio/valuar.ts'
+import {
+  proponer, emitir, presentar, facturar, ContratoNoValuable,
+} from '../dominio/valuar.ts'
 import {
   cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, mapeoGuardado,
   CAMPOS, HojaRepetida, type Campo,
@@ -642,7 +644,15 @@ export async function resolver(
         const cab = await cabeceraDeValuacion(q, valuacion[1]!)
         const lineas = await hojaDeValuacion(q, valuacion[1]!, p.idioma, cab.moneda, esCliente)
         const objeciones = await objecionesDe(q, valuacion[1]!)
-        return { cab, lineas, objeciones }
+        const [f] = (await q`
+          select df.numero, df.numero_control from documento_fiscal df
+            join valuacion v on v.documento_id = df.id
+           where v.id = ${valuacion[1]!}::uuid
+        `) as unknown as Array<{ numero: string; numero_control: string }>
+        return {
+          cab, lineas, objeciones,
+          factura: f ? { numero: f.numero, control: f.numero_control } : null,
+        }
       })
       // El botón solo aparece si de verdad se puede pulsar. Enseñar uno que va a
       // rebotar enseña que la acción existe y esconde que no te corresponde.
@@ -668,6 +678,10 @@ export async function resolver(
         // Y cobrar, solo cuando ya hay algo que cobrar.
         puedeCobrar: !esCliente &&
           ['aprobada', 'facturada', 'cobrada'].includes(datos.cab.estado),
+        // Facturar, solo una vez aprobada y sin objeciones abiertas.
+        puedeFacturar: !esCliente && datos.cab.estado === 'aprobada' &&
+          !datos.objeciones.some((o) => o.respondidaEn === null),
+        factura: datos.factura,
         antifalsificacion: testigoAnti(testigo),
         objeciones: datos.objeciones.map((o) => ({
           id: o.id,
@@ -713,6 +727,19 @@ export async function resolver(
       if (e instanceof NoCobrable) return noEncontrado(p.idioma)
       throw e
     }
+  }
+
+  // Emitir la factura. El correlativo lo pone la base de datos, no una persona.
+  const facturarVal = /^\/valuaciones\/([0-9a-f-]{36})\/facturar$/.exec(p.ruta)
+  if (facturarVal && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const r = await comoQuien((q) =>
+      facturar(q, facturarVal[1]!, personaId, esCliente, p.idioma))
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    return aOtroSitio(`/valuaciones/${facturarVal[1]!}`)
   }
 
   const responderObj = /^\/objeciones\/([0-9a-f-]{36})\/responder$/.exec(p.ruta)

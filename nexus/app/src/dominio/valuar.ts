@@ -236,3 +236,52 @@ export async function presentar(
     returning id`
   return filas.length === 1 ? { hecho: true } : { hecho: false, motivo: 'estado_equivocado' }
 }
+
+export type Facturada =
+  | { readonly hecho: true; readonly numero: string; readonly control: string }
+  | { readonly hecho: false; readonly motivo: string }
+
+/**
+ * Emite la factura de una valuación aprobada.
+ *
+ * El correlativo y el número de control los pone la base de datos dentro de la misma
+ * transacción. Un correlativo llevado a mano acaba con huecos o repetido, y las dos
+ * cosas son un problema con el SENIAT: un hueco hay que justificarlo y un repetido
+ * invalida las dos facturas.
+ *
+ * Las condiciones se comprueban aquí antes de llamar, igual que al importar: una
+ * excepción dentro de una transacción la aborta entera y no deja decir nada útil.
+ */
+export async function facturar(
+  q: Consulta, valuacionId: string, personaId: string, esCliente: boolean, idioma: Idioma,
+): Promise<Facturada> {
+  // Factura GPS. Una factura que emite quien la recibe no es una factura.
+  if (esCliente) return { hecho: false, motivo: t(idioma, 'valuar.error.contrato') }
+
+  const [v] = (await q`
+    select estado::text, documento_id from valuacion where id = ${valuacionId}::uuid
+  `) as unknown as Array<{ estado: string; documento_id: string | null }>
+  if (!v) return { hecho: false, motivo: t(idioma, 'valuar.error.contrato') }
+  if (v.documento_id) return { hecho: false, motivo: t(idioma, 'facturar.error.ya') }
+  if (v.estado !== 'aprobada') {
+    return { hecho: false, motivo: t(idioma, 'facturar.error.sin_aprobar') }
+  }
+
+  const [sin] = (await q`
+    select count(*)::int as n from objecion
+     where valuacion_id = ${valuacionId}::uuid and respondida_en is null
+  `) as unknown as Array<{ n: number }>
+  if (Number(sin?.n ?? 0) > 0) {
+    return { hecho: false, motivo: t(idioma, 'facturar.error.objecion') }
+  }
+
+  const [doc] = (await q`
+    select emitir_factura(${valuacionId}::uuid, ${personaId}::uuid) as id
+  `) as unknown as Array<{ id: string }>
+
+  const [f] = (await q`
+    select numero, numero_control from documento_fiscal where id = ${doc!.id}::uuid
+  `) as unknown as Array<{ numero: string; numero_control: string }>
+
+  return { hecho: true, numero: f!.numero, control: f!.numero_control }
+}

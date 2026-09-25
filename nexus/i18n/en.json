@@ -351,5 +351,10 @@
   "periodo.error.orden": "A month cannot be closed while the previous one is still open",
   "periodo.error.descuadre": "That month does not balance: an unbalanced month is not closed",
   "periodo.error.ya": "That month was already there",
-  "periodo.siguiente": "Next month to open"
+  "periodo.siguiente": "Next month to open",
+  "facturar.error.ya": "That progress payment already has an invoice. To correct it you issue a credit note; you do not redo it.",
+  "facturar.error.sin_aprobar": "Only a progress payment approved by the client can be invoiced",
+  "facturar.error.objecion": "It has an unanswered dispute. Invoicing something the client challenged in writing is how you lose an argument before it starts.",
+  "facturar.numero": "Invoice",
+  "facturar.control": "Control number"
 }

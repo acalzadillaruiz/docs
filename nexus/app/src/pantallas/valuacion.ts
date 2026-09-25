@@ -39,6 +39,10 @@ export type DatosValuacion = {
   readonly puedePresentar?: boolean
   /** Solo de dentro, y solo una vez aprobada: registrar lo que entra. */
   readonly puedeCobrar?: boolean
+  /** Solo de dentro, y solo una vez aprobada y sin objeciones abiertas. */
+  readonly puedeFacturar?: boolean
+  /** Si ya tiene factura, su número y su número de control. */
+  readonly factura?: { readonly numero: string; readonly control: string } | null
   readonly antifalsificacion: string
   readonly objeciones: readonly ObjecionVista[]
 }
@@ -154,6 +158,12 @@ h2.sec{margin:30px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5p
 .acc button.ap{background:var(--grt);color:#fff}
 .acc button.ob{background:transparent;color:var(--ik);border:1px solid var(--ln2);margin-top:10px}
 .ayuda{margin:10px 0 0;font-size:12.5px;color:var(--md);text-align:center;line-height:1.45}
+/* El numero de la factura va a la vista y en monoespaciada: es lo que el cliente
+   escribe en su transferencia, y lo que se busca cuando algo no cuadra. */
+.factura{margin:16px 0 0;padding:12px 16px;background:var(--cd);border:1px solid var(--ln);
+  border-left:3px solid var(--grt);border-radius:11px;
+  font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ik2)}
+.factura b{color:var(--ik);font-size:14.5px}
 .obj-nueva{margin-top:16px;border-top:1px solid var(--ln);padding-top:14px}
 .obj-nueva summary{cursor:pointer;font-size:14px;color:var(--ik2);text-align:center;
   list-style:none}
@@ -231,6 +241,19 @@ ${filas}
       <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
       <button type="submit" class="ap">${escapar(t('accion.presentar'))}</button>
       <p class="ayuda">${escapar(t('accion.presentar_aviso'))}</p>
+    </form>
+  </section>`}
+
+  ${!d.factura ? '' : `
+  <p class="factura"><b>${escapar(t('facturar.numero'))} ${escapar(d.factura.numero)}</b>
+    · ${escapar(t('facturar.control'))} ${escapar(d.factura.control)}</p>`}
+
+  ${!d.puedeFacturar ? '' : `
+  <section class="acc">
+    <form method="post" action="/valuaciones/${escapar(d.id)}/facturar">
+      <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
+      <button type="submit" class="ap">${escapar(t('facturar.emitir'))}</button>
+      <p class="ayuda">${escapar(t('facturar.aviso'))}</p>
     </form>
   </section>`}
 

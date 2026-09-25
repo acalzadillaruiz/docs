@@ -351,5 +351,10 @@
   "periodo.error.orden": "No se puede cerrar un mes con el anterior todavía abierto",
   "periodo.error.descuadre": "Ese mes no cuadra: no se cierra un mes descuadrado",
   "periodo.error.ya": "Ese mes ya estaba",
-  "periodo.siguiente": "Siguiente mes por abrir"
+  "periodo.siguiente": "Siguiente mes por abrir",
+  "facturar.error.ya": "Esa valuación ya tiene factura. Para corregirla se emite una nota de crédito, no se rehace.",
+  "facturar.error.sin_aprobar": "Solo se factura una valuación aprobada por el cliente",
+  "facturar.error.objecion": "Tiene una objeción sin responder. Facturar algo que el cliente discutió por escrito es como se pierde una discusión antes de empezarla.",
+  "facturar.numero": "Factura",
+  "facturar.control": "Número de control"
 }

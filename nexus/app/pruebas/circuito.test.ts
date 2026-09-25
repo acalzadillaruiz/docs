@@ -339,3 +339,88 @@ test('y del cobro al cierre: la cuenta por cobrar baja sola, por el navegador', 
   assert.equal(despues!.estado, 'cobrada')
   assert.notEqual(despues!.asiento, null, 'el cobro quedó asentado, no solo registrado')
 })
+
+test('la factura se emite con su correlativo, y el cliente la ve en su valuación', async () => {
+  const gps = await entrar('circ@prueba.test')
+  const afG = testigoAnti(gps)
+  const cli = await entrar('circ-cli@prueba.test')
+  const afC = testigoAnti(cli)
+
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`select instalar_plan_cuentas(${G}::uuid)`
+    await q`insert into periodo (organizacion_id, anio, mes)
+            values (${G}::uuid, extract(year from current_date)::int,
+                    extract(month from current_date)::int)
+            on conflict do nothing`
+  })
+
+  const codigo = `CIRC-FAC-${Date.now() % 1000000}`
+  const alta = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie: gps,
+    campos: { af: afG, accion: 'crear', cliente: C, codigo, tipo: 'servicio',
+              titulo_es: 'Cuadrilla', titulo_en: 'Crew', moneda: 'VES',
+              anticipo_pct: '0', amortiza_pct: '0', garantia_pct: '0', filas: '3' },
+    repetidos: {
+      r_desc_es: ['Cuadrilla', '', ''], r_desc_en: ['Crew', '', ''],
+      r_cantidad: ['1', '', ''], r_unidad: ['mes', '', ''],
+      r_norma: ['', '', ''], r_espec: ['', '', ''],
+      r_precio: ['100000', '', ''], r_costo: ['60000', '', ''],
+    },
+  })
+  const rutaContrato = alta.cabeceras!['Location']!
+  const contratoId = rutaContrato.split('/').pop()!
+  await pedir({ metodo: 'POST', ruta: `${rutaContrato}/activar`, cookie: gps, campos: { af: afG } })
+
+  const [hito] = (await dentro((q) => q`
+    select h.id from hito h join renglon rg on rg.id = h.renglon_id
+     where rg.contrato_id = ${contratoId}::uuid and h.clave = 'movilizacion'
+  `)) as unknown as Array<{ id: string }>
+  await pedir({
+    metodo: 'POST', ruta: `/hitos/${hito!.id}/evidencia`, cookie: gps,
+    campos: { af: afG, clase: 'acta', ocurrido_en: '2026-09-10' },
+    archivo: { archivo: 'acta.pdf', tipoMime: 'application/pdf',
+               contenido: new TextEncoder().encode('%PDF acta para facturar') },
+  })
+  const [evi] = (await dentro((q) => q`
+    select id from evidencia where hito_id = ${hito!.id}::uuid
+  `)) as unknown as Array<{ id: string }>
+  await pedir({
+    metodo: 'POST', ruta: `/evidencia/${evi!.id}/verificar`, cookie: gps, campos: { af: afG },
+  })
+
+  const hoy = new Date().toISOString().slice(0, 10)
+  const emitida = await pedir({
+    metodo: 'POST', ruta: `${rutaContrato}/valuar`, cookie: gps,
+    campos: { af: afG, desde: '2026-09-01', hasta: hoy },
+  })
+  const rutaVal = emitida.cabeceras!['Location']!
+  await pedir({ metodo: 'POST', ruta: `${rutaVal}/presentar`, cookie: gps, campos: { af: afG } })
+
+  // Antes de que el cliente apruebe, no se factura.
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/facturar`, cookie: gps, campos: { af: afG },
+  })).codigo, 409)
+
+  await pedir({ metodo: 'POST', ruta: `${rutaVal}/aprobar`, cookie: cli, campos: { af: afC } })
+
+  const facturada = await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/facturar`, cookie: gps, campos: { af: afG },
+  })
+  assert.equal(facturada.codigo, 303)
+
+  // El número va a la vista: es lo que el cliente escribe en su transferencia.
+  const hoja = await pedir({ ruta: rutaVal, cookie: cli })
+  assert.match(hoja.cuerpo!, /class="factura"/)
+  assert.match(hoja.cuerpo!, /\d{8}/)
+
+  // Y no se factura dos veces: se corrige con una nota de crédito.
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/facturar`, cookie: gps, campos: { af: afG },
+  })).codigo, 409)
+
+  // El cliente no factura: una factura que emite quien la recibe no es una factura.
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/facturar`, cookie: cli, campos: { af: afC },
+  })).codigo, 404)
+})
