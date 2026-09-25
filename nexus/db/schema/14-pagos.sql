@@ -114,12 +114,20 @@ begin
 end $$;
 
 -- Lo que toca pagar, ordenado por vencimiento y por lo que bloquea.
+--
+-- Devuelve tambien el id del documento, porque desde esta misma lista se paga: una lista de deudas de la que no se puede pagar obliga a buscar la factura
+-- otra vez en otra pantalla, y ahi es donde se paga la que no era.
+--
+-- Cambiar las columnas que devuelve una funcion 'returns table' no lo admite
+-- 'create or replace': hay que tirarla antes. El esquema se carga entero y en orden,
+-- asi que esto es inofensivo aqui y no lo seria en una base ya viva.
+drop function if exists por_pagar(uuid, date);
 create or replace function por_pagar(p_org uuid, p_al date)
 returns table (proveedor text, factura text, fecha date, dias int,
-               saldo numeric(20,2), contrato text)
+               saldo numeric(20,2), contrato text, documento uuid)
 language sql stable as $$
   select o.nombre, d.numero, d.fecha, (p_al - d.fecha)::int,
-         saldo_documento(d.id), c.codigo
+         saldo_documento(d.id), c.codigo, d.id
     from documento_fiscal d
     join organizacion o on o.id = d.contraparte_id
     left join contrato c on c.id = d.contrato_id
@@ -128,6 +136,54 @@ language sql stable as $$
      and d.fecha <= p_al
      and saldo_documento(d.id) > 0
    order by d.fecha
+$$;
+
+-- -----------------------------------------------------------------------------
+-- Pagar una factura de proveedor: la fila del pago y su asiento, en un solo acto.
+--
+-- Estaban las dos mitades —la tabla 'pago' y 'asentar_pago'— y no habia forma de
+-- llegar a ellas desde ninguna pantalla. Una contabilidad donde entran facturas y no
+-- sale nunca un pago da un saldo de proveedores que crece para siempre y no es el de
+-- nadie.
+create or replace function registrar_pago(
+  p_documento uuid, p_fecha date, p_medio medio_pago, p_moneda moneda,
+  p_monto numeric, p_referencia text, p_persona uuid)
+returns uuid
+language plpgsql as $$
+declare
+  d    record;
+  tasa uuid := tasa_del_dia(p_fecha);
+  id_p uuid := gen_random_uuid();
+begin
+  select * into d from documento_fiscal where id = p_documento;
+  if d is null then raise exception 'El documento % no existe', p_documento; end if;
+  if d.sentido <> 'recibido' then
+    raise exception 'Esto paga facturas recibidas. Un cobro se registra por otro sitio.';
+  end if;
+  if tasa is null then
+    raise exception 'No hay tasa del BCV publicada para el %', p_fecha;
+  end if;
+
+  insert into pago (id, organizacion_id, documento_id, beneficiario_id, fecha, medio,
+                    moneda, monto, tasa_id, referencia, registrado_por)
+  values (id_p, d.organizacion_id, p_documento, d.contraparte_id, p_fecha, p_medio,
+          p_moneda, round(p_monto, 2), tasa, p_referencia, p_persona);
+
+  perform asentar_pago(id_p, p_persona);
+  return id_p;
+end $$;
+
+-- Los pagos ya hechos de una factura. Se enseñan debajo de la deuda: un pago que no
+-- se ve es un pago que se hace dos veces.
+create or replace function pagos_de(p_documento uuid)
+returns table (id uuid, fecha date, medio text, moneda moneda, monto numeric(20,2),
+               referencia text, asiento bigint)
+language sql stable as $$
+  select p.id, p.fecha, p.medio::text, p.moneda, p.monto, p.referencia, a.numero
+    from pago p
+    left join asiento a on a.id = p.asiento_id
+   where p.documento_id = p_documento
+   order by p.fecha, p.registrado_en
 $$;
 
 -- -----------------------------------------------------------------------------

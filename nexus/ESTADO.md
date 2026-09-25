@@ -1,12 +1,44 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 12:10 (España)
-**Avance:** 132 de 141 sesiones · **94%**
+**Última actualización:** 2026-09-25, 13:40 (España)
+**Avance:** 133 de 141 sesiones · **94%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **la caja chica**, que llevaba semanas parada esperando
+**Lo último terminado:** **pagar una factura de proveedor**, que era el agujero más
+grande que quedaba: estaban la tabla `pago` y el generador `asentar_pago`, y **no
+había forma de llegar a ellos desde ninguna pantalla**. Entraban facturas y no salía
+nunca un pago, así que el saldo de proveedores crecía para siempre y no era el de
+nadie. Ahora `/pagar` enseña lo que se debe, lo que lleva esperando cada factura, y
+se paga desde la misma lista — buscar la factura otra vez en otra pantalla es como
+se acaba pagando la que no era. Debajo de cada deuda van **los pagos ya hechos**:
+un pago que no se ve es un pago que se hace dos veces.
+
+Tres cosas que decide el sistema y no quien teclea:
+
+- **El IGTF.** Pagar en divisa cuesta un 3% más y es un gasto con cuenta propia.
+  Dejarlo a criterio de quien teclea garantiza que la mitad de los pagos lo lleven.
+- **No se paga de más.** El saldo sale de restar —factura, menos retenciones, menos
+  lo ya pagado—, nunca de una columna guardada.
+- **Un pago en dólares se mide contra el saldo pasando por la tasa**, no a ojo. Sin
+  la conversión, un importe pequeño en dólares parece caber siempre.
+
+Y salió algo que hay que decir tal cual: **la prueba de aislamiento que escribí
+primero era falsa**. Daba por hecho que al cliente le saltaría un «permission
+denied», y no salta: `por_pagar` es una función normal y el cliente puede llamarla.
+Lo que le devuelve es **cero filas**, porque la política de fila solo le enseña sus
+documentos. La prueba dice ahora lo que pasa de verdad, y comprueba las tres vallas
+por separado: cero filas, la tabla `pago` denegada, y la línea `if (esCliente)` en
+la ruta.
+
+Y **`colisiones.py` dejaba pasar un choque real**: el RIF de una empresa venezolana
+lleva ocho cifras y el patrón exigía nueve, así que dos archivos compartían
+`J-30777777-7` y el fallo salía como una clave duplicada **en medio de una prueba de
+otra cosa** — justo lo que ese comprobador existe para evitar. Arreglado, y contando
+solo los RIF que se insertan de verdad.
+
+**Antes:** **la caja chica**, que llevaba semanas parada esperando
 ocho respuestas del CEO. Eso fue un error mío: había que construirla con **supuestos
 declarados** en vez de esperar. Así está hecha. Son seis, están escritos en el
 módulo, en la pantalla (bloque «Seis supuestos, no seis decisiones») y cada uno tiene
@@ -175,7 +207,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**892 comprobaciones** (250 de SQL y diccionario + 642 de TypeScript), todas pasando.
+**903 comprobaciones** (250 de SQL y diccionario + 653 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno

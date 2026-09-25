@@ -43,7 +43,17 @@ INSERTA_PERSONA = re.compile(r"insert\s+into\s+persona\b.*?(?:;|`)", re.S | re.I
 CORREO = re.compile(r"'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]*prueba\.test)'")
 
 # El RIF de una organizacion tambien es unico.
-RIF = re.compile(r"'(J-\d{9}-\d)'")
+#
+# Ocho cifras o nueve: un RIF de empresa venezolano lleva ocho, y las pruebas usan
+# de las dos formas. Con solo nueve, esto dejaba pasar J-30777777-7 repetido en dos
+# archivos, y el fallo salia como una violacion de unicidad en MEDIO de una prueba
+# de otra cosa — que es justo lo que este comprobador existe para evitar.
+RIF = re.compile(r"'(J-\d{8,9}-\d)'")
+
+# Y solo cuentan los RIF que se INSERTAN. Varios archivos llevan un RIF dentro de una
+# hoja de calculo de mentira para comprobar como se lee, y esos no llegan a ninguna
+# tabla: no chocan con nada.
+INSERTA_ORG = re.compile(r"insert\s+into\s+organizacion\b.*?(?:;|`)", re.S | re.I)
 
 RELLENO = {'00000000', 'ffffffff'}
 
@@ -94,7 +104,7 @@ def main() -> int:
                 + ', '.join(sorted(archivos)) + ' — y es unico en toda la base'
             )
 
-    for rif, archivos in sorted(duenos(RIF).items()):
+    for rif, archivos in sorted(duenos(RIF, dentro_de=INSERTA_ORG).items()):
         if len(archivos) > 1:
             problemas.append(
                 f'el RIF {rif} lo usan {len(archivos)} archivos: '

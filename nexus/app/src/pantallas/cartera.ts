@@ -180,6 +180,7 @@ ${ESTILOS_AVANCE}
   ${esCliente ? '' : `<a class="medidas" href="/contratos/nuevo">${escapar(t('alta.nuevo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/importar">${escapar(t('importar.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/proveedores">${escapar(t('proveedor.titulo'))}</a>`}
+  ${esCliente ? '' : `<a class="medidas" href="/pagar">${escapar(t('pago.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/activos">${escapar(t('activo.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/reexpresion">${escapar(t('reex.nombre'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/libros">${escapar(t('libro.nombre'))}</a>`}

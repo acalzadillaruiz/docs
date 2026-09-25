@@ -66,6 +66,8 @@ import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
 import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
          anotarVale, reponer, cerrar as cerrarCaja, abrirCaja } from '../dominio/caja.ts'
 import { pintarCaja } from '../pantallas/caja.ts'
+import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
+import { pintarPagar } from '../pantallas/pagar.ts'
 import { pintarReexpresion } from '../pantallas/reexpresion.ts'
 import { libro, libroCrudo, aFilas } from '../dominio/libros.ts'
 import { pintarLibro } from '../pantallas/libros.ts'
@@ -645,6 +647,42 @@ export async function resolver(
     const lista = await comoQuien((q) => equipos(q, org!.organizacion_id, p.idioma))
     return html(errores.length === 0 ? 200 : 400,
       pintarActivos(lista, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // Lo que toca pagar, y el sitio donde se paga. Estaban la tabla y el generador y
+  // no habia forma de llegar a ellos: entraban facturas y no salia nunca un pago.
+  if (p.ruta === '/pagar' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const orgId = org!.organizacion_id
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const monto = decimal(p.campos['monto'])
+      if (monto === null) errores = [t(p.idioma, 'pago.error.monto')]
+      else {
+        const r = await comoQuien((q) => registrarPago(q, {
+          documento: (p.campos['documento'] ?? '').trim(),
+          fecha: (p.campos['fecha'] ?? '').trim(),
+          medio: (p.campos['medio'] ?? '').trim(),
+          moneda: p.campos['moneda'] === 'USD' ? 'USD' : 'VES',
+          monto,
+          referencia: (p.campos['referencia'] ?? '').trim() || null,
+        }, personaId, p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      }
+    }
+
+    const deudas = await comoQuien((q) => porPagar(q, orgId, p.idioma))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarPagar({ deudas, medios: mediosTraducidos(p.idioma),
+                    hoy: new Date().toISOString().slice(0, 10) },
+        p.idioma, testigoAnti(testigo), errores))
   }
 
   // La caja chica. Nunca la ve el cliente: lleva dentro a quien se le pago, por que
