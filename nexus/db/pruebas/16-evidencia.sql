@@ -126,9 +126,9 @@ end $$;
 
 -- ============================================================ una evidencia rechazada no cuenta
 insert into evidencia (hito_id, clase, huella, nombre, bytes, tipo_mime, subida_por,
-                       rechazada_en, motivo_rechazo)
+                       rechazada_en, rechazada_por, motivo_rechazo)
 values ('6f7a8b9c-2222-0000-0000-000000000005','foto', repeat('c', 64),
-        'foto-borrosa.jpg', 44100,'image/jpeg', :yo, now(),
+        'foto-borrosa.jpg', 44100,'image/jpeg', :yo, now(), :yo,
         'La foto no permite leer la placa del equipo');
 
 do $$
@@ -145,9 +145,10 @@ end $$;
 do $$
 begin
   insert into evidencia (hito_id, clase, huella, nombre, bytes, tipo_mime, subida_por,
-                         rechazada_en)
+                         rechazada_en, rechazada_por)
   values ('6f7a8b9c-2222-0000-0000-000000000005','foto', repeat('d', 64),
-          'otra.jpg', 1000,'image/jpeg','6f7a8b9c-0000-0000-0000-00000000000d', now());
+          'otra.jpg', 1000,'image/jpeg','6f7a8b9c-0000-0000-0000-00000000000d', now(),
+          '6f7a8b9c-0000-0000-0000-00000000000d');
   raise exception 'FALLO · se rechazó sin decir por qué';
 exception when check_violation then
   raise notice 'OK · rechazar exige decir por qué';
@@ -201,7 +202,7 @@ select case when recalcular_hito('6f7a8b9c-2222-0000-0000-000000000002') = 'veri
 
 -- Ahora se rechaza ese certificado. El hito tiene que CAER.
 update evidencia set verificada_en = null, verificada_por = null,
-       rechazada_en = now(), motivo_rechazo = 'la colada no coincide con el cabezal'
+       rechazada_en = now(), rechazada_por = :yo, motivo_rechazo = 'la colada no coincide con el cabezal'
  where hito_id = '6f7a8b9c-2222-0000-0000-000000000002';
 
 -- Recalcular va en su PROPIA instruccion, y no por estilo: avance_renglon() es

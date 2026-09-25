@@ -83,6 +83,10 @@ if [ -d "$AQUI/../app/node_modules" ]; then
   echo
   echo "== aplicación (TypeScript) =="
   cargar_esquema
+  # Antes de correr nada: que dos archivos no se pisen los identificadores. Es el
+  # fallo mas caro de los que han salido aqui, porque no se ve — el segundo archivo
+  # se queda con las filas del primero y la prueba pasa o falla segun el orden.
+  if python3 "$AQUI/colisiones.py"; then :; else fallos=$((fallos+1)); fi
   if (cd "$AQUI/../app" && npx tsc --noEmit); then :; else
     echo "FALLO · los tipos no compilan"; fallos=$((fallos+1))
   fi

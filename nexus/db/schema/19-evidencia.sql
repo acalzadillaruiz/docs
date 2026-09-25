@@ -106,6 +106,7 @@ create table evidencia (
   verificada_en   timestamptz,
   verificada_por  uuid references persona(id),
   rechazada_en    timestamptz,
+  rechazada_por   uuid references persona(id),
   motivo_rechazo  text,
 
   constraint verificada_o_rechazada check (
@@ -113,6 +114,9 @@ create table evidencia (
   ),
   constraint rechazo_tiene_motivo check (
     rechazada_en is null or btrim(coalesce(motivo_rechazo,'')) <> ''
+  ),
+  constraint rechazo_tiene_quien check (
+    rechazada_en is null or rechazada_por is not null
   )
 );
 
@@ -343,8 +347,13 @@ begin
   return nuevo;
 end $$;
 
--- Lo que le falta a un hito para poder darse por bueno, dicho en una linea.
--- La pantalla no tiene que averiguarlo: lo pregunta.
+-- Que documento le FALTA a un hito, dicho en una linea. La pantalla no tiene que
+-- averiguarlo: lo pregunta.
+--
+-- 'Falta' significa que no hay ningun documento de esa clase, no que lo haya y este
+-- sin revisar. Son dos cosas distintas y llevan a dos acciones distintas: una es ir
+-- a buscar el papel al patio, la otra es que alguien de aqui lo mire. Mezclarlas en
+-- una sola lista hace que se busque otra vez un papel que ya estaba.
 create or replace function falta_al_hito(p_hito uuid) returns clase_evidencia[]
 language sql stable as $$
   select array_agg(c order by c)
@@ -352,7 +361,7 @@ language sql stable as $$
    where h.id = p_hito
      and not exists (select 1 from evidencia e
                       where e.hito_id = h.id and e.clase = c
-                        and e.rechazada_en is null and e.verificada_en is not null)
+                        and e.rechazada_en is null)
 $$;
 
 -- -----------------------------------------------------------------------------
