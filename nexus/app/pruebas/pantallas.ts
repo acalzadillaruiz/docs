@@ -23,8 +23,9 @@ const SIN_PANTALLA = new Set([
   '/entrar/recuperacion', '/salir',
   // Ni son pantallas ni piden sesión: hacen que la aplicación se instale.
   '/manifest.webmanifest', '/icono.svg', '/icono-180.png', '/icono-512.png',
-  // Devuelve una hoja de cálculo, no una página.
-  '/libros/hoja',
+  // Devuelven una hoja de cálculo, no una página. Las dos las pilló este mismo
+  // barrido el día que se añadieron, que es para lo que está.
+  '/libros/hoja', '/diario/hoja',
 ])
 
 /** Las pantallas que un interno puede abrir, sacadas de las rutas del servidor. */

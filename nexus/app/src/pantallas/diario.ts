@@ -93,6 +93,11 @@ export function pintarDiario(
     <button type="submit">${escapar(x.ver)}</button>
   </form>
 
+  <p class="baja">
+    <a href="/diario/hoja?anio=${d.anio}&amp;mes=${d.mes}">${escapar(t('exp.bajar'))} ↓</a>
+    <span>${escapar(t('exp.explica'))}</span>
+  </p>
+
   ${d.apuntes.length === 0
     ? `<p class="nada">${escapar(t('diario.vacio'))}</p>`
     : `<div class="tot">${escapar(t('diario.total'))} · ${escapar(mm)}/${d.anio}
@@ -106,6 +111,10 @@ export function pintarDiario(
 }
 
 export const ESTILOS_DIARIO = `
+.baja{margin:4px 0 0;max-width:66ch}
+.baja a{color:var(--enl);font-weight:650;text-decoration:none;font-size:14.5px}
+.baja a:hover{text-decoration:underline}
+.baja span{display:block;margin-top:5px;font-size:12.5px;color:var(--md);line-height:1.45}
 /* El reverso se pide con su motivo en la misma linea y sin ceremonia, pero discreto:
    no es una accion de todos los dias, y un boton grande invita a usarlo como si lo
    fuera. Solo sale en los asientos que se pueden reversar. */

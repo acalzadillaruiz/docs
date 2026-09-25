@@ -78,7 +78,7 @@ import { mes as mesGerencia } from '../dominio/gerencia.ts'
 import { pintarGerencia } from '../pantallas/gerencia.ts'
 import { estados } from '../dominio/estados.ts'
 import { pintarEstados } from '../pantallas/estados.ts'
-import { diario, reversar } from '../dominio/diario.ts'
+import { diario, reversar, diarioCrudo, cabecerasDiario } from '../dominio/diario.ts'
 import { pintarDiario } from '../pantallas/diario.ts'
 import { mayor } from '../dominio/mayor.ts'
 import { pintarMayor } from '../pantallas/mayor.ts'
@@ -914,6 +914,36 @@ export async function resolver(
   }
 
   // El libro diario: donde termina de abrirse cualquier cifra del sistema.
+  // El mes entero para el contador. «El exportador para el contador, desde el primer
+  // dia» estaba entre las decisiones ya tomadas y no existia: lo que habia era la
+  // pantalla, que esta escrita para LEERSE. Esto lo abre una maquina.
+  if (p.ruta === '/diario/hoja' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date()
+    const cuando = anioMes(p)
+    const anio = cuando?.anio ?? hoy.getUTCFullYear()
+    const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
+
+    const filas = await comoQuien((q) => diarioCrudo(q, org!.organizacion_id, anio, mes))
+    const texto = escribirHoja([cabecerasDiario(p.idioma), ...filas])
+    const bytes = new TextEncoder().encode(texto)
+    const nombre = `diario-${anio}-${String(mes).padStart(2, '0')}.csv`
+    return {
+      codigo: 200,
+      bytes,
+      cabeceras: {
+        ...CABECERAS_BASE,
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(nombre)}`,
+        'Content-Length': String(bytes.length),
+      },
+    }
+  }
+
   if (p.ruta === '/diario' && (p.metodo === 'GET' || p.metodo === 'POST')) {
     if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
       return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }

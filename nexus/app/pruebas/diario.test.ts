@@ -14,7 +14,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { randomUUID } from 'node:crypto'
-import { diario, reversar } from '../src/dominio/diario.ts'
+import { diario, reversar, diarioCrudo, cabecerasDiario } from '../src/dominio/diario.ts'
 import { pintarDiario } from '../src/pantallas/diario.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
@@ -46,6 +46,12 @@ before(async () => {
       select instalar_plan_cuentas('${G}');
       insert into periodo (organizacion_id, anio, mes) values ('${G}', 2026, 12)
         on conflict do nothing;
+      -- La base no se vacía entre ejecuciones de un mismo archivo, y una de estas
+      -- pruebas CIERRA noviembre para comprobar que un mes cerrado se dice antes. En
+      -- la segunda corrida ese mes seguía cerrado y no dejaba ni crear el asiento
+      -- suelto: el fixture lo devuelve a abierto, como haría una persona.
+      update periodo set estado = 'abierto'
+       where organizacion_id = '${G}' and anio = 2026 and mes = 11;
     `)
     const [hay] = (await q`
       select count(*)::int as n from asiento where organizacion_id = ${G}::uuid
@@ -253,4 +259,69 @@ test('la pantalla ofrece reversar solo donde se puede', async () => {
   assert.ok(reversables > 0, 'sin asientos reversables esta prueba no comprobaría nada')
   assert.equal(formularios, reversables)
   assert.equal(h.includes('‹falta:'), false)
+})
+
+/**
+ * El exportador para el contador.
+ *
+ * Estaba entre las decisiones YA TOMADAS desde el primer día —«el exportador para el
+ * contador»— y no existía. Lo que había era la pantalla del diario, que está escrita
+ * para leerse: importes con puntos y comas, fechas en el idioma de quien mira. Eso
+ * abierto por una hoja de cálculo en inglés se convierte en otra cosa.
+ */
+
+test('el exportador saca el debe y el haber en columnas distintas', async () => {
+  // Por dentro es un solo campo con signo. Un sistema contable que recibe «-1000»
+  // en la columna del debe no lo entiende: entiende un haber de 1000.
+  const filas = await dentro((q) => diarioCrudo(q, G, 2026, 12))
+  assert.ok(filas.length >= 4, `el mes tiene que tener apuntes, y tenía ${filas.length}`)
+
+  const conDebe = filas.filter((f) => f[6] !== '')
+  const conHaber = filas.filter((f) => f[7] !== '')
+  assert.ok(conDebe.length > 0 && conHaber.length > 0)
+  // Ninguna línea lleva las dos cosas, y ninguna lleva un negativo.
+  for (const f of filas) {
+    assert.equal(f[6] !== '' && f[7] !== '', false, 'una línea con debe Y haber')
+    assert.equal(/-/.test(f[6]!) || /-/.test(f[7]!), false, `importe negativo: ${f[6]}/${f[7]}`)
+  }
+})
+
+test('los importes salen SIN formatear y las fechas en ISO', async () => {
+  // «1.234,56» leído por una hoja en inglés se convierte en 1,23456. Quien lo lee es
+  // una máquina.
+  const filas = await dentro((q) => diarioCrudo(q, G, 2026, 12))
+  for (const f of filas) {
+    for (const importe of [f[6]!, f[7]!, f[8]!, f[9]!]) {
+      if (importe === '') continue
+      assert.match(importe, /^\d+\.\d{2}$/, `importe formateado: ${importe}`)
+    }
+    assert.match(f[1]!, /^\d{4}-\d{2}-\d{2}$/, `fecha no ISO: ${f[1]}`)
+  }
+})
+
+test('el mes exportado CUADRA, igual que en pantalla', async () => {
+  // Si la exportación no cuadra, el contador la carga y su sistema la rechaza — o
+  // peor, la acepta y el descuadre aparece tres meses después.
+  const filas = await dentro((q) => diarioCrudo(q, G, 2026, 12))
+  const suma = (i: number) => filas.reduce((n, f) => n + Number(f[i] || 0), 0)
+  assert.ok(Math.abs(suma(6) - suma(7)) < 0.005, 'el debe y el haber en bolívares')
+  assert.ok(Math.abs(suma(8) - suma(9)) < 0.005, 'y en dólares')
+})
+
+test('cada línea lleva su contrato: es lo que ningún sistema contable trae', async () => {
+  // Sin esta columna, devolver un resultado por contrato es adivinar.
+  const filas = await dentro((q) => diarioCrudo(q, G, 2026, 12))
+  assert.equal(filas[0]!.length, 14, 'la forma de la fila cambió sin avisar')
+  // Y las cabeceras describen exactamente esas catorce columnas, en los dos idiomas.
+  for (const idioma of ['es', 'en'] as const) {
+    const c = cabecerasDiario(idioma)
+    assert.equal(c.length, 14)
+    assert.equal(c.some((x) => x.includes('‹falta:')), false)
+  }
+})
+
+test('un reverso va marcado: el contador tiene que poder distinguirlo', async () => {
+  const filas = await dentro((q) => diarioCrudo(q, G, 2026, 12))
+  assert.ok(filas.some((f) => f[13] === 'reverso'),
+    'sin un reverso en el mes esta prueba no comprobaría nada')
 })

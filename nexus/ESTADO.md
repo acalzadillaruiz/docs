@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 02:50 (España)
+**Última actualización:** 2026-09-26, 03:25 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -10,7 +10,7 @@
 > avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
 > avance lo que el sistema impide hacer con el de un contrato.
 >
-> Lo que hay construido, contado: **39 direcciones que se pueden abrir** y 26
+> Lo que hay construido, contado: **40 direcciones que se pueden abrir** y 26
 > pantallas, sobre las 119 vistas del plan completo. Lo que está **entero y probado
 > de punta a punta** es la contabilidad —las 36 vistas que el CEO mandó primero— más
 > el núcleo de contratos, evidencia y valuaciones que la sostiene. Lo que **no está**
@@ -31,7 +31,27 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **tres barridos que llevaban días mirando media
+**Lo último terminado:** **el exportador para el contador**, que estaba entre las
+decisiones **ya tomadas desde el primer día** y no existía. Lo que había era la
+pantalla del diario, y esa está escrita para *leerse*: importes con puntos y comas,
+fechas en el idioma de quien mira. Abierto por una hoja de cálculo en inglés,
+«1.234,56» se convierte en otra cosa.
+
+`/diario/hoja` saca el mes entero línea a línea, **con el debe y el haber en columnas
+distintas** —por dentro es un solo campo con signo, pero un sistema contable que
+recibe «−1.000» en la columna del debe no lo entiende—, importes con punto decimal,
+fechas en ISO, y los reversos marcados. Con su prueba de que **el mes exportado
+cuadra**: si no cuadra, el contador lo carga y su sistema lo rechaza — o peor, lo
+acepta y el descuadre aparece tres meses después.
+
+Y lleva **una columna que ningún sistema contable trae: el contrato de cada línea.**
+Es lo que permite devolver un resultado por contrato sin adivinar.
+
+**Los barridos nuevos se estrenaron solos:** al añadir la ruta, los tres cantaron que
+`/diario/hoja` no era una pantalla. Lo era de verdad —devuelve un CSV— y quedó
+declarada junto a `/libros/hoja`. Es exactamente para lo que están.
+
+**Antes:** **tres barridos que llevaban días mirando media
 aplicación.** La misma lista de pantallas estaba **copiada a mano en tres sitios** —el
 día 1, los formularios y el móvil— y las tres se habían quedado con diez u once
 pantallas cuando la aplicación ya iba por **dieciocho**.
@@ -413,7 +433,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**976 comprobaciones** (250 de SQL y diccionario + 726 de TypeScript), todas pasando.
+**981 comprobaciones** (250 de SQL y diccionario + 731 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno

@@ -700,5 +700,16 @@
   "log.peor": "el peor, {n} días",
   "log.dicho_sin_papel": "Dicho sin papel",
   "log.papel_esperando": "Papel esperando revisión",
-  "log.posicion_explica": "Si alguien anota que algo se embarcó y no hay conocimiento de embarque, aquí sigue en fábrica y se marca «dicho sin papel». Un tablero que se cree lo que le escriben es el tablero que ya se tiene."
+  "log.posicion_explica": "Si alguien anota que algo se embarcó y no hay conocimiento de embarque, aquí sigue en fábrica y se marca «dicho sin papel». Un tablero que se cree lo que le escriben es el tablero que ya se tiene.",
+  "exp.ocurrido": "Fecha del hecho",
+  "exp.registrado": "Fecha de registro",
+  "exp.linea": "Línea",
+  "exp.cuenta_nombre": "Nombre de la cuenta",
+  "exp.debe_ves": "Debe Bs",
+  "exp.haber_ves": "Haber Bs",
+  "exp.debe_usd": "Debe USD",
+  "exp.haber_usd": "Haber USD",
+  "exp.marca": "Marca",
+  "exp.bajar": "Bajar el mes para el contador",
+  "exp.explica": "Una línea por apunte, con el debe y el haber en columnas distintas y los importes sin formatear: lo abre un sistema contable, no una persona. Lleva además el contrato de cada línea, que es lo que permite devolver un resultado por contrato sin adivinar."
 }

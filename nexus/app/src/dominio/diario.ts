@@ -19,7 +19,7 @@
  */
 
 import type { Consulta } from '../db/conexion.ts'
-import { moneda, fecha as fechaF, t, type Idioma } from '../i18n/t.ts'
+import { moneda, fecha as fechaF, t, type Clave, type Idioma } from '../i18n/t.ts'
 
 export type Movimiento = {
   readonly linea: number
@@ -178,4 +178,69 @@ export async function reversar(
     select reversar_asiento(${asientoId}::uuid, ${personaId}::uuid, ${motivo.trim()}) as id
   `) as unknown as Array<{ id: string }>
   return { hecho: true, id: r!.id }
+}
+
+/**
+ * El mes entero, línea a línea y SIN formatear, para el contador.
+ *
+ * «El exportador para el contador, desde el primer día» estaba en las decisiones ya
+ * tomadas, y no existía. Lo que había era la pantalla del diario, que está escrita
+ * para leerse: importes con puntos y comas, fechas en el idioma de quien mira. Eso
+ * abierto por una hoja de cálculo en inglés se convierte en otra cosa.
+ *
+ * Aquí los importes van con punto decimal y sin separador de miles, las fechas en
+ * ISO, y el debe y el haber en columnas distintas —que es como los quiere cualquier
+ * sistema contable— aunque por dentro sean un solo campo con signo.
+ *
+ * Y va una columna que ningún sistema contable trae: **el contrato**. Es lo que
+ * permite que el contador devuelva un resultado por contrato sin adivinar.
+ */
+export async function diarioCrudo(
+  q: Consulta, orgId: string, anio: number, mesN: number,
+): Promise<readonly (readonly string[])[]> {
+  const filas = (await q`
+    select a.numero, to_char(a.ocurrido_en,'YYYY-MM-DD') as ocurrido,
+           to_char(a.registrado_en,'YYYY-MM-DD') as registrado,
+           a.descripcion_es, a.origen_tipo,
+           (a.reversa_a is not null) as es_reverso,
+           p.linea, p.cuenta, c.nombre_es as cuenta_nombre,
+           p.monto_ves::text, p.monto_usd::text,
+           coalesce(ct.codigo, '') as contrato
+      from asiento a
+      join partida p on p.asiento_id = a.id
+      join cuenta c on c.organizacion_id = p.organizacion_id and c.codigo = p.cuenta
+      left join contrato ct on ct.id = p.contrato_id
+     where a.organizacion_id = ${orgId}::uuid and a.anio = ${anio} and a.mes = ${mesN}
+     order by a.numero, p.linea
+  `) as unknown as Array<Record<string, unknown>>
+
+  const n = (v: unknown) => Number(v ?? 0)
+  // El debe y el haber en columnas distintas, cada uno con su importe en positivo.
+  // Un sistema contable que recibe «-1000» en la columna del debe no lo entiende:
+  // entiende un haber de 1000.
+  const debe = (m: number) => (m > 0 ? m.toFixed(2) : '')
+  const haber = (m: number) => (m < 0 ? (-m).toFixed(2) : '')
+
+  return filas.map((f) => {
+    const ves = n(f['monto_ves'])
+    const usd = n(f['monto_usd'])
+    return [
+      String(f['numero']), f['ocurrido'] as string, f['registrado'] as string,
+      String(f['linea']), f['cuenta'] as string, f['cuenta_nombre'] as string,
+      debe(ves), haber(ves), debe(usd), haber(usd),
+      f['contrato'] as string, f['descripcion_es'] as string,
+      f['origen_tipo'] as string, f['es_reverso'] === true ? 'reverso' : '',
+    ]
+  })
+}
+
+/** Las cabeceras del mismo, en el idioma de quien lo baja. */
+export function cabecerasDiario(idioma: Idioma): readonly string[] {
+  const c = (k: Clave) => t(idioma, k)
+  return [
+    c('diario.numero'), c('exp.ocurrido'), c('exp.registrado'), c('exp.linea'),
+    c('diario.cuenta'), c('exp.cuenta_nombre'),
+    c('exp.debe_ves'), c('exp.haber_ves'), c('exp.debe_usd'), c('exp.haber_usd'),
+    c('diario.contrato'), c('diario.descripcion'), c('diario.origen'), c('exp.marca'),
+  ]
 }

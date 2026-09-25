@@ -700,5 +700,16 @@
   "log.peor": "worst, {n} days",
   "log.dicho_sin_papel": "Claimed, no paper",
   "log.papel_esperando": "Paper awaiting review",
-  "log.posicion_explica": "If somebody notes that something shipped and there is no bill of lading, here it is still at the factory and gets marked «claimed, no paper». A board that believes what it is told is the board you already have."
+  "log.posicion_explica": "If somebody notes that something shipped and there is no bill of lading, here it is still at the factory and gets marked «claimed, no paper». A board that believes what it is told is the board you already have.",
+  "exp.ocurrido": "Date of event",
+  "exp.registrado": "Date recorded",
+  "exp.linea": "Line",
+  "exp.cuenta_nombre": "Account name",
+  "exp.debe_ves": "Debit Bs",
+  "exp.haber_ves": "Credit Bs",
+  "exp.debe_usd": "Debit USD",
+  "exp.haber_usd": "Credit USD",
+  "exp.marca": "Flag",
+  "exp.bajar": "Download the month for the accountant",
+  "exp.explica": "One row per entry line, with debit and credit in separate columns and unformatted amounts: an accounting system opens this, not a person. It also carries each line's contract, which is what lets the result be split by contract without guessing."
 }
