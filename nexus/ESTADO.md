@@ -1,32 +1,34 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 07:50 (España)
-**Avance:** 56 de 141 sesiones · **40%**
+**Última actualización:** 2026-09-25, 07:40 (España)
+**Avance:** 59 de 141 sesiones · **42%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** el circuito de la evidencia **se recorre desde un navegador**.
-Subir el archivo (multipart escrito a mano, sin armazón), guardarlo bajo su huella en
-`app/src/servidor/almacen.ts`, verificarlo o rechazarlo con motivo, descargarlo como
-descarga, y ver el avance subir y caer. Commit `8494efb`. **391 comprobaciones.**
+**Lo último terminado:** **los avisos por correo**. Buzón de salida en la base de
+datos (el aviso se encola en la misma transacción que el hecho, así que si el hecho
+se deshace el aviso se deshace con él), redacción en el idioma de quien lo recibe,
+SMTP escrito contra el protocolo y probado contra un servidor de mentira que habla
+SMTP de verdad, y el proceso `herramientas/avisar.ts` que vacía la cola. Commit
+`310b121`. **425 comprobaciones.**
 
 Avisado al CEO el **40%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
-La pantalla de verdad: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
+La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Avisar por correo.** Cuando algo entra en la bandeja, cuando una valuación queda
-   presentada, o cuando un documento lleva días sin revisar. Hoy hay que abrir la
-   aplicación para enterarse, y eso deja el circuito entero dependiendo de que alguien
-   se acuerde de mirar. Sin esto, lo construido se usa la primera semana y se
-   abandona la tercera.
-2. **Las tres medidas, en pantalla.** `brecha_evidencia()`, `tiempo_hasta_la_verdad()`
-   y `cobertura()` existen y están probadas, pero no las enseña ninguna pantalla.
-   Solo para dentro; el cliente no ve ninguna de las tres.
-3. **Los hitos desde la plantilla.** `plantilla_hito` existe y está vacía: hoy los
-   hitos se insertan a mano. Falta sembrar las plantillas de los cinco tipos de
-   contrato y crearlos solos al dar de alta un renglón.
+1. **Las tres medidas, en pantalla.** `brecha_evidencia()`, `tiempo_hasta_la_verdad()`
+   y `cobertura()` existen y están probadas en la base de datos desde hace rato, pero
+   no las enseña ninguna pantalla. Es lo que ningún portal da y lo que más se va a
+   enseñar en una reunión. Solo para dentro: el cliente no ve ninguna de las tres.
+2. **Los hitos desde la plantilla.** `plantilla_hito` existe y está **vacía**: hoy los
+   hitos se insertan a mano, así que un contrato nuevo nace sin hitos y su avance es
+   cero para siempre. Falta sembrar las plantillas de los cinco tipos y crear los
+   hitos solos al dar de alta un renglón.
+3. **La pantalla de preferencias de aviso.** La tabla existe y se respeta, pero no hay
+   dónde decir que no quieres uno. Un aviso del que no puedes salir acaba en la
+   carpeta de correo no deseado, y con él todos los demás.
 4. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
    (caja chica, y el importador atado a valuaciones de verdad).
 
@@ -49,7 +51,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-391 comprobaciones hayan encontrado doce fallos reales, diez de ellos míos.
+425 comprobaciones hayan encontrado catorce fallos reales, doce de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -198,6 +200,11 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/almacen.ts` | Dónde viven los bytes. **Bajo su huella, no bajo su nombre.** El mismo certificado de colada acompaña a las cuatro válvulas del mismo lote y hoy se sube cuatro veces; así ocupa una. Comprobar que un documento no se ha cambiado es volver a calcular su huella, sin confiar en nadie. Es un almacén en disco a propósito: el día que haga falta S3 cambia ese archivo y nada más, porque el resto del sistema solo conoce huellas. |
 | `app/pruebas/subida.test.ts` | El circuito entero por HTTP: subir, verificar, ver el avance subir, rechazar con motivo, verlo caer, y todos los intentos de saltárselo. |
 | `app/herramientas/pintar-avance.ts` | Genera la pantalla del avance desde la base de datos real, como cliente o como GPS, sin desplegar nada. |
+| `db/schema/20-avisos.sql` | **Sin esto, todo lo construido se usa la primera semana y se abandona la tercera.** Un buzón de salida: el aviso se encola en la misma transacción que el hecho, no se manda desde el disparador. Si la transacción se deshace, el aviso se deshace con ella; si el correo está caído, el aviso espera en vez de perderse. El texto no se guarda — se guardan los datos y se redacta al enviar, en el idioma de quien lo recibe. Y `encolar_lo_parado()` para lo que no avisa ningún hecho: **un documento sin revisar no es un suceso, es la ausencia de uno**, y nadie encola nada cuando algo NO pasa. |
+| `app/src/dominio/avisos.ts` | Redactar y vaciar la cola. **Un aviso nunca lleva cifras que no sean del destinatario:** un correo se reenvía, y en cuanto sale deja de estar bajo las políticas de fila. La plantilla solo sustituye lo que pide, así que un dato de más no acaba dentro por descuido. Y el aviso no es el contenido: es un empujón hacia la aplicación, al sitio exacto y nunca a la portada. |
+| `app/src/servidor/correo.ts` | SMTP contra el protocolo, sin dependencia. **Nunca manda la contraseña en claro:** si el servidor no ofrece STARTTLS y la conexión no era ya cifrada, se corta. Un servidor de correo sin cifrado no es algo con lo que negociar, es un error de configuración. Con el transporte al registro para poder arrancar el primer día sin buzón. |
+| `app/pruebas/correo.test.ts` | Levanta un servidor que **habla SMTP de verdad** y comprueba la conversación orden por orden. Encontró que el cliente leía solo la última línea de una respuesta de varias, y que lo que el servidor sabe hacer viene en las intermedias. |
+| `app/herramientas/avisar.ts` | Vacía la cola, aparte del servidor web: un servidor de correo lento no tiene por qué hacer lenta la aplicación. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -355,6 +362,24 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 150 | El cliente no puede subir, ni verificar, ni rechazar — y la pantalla ni le pinta los botones. |
 | 151 | Rechazar exige motivo también en la ruta, no solo en la base de datos. |
 | 152 | El destino de vuelta no puede sacarte del portal, tampoco al subir. |
+| 153 | Presentar avisa a las **dos** personas del cliente, no solo a la que firmó la vez anterior. |
+| 154 | A GPS no se le avisa de lo que acaba de hacer. |
+| 155 | El aviso lleva el importe de la obra y **ningún costo ni margen**, aunque se le metan en los datos. |
+| 156 | Presentar dos veces no manda el correo dos veces. |
+| 157 | La objeción del cliente avisa a GPS el mismo día; la respuesta vuelve al cliente. |
+| 158 | Quien dijo que no quiere ese aviso no lo recibe; quien está de baja tampoco. |
+| 159 | **Si el hecho se deshace, el aviso se deshace con él.** |
+| 160 | Tomar de la cola gasta un intento, aunque el envío se muera a mitad. |
+| 161 | El reintento espera cada vez más, y a la sexta se da por perdido. |
+| 162 | Cada quien ve sus avisos y no los de los demás — ni siquiera alguien de dentro. |
+| 163 | Lo que lleva días parado avisa solo, y pasarlo dos veces el mismo día no duplica nada. |
+| 164 | El aviso sale en el idioma de cada destinatario, no en el del sistema. |
+| 165 | Si el correo falla, el aviso sigue pendiente y no reintenta inmediatamente. |
+| 166 | Un fallo al mandar uno no deja sin avisar a los demás. |
+| 167 | Sin cifrado **no se manda la contraseña**: la conversación se corta antes de autenticar. |
+| 168 | Una cabecera de correo no puede llevar saltos de línea: no se cuela un destinatario oculto. |
+| 169 | Una línea que sea solo un punto no termina el mensaje a mitad. |
+| 170 | El registro no escribe la dirección de correo entera. |
 
 ## Lo que sigue
 
