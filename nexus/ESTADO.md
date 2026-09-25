@@ -1,12 +1,38 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 14:25 (España)
-**Avance:** 134 de 141 sesiones · **95%**
+**Última actualización:** 2026-09-25, 21:20 (España)
+**Avance:** 135 de 141 sesiones · **96%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **reversar un asiento desde el diario.** Todo el sistema
+**Lo último terminado:** **el techo de `brecha_evidencia`, derribado midiendo.**
+Llamaba a `avance_declarado` y `avance_renglon` **una vez por renglón**: con 500
+contratos eran 4.000 llamadas a función, cada una con su propia consulta. Ahora hace
+la misma cuenta —el mismo redondeo por renglón antes de dividir entre cien— en una
+sola pasada sobre los hitos.
+
+**De 1.719 ms a 189 ms.** Y hay que decir cómo se llegó a esos números, porque la
+medición anterior estaba mal: decía 536 ms, pero **`brecha_evidencia` devolvía cero
+filas** porque el sembrado no creaba hitos. Medir el recorrido sin el trabajo no es
+medir. Ahora existe `app/herramientas/medir.ts`, que siembra su propia organización
+con **500 contratos, 2.000 renglones y 10.000 hitos** y cronometra las cuatro
+consultas de las medidas. La herramienta se queda: la medición anterior se escribió
+suelta y se perdió.
+
+Las dos funciones por renglón **se quedan donde están**: las usa la ficha de un
+contrato, donde se pregunta por UN renglón y llamarlas es lo correcto. Y hay una
+prueba nueva que **cruza los dos caminos** —la función de la pantalla contra la
+cuenta hecha con las de siempre— y falla si alguien mejora una y olvida la otra.
+Comprobado rompiendo la función a propósito: fallan tres pruebas, no cero.
+
+**El siguiente techo, ya localizado y medido:** de esos 189 ms, la mayor parte no
+está en la consulta sino en **la política de fila de `hito`**, que por cada hito
+comprueba si su renglón se ve, y eso mira el contrato — tres niveles de subconsulta
+por fila, diez mil veces. Se puede bajar. **No se toca de paso:** una valla de
+aislamiento no se reescribe para ganar milisegundos sin su barrido delante.
+
+**Antes:** **reversar un asiento desde el diario.** Todo el sistema
 dice «un asiento no se modifica ni se borra: registra su reverso» — y **no había ni
 un solo sitio donde registrarlo**. La instrucción era correcta y el camino no
 existía, que es la peor combinación posible: quien la seguía al pie de la letra se
@@ -220,7 +246,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**910 comprobaciones** (250 de SQL y diccionario + 660 de TypeScript), todas pasando.
+**911 comprobaciones** (250 de SQL y diccionario + 661 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -330,6 +356,14 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Una medición sobre cero filas mide el recorrido, no el trabajo.** `brecha_evidencia`
+  «tardaba 536 ms» con 500 contratos… y devolvía cero filas, porque el sembrado no
+  creaba hitos. Con hitos de verdad eran 1.719 ms. Antes de creerse una medida, mirar
+  cuántas filas salieron.
+- **Dos medidas tomadas en bases distintas no se comparan.** La misma consulta da
+  1.719 ms en una base recién cargada y 4.349 en una con muchas corridas encima. El
+  antes y el después se miden en la misma base, y se dice en cuál.
 
 - **Una pantalla que manda hacer algo tiene que poder hacerlo.** «Registra su
   reverso» y «para rehacerlo, reversa su asiento» eran las dos ciertas y las dos sin

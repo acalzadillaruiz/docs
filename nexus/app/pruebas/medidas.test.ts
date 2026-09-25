@@ -243,3 +243,38 @@ test('el TOTAL se calcula sobre TODAS las filas, no sobre las que se enseñan', 
   assert.equal(m.ocultas.brecha, 0)
   assert.ok(m.brechaTotal.length > 0 || m.brecha.length === 0)
 })
+
+test('la brecha, calculada en conjunto, da LO MISMO que renglón por renglón', async () => {
+  // `brecha_evidencia` ya no llama a `avance_declarado`/`avance_renglon` una vez por
+  // renglón: con 500 contratos eran 4.000 llamadas y 4,3 segundos. Ahora hace la
+  // misma cuenta en una sola pasada.
+  //
+  // Esta prueba cruza los DOS caminos: la función de la pantalla contra la cuenta
+  // hecha llamando a las de siempre. No es circular —son dos implementaciones
+  // distintas— y es lo que se rompe si alguien "mejora" una y olvida la otra.
+  const filas = (await dentro((q) => q`
+    with suyo as (
+      select ct.codigo,
+             round(sum(rg.cantidad * rg.precio_unitario
+                       * avance_declarado(rg.id, current_date) / 100), 2) as declarado,
+             round(sum(rg.cantidad * rg.precio_unitario
+                       * avance_renglon(rg.id, current_date) / 100), 2) as evidenciado
+        from renglon rg
+        join contrato ct on ct.id = rg.contrato_id
+       where ct.organizacion_id = ${G}::uuid and ct.estado <> 'borrador'
+       group by ct.codigo
+    )
+    select b.contrato, b.declarado::text as b_dec, b.evidenciado::text as b_evi,
+           s.declarado::text as s_dec, s.evidenciado::text as s_evi
+      from brecha_evidencia(${G}::uuid) b
+      join suyo s on s.codigo = b.contrato
+  `)) as unknown as Array<Record<string, string>>
+
+  // Sin esta línea, una consulta que devolviera cero filas "pasaría" sin comprobar
+  // nada. Es la trampa de siempre.
+  assert.ok(filas.length >= 2, `el cruce tiene que mirar contratos de verdad, y miró ${filas.length}`)
+  for (const f of filas) {
+    assert.equal(f['b_dec'], f['s_dec'], `declarado distinto en ${f['contrato']}`)
+    assert.equal(f['b_evi'], f['s_evi'], `evidenciado distinto en ${f['contrato']}`)
+  }
+})
