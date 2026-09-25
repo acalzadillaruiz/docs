@@ -1,35 +1,34 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 08:00 (España)
-**Avance:** 63 de 141 sesiones · **45%**
+**Última actualización:** 2026-09-25, 08:20 (España)
+**Avance:** 71 de 141 sesiones · **50%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **las tres medidas en pantalla**, **las cadenas de hitos de
-los cinco tipos de contrato**, y **el perfil** con las preferencias de aviso. De paso,
-la cerca que faltaba sobre `persona`: sin ella, dejar que el cliente leyera su propio
-perfil le habría dado la lista entera de personas del sistema. Commit `cbb9e87`.
-**472 comprobaciones.**
+**Lo último terminado:** **el circuito entero se recorre sin tocar la base de datos
+ni una vez.** Alta del contrato con sus hitos → ponerlo en vigor → subir la evidencia
+→ verificarla → ver subir el avance → proponer la valuación **desde lo verificado** →
+presentarla → que el cliente la objete → responder → que apruebe. Hay una sola prueba
+que hace ese camino entero por HTTP: `app/pruebas/circuito.test.ts`. Commit `f90b11a`.
+**519 comprobaciones.**
 
-Avisado al CEO el **40%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
+Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Dar de alta un contrato desde la aplicación.** Es el agujero más grande que
-   queda: hoy un contrato solo entra por SQL o por el importador de Excel. Sin esto,
-   nada de lo construido se puede usar sin que alguien toque la base de datos a mano.
-   Al crear el renglón hay que llamar a `crear_hitos_desde_plantilla()`, que ya
-   existe y está probada.
-2. **El importador, atado a la aplicación.** `13-importacion.sql` está construido y
-   probado y no lo usa ninguna pantalla. Es lo que saca la contabilidad de Excel, que
-   es la prioridad que puso el CEO.
-3. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
-   (caja chica sobre todo).
-4. **Los avisos, en marcha de verdad:** hace falta que alguien llame a
-   `herramientas/avisar.ts` cada pocos minutos. Hoy la cola se llena y nadie la vacía
-   si no se lanza a mano.
+1. **Lo que falta de contabilidad**, que es la prioridad que puso el CEO. Caja chica
+   y el importador de Excel atado a la aplicación. `13-importacion.sql` está
+   construido y probado y **no lo usa ninguna pantalla**: es lo que saca la
+   contabilidad de Excel.
+2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
+   lanza `herramientas/avisar.ts` a mano cada pocos minutos.
+3. **Facturar y cobrar desde la aplicación.** Los generadores de asiento existen y
+   están probados; lo que falta es el botón que emite el documento fiscal desde una
+   valuación aprobada, y el que registra el cobro.
+4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
+   falta la ruta que lo recibe y la pantalla que manda a la operadora.
 
 **Cómo continuar, literalmente:**
 
@@ -50,7 +49,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-472 comprobaciones hayan encontrado diecisiete fallos reales, quince de ellos míos.
+519 comprobaciones hayan encontrado veinte fallos reales, dieciocho de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -207,6 +206,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/21-plantillas.sql` | Las cadenas de hitos de los cinco tipos de contrato. `plantilla_hito` existía desde el principio y estaba **vacía**, que es el peor estado posible: un contrato nuevo nacía sin hitos, su avance salía cero, y cero es lo que sale también cuando algo va mal. **El peso de cada hito es cuánto del trabajo está hecho, no cuánto se cobra** — mezclarlas es lo que hace que un contrato aparezca al 80% con el equipo todavía en el patio del proveedor. Y `renglones_sin_hitos()`, porque crear los hitos se puede olvidar y un renglón sin hitos se ve igual que uno que no ha empezado. |
 | `app/src/dominio/medidas.ts` · `pantallas/medidas.ts` | Las tres cifras, en pantalla. Cada bloque abre con **la pregunta que contesta**, en castellano normal: un cuadro de mando que hay que aprender a leer se mira el día que se instala y nunca más. **No se suman dólares con bolívares.** Y cuando no hay nada que señalar lo dice con palabras, porque una tabla vacía parece un error del programa. |
 | `app/src/dominio/perfil.ts` · `pantallas/perfil.ts` | Lo poco que cada quien decide sobre sí mismo. Las casillas vienen **marcadas**: un aviso que hay que activar es un aviso que nadie activa. Al cliente no se le ofrecen los avisos que son de dentro. |
+| `db/schema/22-valuar.sql` | **De la evidencia al dinero.** La obra de una valuación no se teclea: sale de los hitos verificados que todavía no se han cobrado. Cada hito se marca con la valuación que se lo llevó, así que **no se cobra dos veces** — y no depende de que los periodos no se solapen, porque se solapan siempre. Si un hito se cae después, se ve qué valuación lo cobró, y **no se corrige solo**: lo facturado se arregla con una nota de crédito. |
+| `app/src/dominio/alta.ts` · `pantallas/alta.ts` | Dar de alta un contrato. **El monto se calcula, no se teclea.** Nace en borrador. Los hitos se crean ahí mismo, en la misma transacción. Los errores salen todos juntos y lo escrito vuelve escrito. **Sin una línea de JavaScript**, porque la política de seguridad es `default-src 'none'` y relajarla para clonar una fila sería pagar con la mejor defensa que hay. |
+| `app/src/dominio/valuar.ts` · `pantallas/valuar.ts` | La propuesta de valuación. **La pantalla no tiene ninguna casilla donde teclear la obra**, y esa ausencia es la decisión de diseño más importante del proyecto: ponerla «por si acaso» convertiría todo lo anterior en decoración. |
+| `app/pruebas/circuito.test.ts` | **La prueba que contesta la única pregunta que importa.** Recorre el circuito entero por HTTP sin tocar la base de datos. Si pasa, el sistema sirve; si falla, da igual lo que digan las demás. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -395,6 +398,20 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 181 | Un grupo de casillas repetidas no se queda en una sola. |
 | 182 | El cliente **no puede leer** la huella de la clave, el secreto del 2FA ni el sujeto del directorio. |
 | 183 | El cliente ve a los suyos y a nadie más; GPS ve a todos porque administra las cuentas. |
+| 184 | El monto del contrato **sale de los renglones**: 3×1.000 + 2×250,50 = 3.501,00. |
+| 185 | Un contrato nuevo nace **con sus cinco hitos** y en borrador; el cliente no lo ve. |
+| 186 | Un anticipo sin ritmo de amortización no pasa: quedaría cobrado dos veces. |
+| 187 | Si algo falla, **no queda un contrato a medias**. |
+| 188 | El formulario de alta no lleva ni un `<script>` ni un `onclick`. |
+| 189 | La propuesta de valuación sale de lo **verificado**; lo declarado sin papel no aparece. |
+| 190 | Emitir se lleva los hitos: **no se cobra dos veces lo mismo**, ni con periodos solapados. |
+| 191 | La obra guardada es la calculada, y queda anotado que salió de `hitos_evidenciados`. |
+| 192 | Los porcentajes se copian del contrato y **se congelan**. |
+| 193 | Un hito facturado que después se cayó se ve, y **sigue apuntando** a la valuación que lo cobró. |
+| 194 | La pantalla de valuar **no tiene casilla para teclear la obra**. |
+| 195 | Un contrato sin hitos **no se puede poner en vigor**. |
+| 196 | Presentar dos veces no pasa: mandaría dos correos. |
+| 197 | **El circuito entero, por HTTP y sin tocar la base de datos**, de punta a punta. |
 
 ## Lo que sigue
 
