@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 129 de 141 sesiones · **91%**
+**Avance:** 130 de 141 sesiones · **92%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -132,7 +132,19 @@ cliente de otra operadora. **La lista sale del código fuente, no de una copia a
 así que una pantalla nueva entra sola en el barrido. Las cinco de hoy tenían la valla;
 lo comprobé quitando una a propósito y viendo fallar la prueba antes de creérmelo.
 
-**878 comprobaciones** (250 de SQL y diccionario + 625 de TypeScript), todas pasando.
+Y **la primera medición con datos de verdad** (`d74072e`): 500 contratos y 2.000
+renglones sembrados, todas las pantallas recorridas. `/medidas` pesaba **613 KB** y
+ahora pesa 22. Las otras once, por debajo de 15 ms y 10 KB.
+
+**881 comprobaciones** (250 de SQL y diccionario + 628 de TypeScript), todas pasando.
+
+**Techo medido y NO arreglado, para que no se descubra tarde:** `/medidas` sigue
+tardando **963 ms** con 500 contratos, y el coste está en las consultas, no en
+pintar. `brecha_evidencia` se lleva **536 ms** ella sola porque llama a
+`avance_declarado` y `avance_renglon` **una vez por renglón** — 2.000 veces — y
+encima devolvió cero filas: paga el barrido entero para no encontrar nada. Se arregla
+reescribiéndola sin llamadas por fila. Con las decenas de contratos que GPS tiene hoy
+no es un problema; con cientos, sí.
 Avisado al CEO el **90%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 
 **Decisión pendiente del CEO:** las tablas de rentabilidad son **acumuladas**, no del
