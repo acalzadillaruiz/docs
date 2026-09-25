@@ -66,6 +66,8 @@ import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
 import { pintarReexpresion } from '../pantallas/reexpresion.ts'
 import { libro, libroCrudo, aFilas } from '../dominio/libros.ts'
 import { pintarLibro } from '../pantallas/libros.ts'
+import { mes as mesGerencia } from '../dominio/gerencia.ts'
+import { pintarGerencia } from '../pantallas/gerencia.ts'
 import { escribirHoja } from './csv.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
@@ -668,6 +670,21 @@ export async function resolver(
     const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
     return html(errores.length === 0 ? 200 : 400,
       pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // «Como va el mes». Nunca lo ve el cliente: es la contabilidad de GPS.
+  if (p.ruta === '/gerencia' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date()
+    const cuando = anioMes(p)
+    const anio = cuando?.anio ?? hoy.getUTCFullYear()
+    const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
+    const m = await comoQuien((q) => mesGerencia(q, org!.organizacion_id, anio, mes, p.idioma))
+    return html(200, pintarGerencia(m, p.idioma, testigoAnti(testigo)))
   }
 
   // Los libros de ventas y compras. Es lo unico de esta aplicacion que sale de la

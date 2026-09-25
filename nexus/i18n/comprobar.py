@@ -33,6 +33,8 @@ IGUALES_A_PROPOSITO = {
     # Cabeceras de los libros fiscales. «Control» y «Total» se escriben igual en los
     # dos idiomas; traducirlas por traducirlas seria empeorarlas.
     "libro.control", "libro.total",
+    # El signo de porcentaje es el mismo en los dos idiomas.
+    "ger.margen_pct",
 }
 iguales = sorted(k for k in set(es) & set(en)
                  if k not in IGUALES_A_PROPOSITO and es[k] == en[k])
