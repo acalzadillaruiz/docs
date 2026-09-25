@@ -445,5 +445,10 @@
   "reex.sin_nada": "No hay nada asentado todavía a esa fecha.",
   "reex.error.mes": "Ese mes ya está reexpresado. Para rehacerlo, reversa su asiento.",
   "reex.error.periodo": "Ese mes contable está cerrado. Para reexpresarlo hay que abrirlo.",
-  "reex.error.indice": "No hay índice de precios (INPC) vigente al último día de ese mes."
+  "reex.error.indice": "No hay índice de precios (INPC) vigente al último día de ese mes.",
+  "importar.error.clientes": "Estos clientes no están dados de alta. Créalos antes de importar: crear empresas desde una hoja es como se acaba con el mismo cliente tres veces escrito de tres maneras",
+  "importar.destino.facturas_emitidas": "Histórico de facturas emitidas",
+  "importar.destino.ventas_explica": "Para cargar lo que ya se facturó antes de este sistema. El número no se inventa: estas facturas ya existen y ya se declararon. Las que nacieron de una valuación de aquí no se vuelven a asentar.",
+  "campo.cliente": "RIF del cliente",
+  "campo.cliente_nombre": "Nombre del cliente"
 }

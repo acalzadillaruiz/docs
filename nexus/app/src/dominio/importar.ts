@@ -21,11 +21,13 @@ import type { Consulta } from '../db/conexion.ts'
 import { leerHoja } from '../servidor/csv.ts'
 import { t, type Clave, type Idioma } from '../i18n/t.ts'
 
-export type Destino = 'facturas_recibidas'
+export type Destino = 'facturas_recibidas' | 'facturas_emitidas'
+
+export const DESTINOS: readonly Destino[] = ['facturas_recibidas', 'facturas_emitidas']
 
 export type Campo =
-  | 'fecha' | 'proveedor' | 'proveedor_nombre' | 'numero' | 'control'
-  | 'base' | 'iva' | 'contrato'
+  | 'fecha' | 'proveedor' | 'proveedor_nombre' | 'cliente' | 'cliente_nombre'
+  | 'numero' | 'control' | 'base' | 'iva' | 'contrato'
 
 /** Los campos de cada destino, y cuáles no pueden faltar. */
 export const CAMPOS: Record<Destino, readonly { campo: Campo; tipo: 'texto' | 'fecha' | 'numero'; obligatorio: boolean }[]> = {
@@ -33,6 +35,20 @@ export const CAMPOS: Record<Destino, readonly { campo: Campo; tipo: 'texto' | 'f
     { campo: 'fecha', tipo: 'fecha', obligatorio: true },
     { campo: 'proveedor', tipo: 'texto', obligatorio: true },
     { campo: 'proveedor_nombre', tipo: 'texto', obligatorio: false },
+    { campo: 'numero', tipo: 'texto', obligatorio: true },
+    { campo: 'control', tipo: 'texto', obligatorio: false },
+    { campo: 'base', tipo: 'numero', obligatorio: true },
+    { campo: 'iva', tipo: 'numero', obligatorio: false },
+    { campo: 'contrato', tipo: 'texto', obligatorio: false },
+  ],
+  // El histórico de ventas. Al revés que al emitir una factura nueva, el número NO lo
+  // pone la base de datos: estas facturas ya existen, ya las tiene el cliente y ya se
+  // declararon. Inventarles un correlativo sería crear una segunda versión de un
+  // documento que ya está en la calle.
+  facturas_emitidas: [
+    { campo: 'fecha', tipo: 'fecha', obligatorio: true },
+    { campo: 'cliente', tipo: 'texto', obligatorio: true },
+    { campo: 'cliente_nombre', tipo: 'texto', obligatorio: false },
     { campo: 'numero', tipo: 'texto', obligatorio: true },
     { campo: 'control', tipo: 'texto', obligatorio: false },
     { campo: 'base', tipo: 'numero', obligatorio: true },
@@ -52,6 +68,8 @@ const PISTAS: Record<Campo, readonly string[]> = {
   fecha: ['fecha', 'date', 'emision', 'emisión', 'f. factura'],
   proveedor: ['rif', 'r.i.f', 'nit', 'tax id', 'identificacion', 'identificación'],
   proveedor_nombre: ['proveedor', 'supplier', 'razon social', 'razón social', 'vendor', 'nombre'],
+  cliente: ['rif', 'r.i.f', 'nit', 'tax id', 'identificacion', 'identificación'],
+  cliente_nombre: ['cliente', 'client', 'customer', 'razon social', 'razón social', 'operadora', 'nombre'],
   numero: ['factura', 'numero', 'número', 'nro', 'n°', 'invoice', 'documento'],
   control: ['control', 'nro control', 'n° control'],
   base: ['base', 'monto', 'subtotal', 'neto', 'importe', 'amount'],
@@ -291,14 +309,21 @@ export async function confirmar(
     return { hecho: false, motivo: t(idioma, 'importar.error.filas_malas') }
   }
 
+  const [dest] = (await q`
+    select destino from lote_importacion where id = ${loteId}::uuid
+  `) as unknown as Array<{ destino: string }>
+  const ventas = dest?.destino === 'facturas_emitidas'
+
   // Sin plan de cuentas no hay dónde asentar, y una factura registrada y sin asentar
   // es el peor sitio donde dejarla: parece que cuenta y no cuenta. Se dice antes de
-  // crear nada, no a mitad.
+  // crear nada, no a mitad. El concepto que hace falta no es el mismo según a dónde
+  // vaya la hoja: una compra necesita cuenta de gasto y una venta, de ingreso.
+  const concepto = ventas ? 'ingreso_obra' : 'gasto'
   const [plan] = (await q`
     select count(*)::int as n from mapa_cuenta
      where organizacion_id = (select organizacion_id from lote_importacion
                                where id = ${loteId}::uuid)
-       and concepto = 'gasto'
+       and concepto = ${concepto}
   `) as unknown as Array<{ n: number }>
   if (Number(plan?.n ?? 0) === 0) {
     return { hecho: false, motivo: t(idioma, 'importar.error.sin_plan') }
@@ -318,13 +343,18 @@ export async function confirmar(
     }
   }
 
-  const faltan = (await q`
-    select rif from proveedores_desconocidos(${loteId}::uuid)
-  `) as unknown as Array<{ rif: string }>
+  // Crear empresas desde una hoja es como se acaba con el mismo proveedor —o el mismo
+  // cliente— tres veces escrito de tres maneras. Se dice quiénes faltan y se para.
+  const faltan = ventas
+    ? ((await q`select rif from clientes_desconocidos(${loteId}::uuid)`) as unknown as
+        Array<{ rif: string }>)
+    : ((await q`select rif from proveedores_desconocidos(${loteId}::uuid)`) as unknown as
+        Array<{ rif: string }>)
   if (faltan.length > 0) {
+    const cual = ventas ? 'importar.error.clientes' : 'importar.error.proveedores'
     return {
       hecho: false,
-      motivo: `${t(idioma, 'importar.error.proveedores')}: ${faltan.map((f) => f.rif).join(', ')}`,
+      motivo: `${t(idioma, cual)}: ${faltan.map((f) => f.rif).join(', ')}`,
     }
   }
 

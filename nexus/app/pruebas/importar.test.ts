@@ -330,3 +330,155 @@ test('un mes con el periodo contable cerrado se dice ANTES, no a mitad', async (
   `)) as unknown as Array<{ n: number }>
   assert.equal(n!.n, 0, 'no quedó media hoja dentro')
 })
+
+// ===========================================================================
+// El histórico de ventas.
+//
+// El día que esto se enciende, la empresa no empieza de cero: lleva años
+// facturando y ese histórico está en una hoja. Sin él, el libro de ventas nace
+// vacío y comparar este mes con el mismo mes del año pasado es imposible —que es
+// justo la comparación que se quiere hacer.
+
+/** Una hoja de ventas de antes del sistema, con el cliente por RIF. */
+const VENTAS = '﻿' + [
+  'Fecha;RIF Cliente;Cliente;Nro Factura;Nro Control;Base;IVA;Contrato',
+  '10/04/2026;J-900400000-0;Operadora Imp;V-0000101;01-00000101;"2.000.000,00";"320.000,00";IMP-APP-001',
+  '20/04/2026;J-900400000-0;Operadora Imp;V-0000102;01-00000102;"1.000.000,00";"160.000,00";',
+].join('\r\n')
+
+async function cargarVentas(nombre = 'ventas.csv', hoja = VENTAS) {
+  const r = await dentro((q) => cargar(q, G, YO, nombre, bytes(hoja), 'facturas_emitidas'))
+  const props = proponerMapeo(r.cabeceras, r.muestras, 'facturas_emitidas')
+  await dentro((q) => guardarMapeo(q, r.loteId, props))
+  await dentro((q) => validar(q, r.loteId))
+  return r.loteId
+}
+
+test('una hoja de ventas se reconoce sola: el RIF es el cliente, no el proveedor', async () => {
+  await limpio()
+  const r = await dentro((q) => cargar(q, G, YO, 'ventas.csv', bytes(VENTAS), 'facturas_emitidas'))
+  const props = proponerMapeo(r.cabeceras, r.muestras, 'facturas_emitidas')
+  const de = (c: Campo) => props.find((p) => p.campo === c)
+  assert.equal(de('cliente')?.columna, 2)        // «RIF Cliente», no «Cliente»
+  assert.equal(de('cliente_nombre')?.columna, 3)
+  assert.equal(de('numero')?.columna, 4)
+  assert.equal(de('base')?.columna, 6)
+  // Y no propone campos del otro destino: 'proveedor' no existe en una hoja de ventas.
+  assert.equal(props.some((p) => p.campo === ('proveedor' as Campo)), false)
+})
+
+test('el histórico entra con su NÚMERO, que no se inventa', async () => {
+  // Al revés que al emitir una factura nueva. Estas ya existen, ya las tiene el
+  // cliente y ya se declararon: darles un correlativo nuevo sería crear una segunda
+  // versión de un documento que está en la calle.
+  await limpio()
+  const lote = await cargarVentas()
+  const r = await dentro((q) => confirmar(q, lote, YO, 'es'))
+  assert.equal(r.hecho, true)
+
+  const docs = (await dentro((q) => q`
+    select numero, numero_control, base_ves::text, iva_ves::text, base_usd::text
+      from documento_fiscal
+     where organizacion_id = ${G}::uuid and sentido = 'emitido' order by numero
+  `)) as unknown as Array<Record<string, string>>
+  assert.equal(docs.length, 2)
+  assert.equal(docs[0]!['numero'], 'V-0000101')
+  assert.equal(docs[0]!['numero_control'], '01-00000101')
+  assert.equal(Number(docs[0]!['base_ves']), 2000000)
+  // El importe en dólares NO está en la hoja: sale de la tasa del día de la factura.
+  assert.equal(Number(docs[0]!['base_usd']), 50000)
+})
+
+test('el histórico llega al LIBRO: cobrar contra ingreso y IVA débito', async () => {
+  // Una factura registrada y sin asentar es el peor sitio donde dejarla: parece que
+  // cuenta y no cuenta.
+  await limpio()
+  const lote = await cargarVentas()
+  await dentro((q) => confirmar(q, lote, YO, 'es'))
+
+  // Del asiento de ESTA carga, no de los que dejaron las pruebas anteriores: un
+  // asiento no se borra, así que `limpio()` no puede llevárselos por delante.
+  const partidas = (await dentro((q) => q`
+    select p.cuenta, p.monto_ves::text from partida p
+     where p.asiento_id = (
+       select a.id from asiento a
+        where a.organizacion_id = ${G}::uuid and a.origen_tipo = 'factura_emitida'
+          and a.descripcion_es like '%V-0000101%'
+        order by a.registrado_en desc limit 1)
+     order by p.linea
+  `)) as unknown as Array<{ cuenta: string; monto_ves: string }>
+  assert.equal(partidas.length, 3)
+  assert.equal(Number(partidas[0]!.monto_ves), 2320000)     // por cobrar, todo
+  assert.equal(Number(partidas[1]!.monto_ves), -2000000)    // ingreso
+  assert.equal(Number(partidas[2]!.monto_ves), -320000)     // IVA débito
+  // El ingreso va a la cuenta del TIPO del contrato, no a un cajón de «ingresos»:
+  // saber cuál de los cinco tipos deja dinero es media decisión.
+  assert.equal(partidas[1]!.cuenta, '4.1.01')
+})
+
+test('el asiento del histórico cuadra, como todos', async () => {
+  await limpio()
+  const lote = await cargarVentas()
+  await dentro((q) => confirmar(q, lote, YO, 'es'))
+  const [d] = (await dentro((q) => q`
+    select ves::text from descuadre(${G}::uuid,'2026-12-31'::date)
+  `)) as unknown as Array<{ ves: string }>
+  assert.equal(Number(d?.ves ?? 0), 0)
+})
+
+test('una factura del histórico NO se asienta dos veces al reimportar la hoja', async () => {
+  // Reimportar una hoja corregida es lo normal, no un error. Lo que no puede pasar es
+  // que el ingreso entre dos veces.
+  await limpio()
+  const cuantos = async () => {
+    const [n] = (await dentro((q) => q`
+      select count(*)::int as n from asiento
+       where organizacion_id = ${G}::uuid and origen_tipo = 'factura_emitida'
+    `)) as unknown as Array<{ n: number }>
+    return Number(n!.n)
+  }
+  // Se cuenta el ANTES y el DESPUÉS, no el total: los asientos de las pruebas
+  // anteriores siguen ahí, porque un asiento no se borra.
+  const antes = await cuantos()
+  const primera = await cargarVentas('ventas.csv')
+  await dentro((q) => confirmar(q, primera, YO, 'es'))
+  const tras_una = await cuantos()
+  // La hoja corregida no es la misma hoja: si lo fuera, la aplicación avisaría de que
+  // ya se trajo, que es otra prueba. Aquí se corrige el IVA de la SEGUNDA factura, y
+  // lo que se mira es que la primera no se vuelva a asentar por ello.
+  const corregida = VENTAS.replace('"160.000,00"', '"161.000,00"')
+  const segunda = await cargarVentas('ventas-corregida.csv', corregida)
+  await dentro((q) => confirmar(q, segunda, YO, 'es'))
+  const tras_dos = await cuantos()
+
+  assert.equal(tras_una - antes, 2, 'dos facturas, dos asientos')
+  assert.equal(tras_dos - tras_una, 0, 'la segunda vez no vuelve a asentar nada')
+})
+
+test('un cliente sin dar de alta para la carga y dice quién es', async () => {
+  // Crear empresas desde una hoja es como se acaba con el mismo cliente tres veces
+  // escrito de tres maneras.
+  await limpio()
+  const hoja = VENTAS.replace(/J-900400000-0/g, 'J-90099999-9')
+  const r = await dentro((q) => cargar(q, G, YO, 'ventas-raras.csv', bytes(hoja), 'facturas_emitidas'))
+  const props = proponerMapeo(r.cabeceras, r.muestras, 'facturas_emitidas')
+  await dentro((q) => guardarMapeo(q, r.loteId, props))
+  await dentro((q) => validar(q, r.loteId))
+
+  const res = await dentro((q) => confirmar(q, r.loteId, YO, 'es'))
+  assert.equal(res.hecho, false)
+  assert.match(res.hecho ? '' : res.motivo, /J-90099999-9/)
+
+  const [creadas] = (await dentro((q) => q`
+    select count(*)::int as n from documento_fiscal
+     where organizacion_id = ${G}::uuid and sentido = 'emitido'
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(Number(creadas!.n), 0, 'ni media hoja dentro')
+})
+
+test('la pantalla ofrece los dos destinos, no solo el de compras', async () => {
+  const { pintarSubirHoja } = await import('../src/pantallas/importar.ts')
+  const h = pintarSubirHoja('es', 'af', [])
+  assert.match(h, /value="facturas_recibidas"/)
+  assert.match(h, /value="facturas_emitidas"/)
+})

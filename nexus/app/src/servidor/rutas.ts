@@ -48,7 +48,7 @@ import {
 } from '../dominio/valuar.ts'
 import {
   cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, mapeoGuardado,
-  CAMPOS, HojaRepetida, type Campo,
+  CAMPOS, DESTINOS, HojaRepetida, type Campo, type Destino,
 } from '../dominio/importar.ts'
 import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
 import { estadoDeCobro, registrarCobro, NoCobrable, type Medio } from '../dominio/cobrar.ts'
@@ -426,12 +426,20 @@ export async function resolver(
       return html(400, pintarSubirHoja(p.idioma, testigoAnti(testigo), await listaDe(),
         t(p.idioma, 'alta.error.campo')))
     }
+    // El destino llega del formulario, así que se comprueba contra la lista en vez de
+    // pasarlo tal cual: un valor inventado acabaría en la columna `destino` del lote y
+    // se quedaría ahí para siempre sin que nada lo materialice.
+    const pedido = p.campos['destino']
+    const destino: Destino = DESTINOS.includes(pedido as Destino)
+      ? (pedido as Destino)
+      : 'facturas_recibidas'
+
     try {
       const r = await comoQuien((q) => cargar(q, org!.organizacion_id, personaId,
-        a.archivo, a.contenido, 'facturas_recibidas'))
+        a.archivo, a.contenido, destino))
       // El mapeo propuesto se guarda de una vez: así la pantalla siguiente enseña
       // lo mismo que se va a usar, y no una sugerencia que todavía no existe.
-      const propuestas = proponerMapeo(r.cabeceras, r.muestras, 'facturas_recibidas')
+      const propuestas = proponerMapeo(r.cabeceras, r.muestras, destino)
       await comoQuien((q) => guardarMapeo(q, r.loteId, propuestas))
       return aOtroSitio(`/importar/${r.loteId}`)
     } catch (e) {

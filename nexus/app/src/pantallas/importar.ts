@@ -11,7 +11,7 @@
  */
 
 import type { Propuesta, Revision, Lote, Campo } from '../dominio/importar.ts'
-import { CAMPOS, nombreCampo } from '../dominio/importar.ts'
+import { CAMPOS, DESTINOS, nombreCampo } from '../dominio/importar.ts'
 import { traductor, type Clave, type Idioma } from '../i18n/t.ts'
 import { pagina, escapar } from './base.ts'
 
@@ -61,12 +61,13 @@ export function pintarSubirHoja(
     <div class="caja pad">
       <label class="c"><span>${escapar(t('importar.destino'))}</span>
         <select name="destino">
-          <option value="facturas_recibidas">${escapar(
-            t('importar.destino.facturas_recibidas'))}</option>
+          ${DESTINOS.map((d) => `<option value="${d}">${escapar(
+            t(`importar.destino.${d}` as Clave))}</option>`).join('')}
         </select></label>
       <label class="c"><span>${escapar(t('importar.subir'))}</span>
         <input type="file" name="documento" accept=".csv,text/csv,text/plain" required></label>
     </div>
+    <p class="expl">${escapar(t('importar.destino.ventas_explica'))}</p>
     <button type="submit">${escapar(t('importar.subir'))}</button>
   </form>
   ${lotes}

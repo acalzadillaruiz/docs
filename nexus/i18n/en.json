@@ -445,5 +445,10 @@
   "reex.sin_nada": "Nothing has been posted as of that date yet.",
   "reex.error.mes": "That month is already restated. To redo it, reverse its journal entry.",
   "reex.error.periodo": "That accounting period is closed. To restate it, it has to be reopened.",
-  "reex.error.indice": "There is no consumer price index (INPC) in force on the last day of that month."
+  "reex.error.indice": "There is no consumer price index (INPC) in force on the last day of that month.",
+  "importar.error.clientes": "These clients are not registered. Create them before importing: creating companies from a spreadsheet is how you end up with the same client written three different ways",
+  "importar.destino.facturas_emitidas": "Historical issued invoices",
+  "importar.destino.ventas_explica": "For loading what was already invoiced before this system. The number is not invented: these invoices already exist and were already filed. Ones that came from a progress payment here are not posted again.",
+  "campo.cliente": "Client tax ID",
+  "campo.cliente_nombre": "Client name"
 }
