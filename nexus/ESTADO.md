@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 111 de 141 sesiones · **79%**
+**Avance:** 112 de 141 sesiones · **79%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -24,8 +24,13 @@ Y salieron **dos fallos reales de la contabilidad** al usarla, los dos arreglado
   libro para siempre — eso es la contabilidad — pero esa tabla no es el libro.
 
 Con esto, de los tres módulos «construidos y sin pantalla» queda **uno y medio**.
-Commit `632b9b0`. **707 comprobaciones** (246 de SQL y diccionario + 461 de
-TypeScript), todas pasando.
+
+Y **los avisos ya salen solos**: `avisar.ts --repetir=<segundos>` se queda dando
+vueltas, con su unidad de systemd hecha en `operar/`. Era el punto 2 de esta lista y
+no era un detalle de instalación: la cola se llenaba y nadie la vaciaba. El bucle va
+aparte y probado con un reloj de mentira — uno que se prueba esperando de verdad es
+uno que nadie vuelve a probar. Commits `632b9b0` y `ac7cb5a`.
+**714 comprobaciones** (246 de SQL y diccionario + 468 de TypeScript), todas pasando.
 
 Avisado al CEO el **70%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
@@ -34,15 +39,12 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
-   lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
-   usa la primera semana y se abandona la tercera.
-3. **Reexpresión por inflación en pantalla.** `16-reexpresion.sql` construido y
+2. **Reexpresión por inflación en pantalla.** `16-reexpresion.sql` construido y
    probado, sin pantalla. El patrón está hecho: mirar `src/pantallas/activos.ts` y
    `src/dominio/activos.ts`, que son exactamente el mismo caso resuelto ayer — una
    función de base de datos que cierra un mes, con sus comprobaciones previas en
    TypeScript para que el error salga explicado antes de pulsar.
-4. **La importación de destinos que no sean facturas de proveedor**, también sin
+3. **La importación de destinos que no sean facturas de proveedor**, también sin
    pantalla.
 
 **Trampa que se acaba de pagar dos veces, y que se va a volver a pagar:** dentro de una
@@ -260,6 +262,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/proveedores.ts` · `pantallas/proveedores.ts` | Retener el IVA y el ISLR a los proveedores. **No retener cuando toca lo paga GPS de su bolsillo, con multa.** La pantalla avisa antes de pulsar de lo que más se discute: **sin número de control la retención es del 100%, no del 75%**. Y si la empresa no consta como agente de retención en esa fecha, el botón no se ofrece y se dice por qué — un botón que aparece y revienta hace pensar que el sistema está roto. |
 | `app/src/dominio/banco.ts` · `pantallas/banco.ts` | Conciliación bancaria. **La máquina propone; casar lo hace una persona** — dos movimientos del mismo importe el mismo día son más frecuentes de lo que parece, y una conciliación automática que se equivoca una vez al mes es peor que ninguna. **Lo que no casa no se esconde**, a los dos lados, y queda señalado hasta que alguien lo explique por escrito. La nota solo se ofrece en los movimientos del banco: un cobro que el banco no tiene no se arregla con una nota. |
 | `app/src/dominio/activos.ts` · `pantallas/activos.ts` | Los equipos. Cada uno con lo que queda en libros y, si está alquilado, **lo que deja**: lo facturado del contrato menos el desgaste del periodo. Un equipo que deja menos de lo que se gasta no es una pérdida contable abstracta: es **una máquina que habría salido más barata parada**, y esa cifra no estaba en ningún sitio. Depreciar el mes se hace desde aquí, y las tres cosas que lo impedirían se comprueban **antes** de pulsar, no después. |
+| `app/src/servidor/bucle.ts` · `herramientas/avisar.ts` · `operar/` | Los avisos saliendo solos. La espera se cuenta **desde que termina** la vuelta, no desde que empieza: contándola desde el principio, un servidor de correo lento arranca la vuelta siguiente encima de la anterior. Un fallo no mata el bucle, pero fallo tras fallo espera más cada vez. Se para con SIGTERM **terminando la vuelta**: cortar a mitad de un envío deja avisos tomados y sin mandar. Probado con un reloj de mentira — un bucle que se prueba esperando de verdad es un bucle que nadie vuelve a probar. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
