@@ -190,13 +190,19 @@ test('el correo sale en el idioma de cada destinatario, no en el del sistema', a
 })
 
 test('vaciar dos veces no manda el mismo correo dos veces', async () => {
-  await presentada(903)
+  const v = await presentada(903)
   const uno = new Papelera()
   await dentro((q) => vaciarCola(q, uno, 'https://nexus.gps'))
   const dos = new Papelera()
-  const r = await dentro((q) => vaciarCola(q, dos, 'https://nexus.gps'))
-  assert.equal(r.enviados, 0)
-  assert.equal(dos.mandados.length, 0)
+  await dentro((q) => vaciarCola(q, dos, 'https://nexus.gps'))
+
+  // Se cuenta lo de ESTA valuación, no el total. La cola es una sola para todo el
+  // sistema y los archivos de prueba corren a la vez, así que entre las dos pasadas
+  // puede entrar un aviso de otro archivo — y contar el total haría que esta
+  // comprobación fallara por algo que no tiene nada que ver con lo que comprueba.
+  const mio = (p: Papelera) => p.mandados.filter((m) => m.enlace.endsWith(v)).length
+  assert.equal(mio(uno), 1, 'la primera pasada tenía que mandarlo')
+  assert.equal(mio(dos), 0, 'la segunda no puede volver a mandarlo')
 })
 
 test('si el servidor de correo falla, el aviso espera en la cola', async () => {
