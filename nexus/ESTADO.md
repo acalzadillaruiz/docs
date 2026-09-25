@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 128 de 141 sesiones · **91%**
+**Avance:** 129 de 141 sesiones · **91%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -127,7 +127,12 @@ Y **el mayor de una cuenta** (`d5427d4`): el diario recorre el tiempo, el mayor
 recorre una cuenta. Es lo que contesta «¿por qué el banco tiene exactamente este
 saldo?», que es la pregunta que se hace cuando algo no cuadra.
 
-**871 comprobaciones** (250 de SQL y diccionario + 618 de TypeScript), todas pasando.
+Y **el barrido de aislamiento por rutas** (`4f701cf`): todas las rutas recorridas como
+cliente de otra operadora. **La lista sale del código fuente, no de una copia a mano**,
+así que una pantalla nueva entra sola en el barrido. Las cinco de hoy tenían la valla;
+lo comprobé quitando una a propósito y viendo fallar la prueba antes de creérmelo.
+
+**878 comprobaciones** (250 de SQL y diccionario + 625 de TypeScript), todas pasando.
 Avisado al CEO el **90%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 
 **Decisión pendiente del CEO:** las tablas de rentabilidad son **acumuladas**, no del
