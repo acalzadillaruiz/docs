@@ -132,3 +132,122 @@ select case when count(*) = 2
             then 'OK · las dos facturas salen en el libro de ventas sin transcribir nada'
             else 'FALLO · salieron ' || count(*)::text end as resultado
   from libro_ventas where organizacion_id = :org;
+
+-- ============================================================ notas de crédito y débito
+-- Una factura emitida no se modifica ni se borra: ya estaba declarada, ya la tiene el
+-- cliente, y ya lleva su número de control. Se corrige con una nota que apunta a ella.
+
+select case when emitir_nota((select id from documento_fiscal
+                               where organizacion_id = :org and numero = '00000001'),
+                             'nota_credito', 20000.00,
+                             'El cliente rechazó dos días de cuadrilla', :yo) is not null
+            then 'OK · se emite una nota de crédito sobre una factura'
+            else 'FALLO' end as resultado;
+
+select case when afecta_a is not null and base_ves = 20000.00 and iva_ves = 3200.00
+            then 'OK · la nota apunta a su factura y lleva su IVA calculado'
+            else 'FALLO · ' || base_ves::text || ' / ' || iva_ves::text end as resultado
+  from documento_fiscal where organizacion_id = :org and tipo = 'nota_credito';
+
+-- La factura original sigue donde estaba: las dos quedan en el libro.
+select case when base_ves = 100000.00
+            then 'OK · la factura original NO se toca: las dos quedan en el libro'
+            else 'FALLO' end as resultado
+  from documento_fiscal where organizacion_id = :org and numero = '00000001';
+
+-- Lo que queda vivo se resta, no se guarda.
+select case when base = 80000.00 and iva = 12800.00 and total = 92800.00
+            then 'OK · lo que queda facturado se resta: 80.000 de base'
+            else 'FALLO · ' || base::text || ' / ' || iva::text end as resultado
+  from neto_facturado((select id from documento_fiscal
+                        where organizacion_id = :org and numero = '00000001'));
+
+-- ============================================================ no se devuelve de más
+do $$
+begin
+  perform emitir_nota((select id from documento_fiscal
+                        where organizacion_id = '1f2a3b4c-1000-0000-0000-00000000000a'
+                          and numero = '00000001'),
+                      'nota_credito', 90000.00,'de más',
+                      '1f2a3b4c-1000-0000-0000-00000000000d');
+  raise exception 'FALLO · devolvió más de lo que quedaba facturado';
+exception when sqlstate 'P0001' then
+  if SQLERRM like 'FALLO%' then raise; end if;
+  -- Una base imponible negativa no significa nada en una declaración.
+  raise notice 'OK · una nota de crédito no devuelve más de lo que queda facturado';
+end $$;
+
+-- ============================================================ una nota sin motivo no entra
+do $$
+begin
+  perform emitir_nota((select id from documento_fiscal
+                        where organizacion_id = '1f2a3b4c-1000-0000-0000-00000000000a'
+                          and numero = '00000002'),
+                      'nota_debito', 1000.00,'   ',
+                      '1f2a3b4c-1000-0000-0000-00000000000d');
+  raise exception 'FALLO · entró una nota sin motivo';
+exception when sqlstate 'P0001' then
+  if SQLERRM like 'FALLO%' then raise; end if;
+  raise notice 'OK · una nota sin motivo no explica nada, que es para lo que sirve';
+end $$;
+
+-- ============================================================ la de débito SUMA
+select emitir_nota((select id from documento_fiscal
+                     where organizacion_id = :org and numero = '00000002'),
+                   'nota_debito', 5000.00,'Recargo por traslado adicional', :yo) as _;
+
+select case when base = 205000.00
+            then 'OK · la nota de débito SUMA: confundirla con la de crédito invierte el signo'
+            else 'FALLO · ' || base::text end as resultado
+  from neto_facturado((select id from documento_fiscal
+                        where organizacion_id = :org and numero = '00000002'));
+
+-- ============================================================ una nota no corrige otra nota
+do $$
+begin
+  perform emitir_nota((select id from documento_fiscal
+                        where organizacion_id = '1f2a3b4c-1000-0000-0000-00000000000a'
+                          and tipo = 'nota_credito' limit 1),
+                      'nota_credito', 100.00,'sobre una nota',
+                      '1f2a3b4c-1000-0000-0000-00000000000d');
+  raise exception 'FALLO · se emitió una nota sobre otra nota';
+exception when sqlstate 'P0001' then
+  if SQLERRM like 'FALLO%' then raise; end if;
+  raise notice 'OK · una nota corrige una factura, no otra nota';
+end $$;
+
+-- ============================================================ las notas también van al libro
+select case when count(*) = 4
+            then 'OK · las notas salen en el libro de ventas junto a sus facturas'
+            else 'FALLO · salieron ' || count(*)::text end as resultado
+  from libro_ventas where organizacion_id = :org;
+
+select case when afecta_numero = '00000001'
+            then 'OK · el libro dice a qué factura afecta cada nota'
+            else 'FALLO' end as resultado
+  from libro_ventas where organizacion_id = :org and tipo = 'nota_credito';
+
+-- ============================================================ el motivo SE GUARDA
+-- Exigir el motivo y no guardarlo es peor que no exigirlo: da la impresión de que
+-- queda escrito.
+select case when motivo = 'El cliente rechazó dos días de cuadrilla'
+            then 'OK · el motivo de la nota queda escrito, no solo exigido'
+            else 'FALLO · quedó ' || coalesce(motivo,'(nada)') end as resultado
+  from documento_fiscal where organizacion_id = :org and tipo = 'nota_credito';
+
+-- Y la base de datos tampoco admite una nota sin motivo por la puerta de atrás.
+do $$
+begin
+  insert into documento_fiscal (organizacion_id, sentido, tipo, numero, numero_control,
+                                contraparte_id, fecha, afecta_a, base_ves, base_usd,
+                                iva_ves, iva_usd, tasa_id, registrado_por)
+  select '1f2a3b4c-1000-0000-0000-00000000000a','emitido','nota_credito','99999999',
+         '00-26-99999999','1f2a3b4c-1000-0000-0000-00000000000b', current_date,
+         id, 10.00, 0.25, 1.60, 0.04,'1f2a3b4c-1100-0000-0000-00000000000a',
+         '1f2a3b4c-1000-0000-0000-00000000000d'
+    from documento_fiscal
+   where organizacion_id = '1f2a3b4c-1000-0000-0000-00000000000a' and numero = '00000001';
+  raise exception 'FALLO · entró una nota sin motivo por la puerta de atrás';
+exception when check_violation then
+  raise notice 'OK · la base de datos tampoco admite una nota sin motivo';
+end $$;
