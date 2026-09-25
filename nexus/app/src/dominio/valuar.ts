@@ -201,3 +201,38 @@ export async function emitir(
 export function pesoTexto(idioma: Idioma, n: number): string {
   return `${numero(idioma, n, n % 1 === 0 ? 0 : 2)} %`
 }
+
+export type Presentada =
+  | { readonly hecho: true }
+  | { readonly hecho: false; readonly motivo: 'no_alcanzable' | 'estado_equivocado' }
+
+/**
+ * Presentar la valuación al cliente.
+ *
+ * Es el momento en que sale de GPS. Antes de esto el cliente no la ve — está en
+ * borrador, que es donde se revisa y se corrige. Al presentarla se le avisa por
+ * correo, y eso lo hace la base de datos sola: el aviso se encola en la misma
+ * transacción que el cambio de estado.
+ *
+ * La condición del estado va DENTRO del update: dos pulsaciones simultáneas no
+ * pueden presentar dos veces, y presentar dos veces mandaría dos correos.
+ */
+export async function presentar(
+  q: Consulta, valuacionId: string, esCliente: boolean,
+): Promise<Presentada> {
+  // Presenta GPS, no el cliente. Un cliente que pudiera presentar se estaría
+  // mandando trabajo a sí mismo para firmar.
+  if (esCliente) return { hecho: false, motivo: 'no_alcanzable' }
+
+  const [v] = (await q`
+    select estado::text from valuacion where id = ${valuacionId}::uuid
+  `) as unknown as Array<{ estado: string }>
+  if (!v) return { hecho: false, motivo: 'no_alcanzable' }
+  if (v.estado !== 'borrador') return { hecho: false, motivo: 'estado_equivocado' }
+
+  const filas = await q`
+    update valuacion set estado = 'presentada', presentada_el = current_date
+     where id = ${valuacionId}::uuid and estado = 'borrador'
+    returning id`
+  return filas.length === 1 ? { hecho: true } : { hecho: false, motivo: 'estado_equivocado' }
+}

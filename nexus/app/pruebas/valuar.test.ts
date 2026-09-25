@@ -9,7 +9,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
-import { proponer, emitir, ContratoNoValuable } from '../src/dominio/valuar.ts'
+import { proponer, emitir, presentar, ContratoNoValuable } from '../src/dominio/valuar.ts'
 import { pintarValuar } from '../src/pantallas/valuar.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
@@ -229,4 +229,54 @@ test('la pantalla sale entera en los dos idiomas', async () => {
   assert.match(en, /What can be invoiced today/)
   assert.match(en, /No evidence, no invoice|comes from verified milestones/)
   assert.equal(en.includes('‹falta:'), false)
+})
+
+test('presentar saca la valuación de GPS y le avisa al cliente, en el mismo acto', async () => {
+  await limpio()
+  const r = await dentro((q) => emitir(q, {
+    contratoId: CTR, desde: '2026-08-01', hasta: hoy(), retieneIva: false, pagaEnDivisa: false,
+  }, YO, G, 'es'))
+  const id = (r as { valuacionId: string }).valuacionId
+
+  // En borrador el cliente no la ve.
+  const antes = await comoPersona({ id: ING }, 'nexus_cliente', (q) => q`
+    select id from valuacion where id = ${id}::uuid`)
+  assert.equal(antes.length, 0)
+
+  assert.deepEqual(await dentro((q) => presentar(q, id, false)), { hecho: true })
+
+  const despues = await comoPersona({ id: ING }, 'nexus_cliente', (q) => q`
+    select estado::text from valuacion where id = ${id}::uuid`) as unknown as
+    Array<{ estado: string }>
+  assert.equal(despues[0]!.estado, 'presentada')
+
+  // El aviso lo encola la base de datos sola, en la misma transacción.
+  const avisos = (await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    return q`select tipo::text from aviso where sobre_id = ${id}::uuid`
+  })) as unknown as Array<{ tipo: string }>
+  assert.ok(avisos.some((a) => a.tipo === 'valuacion_presentada'))
+})
+
+test('presentar dos veces no pasa: mandaría dos correos', async () => {
+  await limpio()
+  const r = await dentro((q) => emitir(q, {
+    contratoId: CTR, desde: '2026-08-01', hasta: hoy(), retieneIva: false, pagaEnDivisa: false,
+  }, YO, G, 'es'))
+  const id = (r as { valuacionId: string }).valuacionId
+  await dentro((q) => presentar(q, id, false))
+  assert.deepEqual(await dentro((q) => presentar(q, id, false)),
+    { hecho: false, motivo: 'estado_equivocado' })
+})
+
+test('el cliente NO presenta: se estaría mandando trabajo a sí mismo para firmar', async () => {
+  await limpio()
+  const r = await dentro((q) => emitir(q, {
+    contratoId: CTR, desde: '2026-08-01', hasta: hoy(), retieneIva: false, pagaEnDivisa: false,
+  }, YO, G, 'es'))
+  const id = (r as { valuacionId: string }).valuacionId
+  assert.deepEqual(
+    await comoPersona({ id: ING }, 'nexus_cliente', (q) => presentar(q, id, true)),
+    { hecho: false, motivo: 'no_alcanzable' },
+  )
 })

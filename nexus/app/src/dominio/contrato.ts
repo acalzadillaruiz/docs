@@ -59,6 +59,8 @@ export type FichaContrato = {
   readonly titulo: string
   readonly tipo: string
   readonly estado: string
+  /** El estado sin traducir. La pantalla decide con esto, no con el texto. */
+  readonly estadoCrudo: string
   readonly monto: string
   readonly moneda: 'VES' | 'USD'
   readonly firmado: string | null
@@ -153,6 +155,7 @@ export async function ficha(
     titulo: idioma === 'es' ? c.titulo_es : c.titulo_en,
     tipo: t(idioma, TIPO[c.tipo] ?? 'contrato.tipo.servicio'),
     estado: t(idioma, ESTADO_C[c.estado] ?? 'contrato.estado.vigente'),
+    estadoCrudo: c.estado,
     monto: moneda(idioma, Number(c.monto), c.moneda),
     moneda: c.moneda,
     firmado: c.firmado_el ? formatearFecha(idioma, c.firmado_el) : null,

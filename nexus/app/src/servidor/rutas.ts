@@ -36,10 +36,11 @@ import { pintarPaginaAvance } from '../pantallas/evidencia.ts'
 import { medidas } from '../dominio/medidas.ts'
 import { perfil, guardarPerfil } from '../dominio/perfil.ts'
 import {
-  crearContrato, clientes, TIPOS, type ContratoNuevo, type RenglonNuevo, type TipoContrato,
+  crearContrato, clientes, activar, TIPOS,
+  type ContratoNuevo, type RenglonNuevo, type TipoContrato,
 } from '../dominio/alta.ts'
 import { pintarAlta, type Traido } from '../pantallas/alta.ts'
-import { proponer, emitir, ContratoNoValuable } from '../dominio/valuar.ts'
+import { proponer, emitir, presentar, ContratoNoValuable } from '../dominio/valuar.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
 import { pintarPerfil } from '../pantallas/perfil.ts'
 import { pintarMedidas } from '../pantallas/medidas.ts'
@@ -298,7 +299,7 @@ export async function resolver(
   if (contrato && p.metodo === 'GET') {
     try {
       const f = await comoQuien((q) => ficha(q, contrato[1]!, p.idioma, !esCliente))
-      return html(200, pintarContrato(f, p.idioma, esCliente))
+      return html(200, pintarContrato(f, p.idioma, esCliente, testigoAnti(testigo)))
     } catch (e) {
       if (e instanceof ContratoNoAlcanzable) return noEncontrado(p.idioma)
       throw e
@@ -475,6 +476,36 @@ export async function resolver(
     }
   }
 
+  // Poner un contrato en vigor. Es el segundo acto deliberado: hasta aquí era un
+  // borrador que el cliente no veía, erratas incluidas.
+  const activarCtr = /^\/contratos\/([0-9a-f-]{36})\/activar$/.exec(p.ruta)
+  if (activarCtr && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const r = await comoQuien((q) => activar(q, activarCtr[1]!, org!.organizacion_id))
+    if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    return aOtroSitio(`/contratos/${activarCtr[1]!}`)
+  }
+
+  // Presentar la valuación: el momento en que sale de GPS. El aviso por correo lo
+  // encola la base de datos sola, en la misma transacción que el cambio de estado.
+  const presentarVal = /^\/valuaciones\/([0-9a-f-]{36})\/presentar$/.exec(p.ruta)
+  if (presentarVal && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    const r = await comoQuien((q) => presentar(q, presentarVal[1]!, esCliente))
+    if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    return aOtroSitio(`/valuaciones/${presentarVal[1]!}`)
+  }
+
   const valuacion = /^\/valuaciones\/([0-9a-f-]{36})$/.exec(p.ruta)
   if (valuacion && p.metodo === 'GET') {
     try {
@@ -504,6 +535,8 @@ export async function resolver(
         puedeDecidir,
         // Responder es de dentro, y solo tiene sentido si hay algo sin responder.
         puedeResponder: !esCliente,
+        // Presentar también, y solo mientras siga siendo un borrador.
+        puedePresentar: !esCliente && datos.cab.estado === 'borrador',
         antifalsificacion: testigoAnti(testigo),
         objeciones: datos.objeciones.map((o) => ({
           id: o.id,

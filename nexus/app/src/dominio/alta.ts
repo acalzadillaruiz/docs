@@ -190,3 +190,45 @@ export async function clientes(q: Consulta): Promise<readonly ClienteBreve[]> {
 export function nombreTipo(idioma: Idioma, tipo: TipoContrato): string {
   return t(idioma, `contrato.tipo.${tipo}` as Clave)
 }
+
+export type Cambio =
+  | { readonly hecho: true }
+  | { readonly hecho: false; readonly motivo: 'no_alcanzable' | 'estado_equivocado' | 'sin_hitos' }
+
+/**
+ * Poner un contrato en vigor.
+ *
+ * Es el segundo acto deliberado: hasta aquí el contrato era un borrador que el
+ * cliente no veía, erratas incluidas. Al pasar a vigente aparece en su portal.
+ *
+ * No se deja poner vigente un contrato cuyos renglones no tengan hitos. Sería un
+ * contrato que el cliente ve con avance cero y que se va a quedar en cero para
+ * siempre, y nadie entendería por qué.
+ *
+ * La condición del estado va DENTRO del update, no en un `if` de arriba: entre la
+ * consulta y la escritura cabe otra petición.
+ */
+export async function activar(
+  q: Consulta, contratoId: string, orgId: string,
+): Promise<Cambio> {
+  const [c] = (await q`
+    select estado::text from contrato
+     where id = ${contratoId}::uuid and organizacion_id = ${orgId}::uuid
+  `) as unknown as Array<{ estado: string }>
+  if (!c) return { hecho: false, motivo: 'no_alcanzable' }
+  if (c.estado !== 'borrador') return { hecho: false, motivo: 'estado_equivocado' }
+
+  const [sin] = (await q`
+    select count(*)::int as n from renglon rg
+     where rg.contrato_id = ${contratoId}::uuid
+       and not exists (select 1 from hito h where h.renglon_id = rg.id)
+  `) as unknown as Array<{ n: number }>
+  if (Number(sin?.n ?? 0) > 0) return { hecho: false, motivo: 'sin_hitos' }
+
+  const filas = await q`
+    update contrato set estado = 'vigente'
+     where id = ${contratoId}::uuid and organizacion_id = ${orgId}::uuid
+       and estado = 'borrador'
+    returning id`
+  return filas.length === 1 ? { hecho: true } : { hecho: false, motivo: 'estado_equivocado' }
+}

@@ -266,5 +266,11 @@
   "valuar.error.tasa": "No BCV rate has been published for today yet",
   "valuar.error.fiscal": "The tax tables for the period are missing (VAT or income tax)",
   "valuar.caido": "Invoiced with no backing",
-  "valuar.caido_explica": "These milestones were invoiced and later lost their evidence. It does not fix itself: what is invoiced is corrected with a credit note, not by deleting."
+  "valuar.caido_explica": "These milestones were invoiced and later lost their evidence. It does not fix itself: what is invoiced is corrected with a credit note, not by deleting.",
+  "accion.activar": "Make active",
+  "accion.activar_aviso": "From that moment the client sees it in their portal.",
+  "accion.presentar": "Submit to the client",
+  "accion.presentar_aviso": "They are notified by email. Until then the progress payment does not leave GPS.",
+  "accion.error.sin_hitos": "Cannot be made active: some line items have no milestones, and their progress would stay at zero forever",
+  "accion.error.estado": "That is no longer in that state"
 }

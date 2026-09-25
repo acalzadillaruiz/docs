@@ -35,6 +35,8 @@ export type DatosValuacion = {
   readonly puedeDecidir: boolean
   /** Quien está dentro de GPS puede contestar las objeciones abiertas. */
   readonly puedeResponder: boolean
+  /** Solo de dentro, y solo mientras sea un borrador: sacarla hacia el cliente. */
+  readonly puedePresentar?: boolean
   readonly antifalsificacion: string
   readonly objeciones: readonly ObjecionVista[]
 }
@@ -220,6 +222,15 @@ ${filas}
              </form>`
           : `<div class="obj-e">${escapar(a.sinRespuesta)}</div>`}
     </div>`).join('')}</div>`}
+
+  ${!d.puedePresentar ? '' : `
+  <section class="acc">
+    <form method="post" action="/valuaciones/${escapar(d.id)}/presentar">
+      <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
+      <button type="submit" class="ap">${escapar(t('accion.presentar'))}</button>
+      <p class="ayuda">${escapar(t('accion.presentar_aviso'))}</p>
+    </form>
+  </section>`}
 
   ${!d.puedeDecidir ? '' : `
   <section class="acc">

@@ -266,5 +266,11 @@
   "valuar.error.tasa": "No hay tasa del BCV publicada todavía para hoy",
   "valuar.error.fiscal": "Faltan las tablas fiscales del periodo (IVA o ISLR)",
   "valuar.caido": "Facturado y sin respaldo",
-  "valuar.caido_explica": "Estos hitos se facturaron y después se les cayó la evidencia. No se corrige solo: lo facturado se arregla con una nota de crédito, no borrando."
+  "valuar.caido_explica": "Estos hitos se facturaron y después se les cayó la evidencia. No se corrige solo: lo facturado se arregla con una nota de crédito, no borrando.",
+  "accion.activar": "Poner en vigor",
+  "accion.activar_aviso": "A partir de ese momento el cliente lo ve en su portal.",
+  "accion.presentar": "Presentar al cliente",
+  "accion.presentar_aviso": "Se le avisa por correo. Hasta entonces la valuación no sale de GPS.",
+  "accion.error.sin_hitos": "No se puede poner en vigor: hay renglones sin hitos, y su avance se quedaría en cero para siempre",
+  "accion.error.estado": "Eso ya no está en ese estado"
 }

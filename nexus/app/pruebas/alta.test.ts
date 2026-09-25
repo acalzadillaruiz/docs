@@ -9,7 +9,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
-import { crearContrato, clientes, type ContratoNuevo } from '../src/dominio/alta.ts'
+import { crearContrato, clientes, activar, type ContratoNuevo } from '../src/dominio/alta.ts'
 import { pintarAlta } from '../src/pantallas/alta.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
@@ -237,4 +237,51 @@ test('el formulario sale entero en los dos idiomas', () => {
   assert.match(en, /Purchase price/)
   assert.match(en, /It starts as a draft/)
   assert.equal(en.includes('‹falta:'), false)
+})
+
+test('un contrato sin hitos NO se puede poner en vigor', async () => {
+  // Sería un contrato que el cliente ve con avance cero y que se va a quedar en
+  // cero para siempre, y nadie entendería por qué.
+  const r = await crear(base())
+  const id = (r as { contratoId: string }).contratoId
+  await dentro((q) => q`
+    insert into renglon (contrato_id, numero, descripcion_es, descripcion_en,
+                         cantidad, unidad, precio_unitario)
+    values (${id}::uuid, 99,'Sin hitos','No milestones', 1,'u', 1000)`)
+
+  assert.deepEqual(await dentro((q) => activar(q, id, G)),
+    { hecho: false, motivo: 'sin_hitos' })
+
+  const [c] = (await dentro((q) => q`
+    select estado::text from contrato where id = ${id}::uuid
+  `)) as unknown as Array<{ estado: string }>
+  assert.equal(c!.estado, 'borrador', 'no se movió')
+})
+
+test('poner en vigor lo hace visible para el cliente, y solo una vez', async () => {
+  const r = await crear(base())
+  const id = (r as { contratoId: string }).contratoId
+
+  const antes = await comoPersona({ id: ING }, 'nexus_cliente', (q) => q`
+    select id from contrato where id = ${id}::uuid`)
+  assert.equal(antes.length, 0, 'un borrador no se ve')
+
+  assert.deepEqual(await dentro((q) => activar(q, id, G)), { hecho: true })
+
+  const despues = await comoPersona({ id: ING }, 'nexus_cliente', (q) => q`
+    select id from contrato where id = ${id}::uuid`)
+  assert.equal(despues.length, 1)
+
+  // Y no se vuelve a poner en vigor lo que ya lo está.
+  assert.deepEqual(await dentro((q) => activar(q, id, G)),
+    { hecho: false, motivo: 'estado_equivocado' })
+})
+
+test('no se pone en vigor un contrato de otra organización', async () => {
+  const r = await crear(base())
+  const id = (r as { contratoId: string }).contratoId
+  assert.deepEqual(
+    await dentro((q) => activar(q, id, '00000000-0000-0000-0000-0000000000ab')),
+    { hecho: false, motivo: 'no_alcanzable' },
+  )
 })
