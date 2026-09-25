@@ -1,0 +1,249 @@
+/**
+ * El circuito entero, de punta a punta, por HTTP y sin tocar la base de datos.
+ *
+ * Es la prueba que contesta la única pregunta que importa: ¿esto se puede usar?
+ *
+ * Camino completo, como lo recorrería una persona de GPS y otra de la operadora:
+ * dar de alta el contrato → ponerlo en vigor → subir el certificado → verificarlo →
+ * ver subir el avance → proponer la valuación desde lo verificado → presentarla →
+ * que el cliente la objete → responder → que apruebe.
+ *
+ * Si esta prueba pasa, el sistema sirve. Si falla, da igual lo que digan las demás.
+ */
+
+import { test, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
+import { resolver, type Peticion } from '../src/servidor/rutas.ts'
+import { configurarAlmacen } from '../src/servidor/almacen.ts'
+import { cifrarClave } from '../src/dominio/clave.ts'
+import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
+import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
+import { testigoAnti } from '../src/servidor/csrf.ts'
+
+const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
+const G = '3a4b5c6d-0000-0000-0000-00000000000a'
+const C = '3a4b5c6d-0000-0000-0000-00000000000b'
+const YO = '3a4b5c6d-0000-0000-0000-00000000000d'
+const ING = '3a4b5c6d-0000-0000-0000-00000000000e'
+const TASA = '3a4b5c6d-1111-0000-0000-00000000000a'
+const IVA = '3a4b5c6d-1111-0000-0000-00000000000b'
+const SECRETO = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'
+const CLAVE = 'una clave razonable'
+
+let raiz = ''
+const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
+  comoPersona<T>({ id: YO }, 'nexus_interno', f)
+
+const pedir = (p: Partial<Peticion>) => resolver({
+  metodo: 'GET', ruta: '/', campos: {}, cookie: null, idioma: 'es', archivo: null,
+  origen: `o-${Math.random().toString(36).slice(2)}`, ...p,
+}, YO, false)
+
+async function entrar(correo: string): Promise<string> {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo, clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoEnPaso(desdeBase32(SECRETO), pasoDe(new Date())) },
+  }, YO, false)
+  return new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+}
+
+before(async () => {
+  raiz = await mkdtemp(join(tmpdir(), 'nexus-circuito-'))
+  configurarAlmacen(raiz)
+  conectar(DESTINO)
+  const hash = await cifrarClave(CLAVE)
+  await dentro(async (q) => {
+    await q.unsafe(`
+      set local role none;
+      insert into organizacion (id, tipo, nombre, rif) values
+        ('${G}','gps','GPS Circuito','J-994444444-4'),
+        ('${C}','operadora','Petrolera Circuito','J-995555555-5')
+        on conflict (id) do update set nombre = excluded.nombre;
+    `)
+    await q`insert into persona (id, organizacion_id, correo, nombre, metodo, clave_hash, totp_secreto)
+            values (${YO}, ${G},'circ@prueba.test','Ingeniero GPS','clave_2fa', ${hash}, ${SECRETO}),
+                   (${ING}, ${C},'circ-cli@prueba.test','Ingeniera Operadora','clave_2fa', ${hash}, ${SECRETO})
+            on conflict (id) do update set clave_hash = excluded.clave_hash`
+    await q.unsafe(`
+      insert into tasa_bcv (id, vigente_el, ves_por_usd, fuente)
+        values ('${TASA}','2026-09-15', 36.50,'carga_manual')
+        on conflict (id) do update set vigente_el = excluded.vigente_el;
+      insert into alicuota_iva (id, clase, porcentaje, vigente_desde)
+        values ('${IVA}','general', 16.00,'2026-01-01') on conflict do nothing;
+      insert into unidad_tributaria (vigente_desde, valor_ves) values ('2026-01-01', 9.00)
+        on conflict do nothing;
+      insert into concepto_islr (codigo, nombre_es, nombre_en, sujeto, porcentaje, factor_ut,
+                                 minimo_ut, vigente_desde)
+        values ('SERV-PJ','Servicios','Services','pj_domiciliada', 5.00, 83.3334, 0,'2026-01-01')
+        on conflict do nothing;
+    `)
+  })
+})
+after(async () => {
+  await cerrar()
+  await rm(raiz, { recursive: true, force: true })
+})
+
+test('de dar de alta un contrato a que el cliente lo apruebe, sin tocar la base de datos', async () => {
+  const gps = await entrar('circ@prueba.test')
+  const afG = testigoAnti(gps)
+  const codigo = `CIRC-${Date.now() % 1000000}`
+
+  // ---------------------------------------------------------------- 1. el alta
+  const alta = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie: gps,
+    campos: {
+      af: afG, accion: 'crear', cliente: C, codigo, tipo: 'procura',
+      titulo_es: 'Cabezales de pozo', titulo_en: 'Wellheads', moneda: 'USD',
+      inicio: '2026-01-01', fin_previsto: '2026-12-31',
+      anticipo_pct: '0', amortiza_pct: '0', garantia_pct: '5', filas: '3',
+    },
+    repetidos: {
+      r_desc_es: ['Cabezal 11" 5M', '', ''],
+      r_desc_en: ['11" 5M wellhead', '', ''],
+      r_cantidad: ['2', '', ''], r_unidad: ['unidad', '', ''],
+      r_norma: ['API 6A PSL-3', '', ''], r_espec: ['', '', ''],
+      r_precio: ['100000', '', ''], r_costo: ['62000', '', ''],
+    },
+  })
+  assert.equal(alta.codigo, 303, 'el contrato se crea')
+  const rutaContrato = alta.cabeceras!['Location']!
+  const contratoId = rutaContrato.split('/').pop()!
+
+  // Nació en borrador, con sus cinco hitos, y el cliente todavía no lo ve.
+  const cli = await entrar('circ-cli@prueba.test')
+  assert.equal((await pedir({ ruta: rutaContrato, cookie: cli })).codigo, 404)
+
+  // ---------------------------------------------------- 2. ponerlo en vigor
+  const activo = await pedir({
+    metodo: 'POST', ruta: `${rutaContrato}/activar`, cookie: gps, campos: { af: afG },
+  })
+  assert.equal(activo.codigo, 303)
+  assert.equal((await pedir({ ruta: rutaContrato, cookie: cli })).codigo, 200,
+    'ahora el cliente sí lo ve')
+
+  // El avance arranca en cero y se puede abrir para ver por qué.
+  const [renglon] = (await dentro((q) => q`
+    select id from renglon where contrato_id = ${contratoId}::uuid
+  `)) as unknown as Array<{ id: string }>
+  const avance0 = await pedir({ ruta: `/renglones/${renglon!.id}`, cookie: gps })
+  assert.match(avance0.cuerpo!, /class="ba-v" style="width:0%"/)
+
+  // ------------------------------------------------- 3. subir el certificado
+  const [hito] = (await dentro((q) => q`
+    select id from hito where renglon_id = ${renglon!.id}::uuid and clave = 'fabricado'
+  `)) as unknown as Array<{ id: string }>
+
+  const subida = await pedir({
+    metodo: 'POST', ruta: `/hitos/${hito!.id}/evidencia`, cookie: gps,
+    campos: { af: afG, clase: 'certificado', ocurrido_en: '2026-06-15',
+              volver: `/renglones/${renglon!.id}` },
+    archivo: { archivo: 'MTR-colada-44821.pdf', tipoMime: 'application/pdf',
+               contenido: new TextEncoder().encode('%PDF certificado de colada 44821') },
+  })
+  assert.equal(subida.codigo, 303)
+
+  // Con el papel subido pero sin revisar, el avance SIGUE en cero.
+  const avance1 = await pedir({ ruta: `/renglones/${renglon!.id}`, cookie: gps })
+  assert.match(avance1.cuerpo!, /class="ba-v" style="width:0%"/)
+  assert.match(avance1.cuerpo!, /Con documento, sin revisar/)
+
+  // Y no hay nada que facturar todavía: lo evidenciado no es lo verificado.
+  const sinFacturar = await pedir({ ruta: `${rutaContrato}/valuar`, cookie: gps })
+  assert.match(sinFacturar.cuerpo!, /Sin evidencia no se factura/)
+
+  // ----------------------------------------------------- 4. verificarlo
+  const [evi] = (await dentro((q) => q`
+    select id from evidencia where hito_id = ${hito!.id}::uuid
+  `)) as unknown as Array<{ id: string }>
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `/evidencia/${evi!.id}/verificar`, cookie: gps,
+    campos: { af: afG, volver: `/renglones/${renglon!.id}` },
+  })).codigo, 303)
+
+  // Ahora sí: el avance sube al peso del hito, y el cliente lo puede auditar.
+  const avance2 = await pedir({ ruta: `/renglones/${renglon!.id}`, cookie: cli })
+  assert.match(avance2.cuerpo!, /class="ba-v" style="width:30%/)
+  assert.match(avance2.cuerpo!, /MTR-colada-44821\.pdf/)
+
+  // -------------------------------------- 5. la valuación, desde lo verificado
+  const propuesta = await pedir({ ruta: `${rutaContrato}/valuar`, cookie: gps })
+  assert.equal(propuesta.codigo, 200)
+  // 30% de 200.000 = 60.000. Nadie ha tecleado esa cifra.
+  assert.match(propuesta.cuerpo!, /60\.000,00/)
+  assert.match(propuesta.cuerpo!, /fabricado/)
+  assert.equal(propuesta.cuerpo!.includes('name="obra"'), false)
+
+  const emitida = await pedir({
+    metodo: 'POST', ruta: `${rutaContrato}/valuar`, cookie: gps,
+    campos: { af: afG, desde: '2026-06-01', hasta: '2026-06-30' },
+  })
+  assert.equal(emitida.codigo, 303)
+  const rutaVal = emitida.cabeceras!['Location']!
+
+  // En borrador el cliente todavía no la ve.
+  assert.equal((await pedir({ ruta: rutaVal, cookie: cli })).codigo, 404)
+
+  // ---------------------------------------------------- 6. presentarla
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/presentar`, cookie: gps, campos: { af: afG },
+  })).codigo, 303)
+
+  const hoja = await pedir({ ruta: rutaVal, cookie: cli })
+  assert.equal(hoja.codigo, 200)
+  assert.match(hoja.cuerpo!, /60\.000,00/)
+
+  // Y al cliente se le ha encolado el aviso, sin que nadie se acuerde de nada.
+  const [val] = (await dentro((q) => q`
+    select id from valuacion where contrato_id = ${contratoId}::uuid
+  `)) as unknown as Array<{ id: string }>
+  const avisos = (await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    return q`select tipo::text from aviso where sobre_id = ${val!.id}::uuid`
+  })) as unknown as Array<{ tipo: string }>
+  assert.ok(avisos.some((a) => a.tipo === 'valuacion_presentada'))
+
+  // ------------------------------------------------ 7. el cliente objeta
+  const afC = testigoAnti(cli)
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/objetar`, cookie: cli,
+    campos: { af: afC, motivo: 'El certificado no corresponde a la colada del cabezal' },
+  })).codigo, 303)
+
+  // A GPS le entra en la bandeja, sin tener que acordarse de mirar.
+  const bandeja = await pedir({ ruta: '/', cookie: gps })
+  assert.match(bandeja.cuerpo!, /Objeción sin responder/)
+
+  // -------------------------------------------- 8. GPS responde, el cliente aprueba
+  const [obj] = (await dentro((q) => q`
+    select id from objecion where valuacion_id = ${val!.id}::uuid
+  `)) as unknown as Array<{ id: string }>
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `/objeciones/${obj!.id}/responder`, cookie: gps,
+    campos: { af: afG, respuesta: 'Revisado: la colada 44821 es la del cabezal 2',
+              volver: rutaVal },
+  })).codigo, 303)
+
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/aprobar`, cookie: cli, campos: { af: afC },
+  })).codigo, 303)
+
+  const [final] = (await dentro((q) => q`
+    select estado::text, aprobada_por, origen_obra, obra::text
+      from valuacion where id = ${val!.id}::uuid
+  `)) as unknown as Array<Record<string, string>>
+  assert.equal(final!['estado'], 'aprobada')
+  assert.equal(final!['aprobada_por'], ING, 'firmó el cliente, no GPS')
+  assert.equal(final!['origen_obra'], 'hitos_evidenciados')
+  assert.equal(final!['obra'], '60000.00')
+})
