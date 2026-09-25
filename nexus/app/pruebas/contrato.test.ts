@@ -10,6 +10,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { ficha, ContratoNoAlcanzable } from '../src/dominio/contrato.ts'
+import { cabeceraDeValuacion, ValuacionNoAlcanzable } from '../src/dominio/valuacion.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = '2b3c4d5e-0000-0000-0000-00000000000a'
@@ -163,4 +164,24 @@ test('el total de un renglón es cantidad por precio, no un campo guardado', () 
     // 6 válvulas × 18.500 = 111.000
     assert.match(f.renglones[1]!.total, /111[.,]000/)
   })
+})
+
+test('la cabecera de la valuación trae la moneda del contrato, no una fija', () => {
+  // Poner VES fijo daba cifras en bolívares para un contrato en dólares. La moneda
+  // tiene que salir del contrato, siempre.
+  return dentro(async (q) => {
+    const c = await cabeceraDeValuacion(q, '2b3c4d5e-3333-0000-0000-00000000000a')
+    assert.equal(c.moneda, 'USD')
+    assert.equal(c.contrato, 'FICHA-A-001')
+    assert.equal(c.numero, 1)
+    assert.equal(c.estado, 'presentada')
+    assert.equal(c.contratoId, CTR_A)
+  })
+})
+
+test('la cabecera de una valuación ajena tampoco se alcanza', () => {
+  return assert.rejects(
+    comoCliente((q) => cabeceraDeValuacion(q, '2b3c4d5e-9999-0000-0000-000000000000')),
+    ValuacionNoAlcanzable,
+  )
 })

@@ -102,3 +102,49 @@ export function encabezado(idioma: Idioma) {
     neto: t('valuacion.neto'),
   }
 }
+
+export type CabeceraValuacion = {
+  readonly contratoId: string
+  readonly contrato: string
+  readonly cliente: string
+  readonly numero: number
+  readonly desde: Date
+  readonly hasta: Date
+  readonly moneda: 'VES' | 'USD'
+  readonly estado: string
+}
+
+/**
+ * Los datos de cabecera de una valuación.
+ *
+ * Va aparte de la hoja porque la moneda sale de aquí: la hoja no puede formatear
+ * importes hasta saber en qué moneda está el contrato, y ponerla fija era un
+ * apaño que habría dado cifras en bolívares para contratos en dólares.
+ */
+export async function cabeceraDeValuacion(
+  q: Consulta, valuacionId: string,
+): Promise<CabeceraValuacion> {
+  const [c] = (await q`
+    select v.numero, v.periodo_desde, v.periodo_hasta, v.moneda, v.estado::text,
+           ct.id as contrato_id, ct.codigo as contrato, o.nombre as cliente
+      from valuacion v
+      join contrato ct on ct.id = v.contrato_id
+      join organizacion o on o.id = ct.cliente_id
+     where v.id = ${valuacionId}::uuid
+  `) as unknown as Array<{
+    numero: number; periodo_desde: Date; periodo_hasta: Date
+    moneda: 'VES' | 'USD'; estado: string; contrato_id: string
+    contrato: string; cliente: string
+  }>
+  if (!c) throw new ValuacionNoAlcanzable(valuacionId)
+  return {
+    contratoId: c.contrato_id,
+    contrato: c.contrato,
+    cliente: c.cliente,
+    numero: c.numero,
+    desde: c.periodo_desde,
+    hasta: c.periodo_hasta,
+    moneda: c.moneda,
+    estado: c.estado,
+  }
+}

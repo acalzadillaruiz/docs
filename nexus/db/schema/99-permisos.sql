@@ -35,5 +35,11 @@ grant select (id, contrato_id, numero, descripcion_es, descripcion_en,
 grant select on tasa_bcv, alicuota_iva, alicuota_igtf, concepto_islr, unidad_tributaria
   to nexus_cliente;
 
+-- Aprobar y objetar son las unicas cosas que el cliente escribe, y se le concede
+-- lo justo para eso: tres columnas de la valuacion, no la tabla entera. Con 'update'
+-- a secas podria marcarla como cobrada.
+grant update (estado, aprobada_el, aprobada_por) on valuacion to nexus_cliente;
+grant insert, select on objecion to nexus_cliente;
+
 -- La contabilidad no se concede en absoluto.
 revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;

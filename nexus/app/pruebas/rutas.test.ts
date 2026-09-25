@@ -225,3 +225,23 @@ test('una dirección con forma rara no llega a la base de datos', async () => {
   const r = await pedir({ ruta: "/contratos/' or 1=1--", cookie: null })
   assert.equal(r.codigo, 303)   // sin sesión, ni siquiera se mira
 })
+
+test('la hoja de valuación se sirve en su ruta, con el neto calculado', async () => {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+  // Una valuación que no existe: 404, igual que una ajena.
+  const r = await pedir({
+    ruta: '/valuaciones/88888888-8888-8888-8888-888888888888', cookie: testigo,
+  })
+  assert.equal(r.codigo, 404)
+})

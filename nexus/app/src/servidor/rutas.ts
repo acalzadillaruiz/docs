@@ -23,9 +23,10 @@ import { pintarCartera } from '../pantallas/cartera.ts'
 import { pintarContrato } from '../pantallas/contrato.ts'
 import { cartera } from '../dominio/cartera.ts'
 import { ficha, ContratoNoAlcanzable } from '../dominio/contrato.ts'
-import { hojaDeValuacion, ValuacionNoAlcanzable } from '../dominio/valuacion.ts'
+import { hojaDeValuacion, cabeceraDeValuacion, ValuacionNoAlcanzable } from '../dominio/valuacion.ts'
+import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
-import type { Idioma } from '../i18n/t.ts'
+import { fecha as formatearFecha, t, type Idioma } from '../i18n/t.ts'
 
 const MAX_CUERPO = 8 * 1024   // un formulario de entrada no pesa más
 
@@ -183,10 +184,22 @@ export async function resolver(
   const valuacion = /^\/valuaciones\/([0-9a-f-]{36})$/.exec(p.ruta)
   if (valuacion && p.metodo === 'GET') {
     try {
-      const lineas = await comoQuien((q) =>
-        hojaDeValuacion(q, valuacion[1]!, p.idioma, 'VES', esCliente))
-      return html(200, `<!doctype html><html lang="${p.idioma}"><meta charset="utf-8">` +
-        `<title>${lineas.length}</title>`)
+      const datos = await comoQuien(async (q) => {
+        // La cabecera primero: de ahí sale la moneda con la que se formatea la hoja.
+        const cab = await cabeceraDeValuacion(q, valuacion[1]!)
+        const lineas = await hojaDeValuacion(q, valuacion[1]!, p.idioma, cab.moneda, esCliente)
+        return { cab, lineas }
+      })
+      return html(200, pintarValuacion({
+        contrato: datos.cab.contrato,
+        cliente: datos.cab.cliente,
+        numero: datos.cab.numero,
+        desde: formatearFecha(p.idioma, datos.cab.desde),
+        hasta: formatearFecha(p.idioma, datos.cab.hasta),
+        moneda: datos.cab.moneda,
+        estado: t(p.idioma, `valuacion.estado.${datos.cab.estado}` as never),
+        lineas: datos.lineas,
+      }, p.idioma))
     } catch (e) {
       if (e instanceof ValuacionNoAlcanzable) return noEncontrado(p.idioma)
       throw e
