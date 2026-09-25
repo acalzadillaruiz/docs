@@ -91,7 +91,7 @@ export const ESTILOS_PERIODOS = `
 .abrir b{display:block;margin-top:4px;font-size:19px;font-weight:750;letter-spacing:-.02em;
   text-transform:capitalize}
 .abrir button{margin:0;font:inherit;font-size:14.5px;font-weight:700;padding:10px 20px;
-  border:0;border-radius:11px;background:var(--grt);color:#fff;cursor:pointer}
+  border:0;border-radius:11px;background:var(--grt);color:var(--sobre-grt);cursor:pointer}
 .pr{display:flex;align-items:center;gap:14px;padding:13px 16px;border-top:1px solid var(--ln)}
 .pr:first-child{border-top:0}
 .pr-c{flex:1;min-width:0}

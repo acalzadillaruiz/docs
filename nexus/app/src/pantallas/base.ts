@@ -30,7 +30,8 @@ export const ESTILOS_BASE = `
 :root{
   --nv:#0B2137; --nv2:#123049; --nv3:#1B4364; --gr:#12B76A; --grt:#07734A;
   --bg:#F1F2F0; --cd:#FFFFFF; --cd2:#FAFAF8;
-  --ik:#16202B; --ik2:#55616D; --md:#8A939C; --ln:#E3E4E1; --ln2:#D0D2CE;
+  --ik:#16202B; --ik2:#55616D; --md:#666F78; --ln:#E3E4E1; --ln2:#D0D2CE;
+  --enl:#1B4364; --sobre-grt:#FFFFFF;
   --am:#946307; --amb:#FDF3DF; --rj:#A8323C;
   --sh:0 1px 2px rgba(22,32,43,.05);
   --shx:0 1px 2px rgba(22,32,43,.05),0 16px 40px -28px rgba(22,32,43,.45);
@@ -38,12 +39,14 @@ export const ESTILOS_BASE = `
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#071726; --cd:#0D2338; --cd2:#102A42; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
   --ln:#1A3750; --ln2:#254B69; --grt:#3FE0A5; --am:#EFC167; --amb:#33280C; --rj:#E8737E;
+  --enl:#9CC4E4; --sobre-grt:#071726;
   --sh:0 1px 2px rgba(0,0,0,.45);
   --shx:0 1px 2px rgba(0,0,0,.45),0 16px 40px -28px rgba(0,0,0,.9);
 }}
 :root[data-theme="dark"]{
   --bg:#071726; --cd:#0D2338; --cd2:#102A42; --ik:#EDF2F6; --ik2:#A6B6C4; --md:#7A8B99;
   --ln:#1A3750; --ln2:#254B69; --grt:#3FE0A5; --am:#EFC167; --amb:#33280C; --rj:#E8737E;
+  --enl:#9CC4E4; --sobre-grt:#071726;
   --sh:0 1px 2px rgba(0,0,0,.45);
   --shx:0 1px 2px rgba(0,0,0,.45),0 16px 40px -28px rgba(0,0,0,.9);
 }

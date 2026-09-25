@@ -132,8 +132,10 @@ export const ESTILOS_LIBRO = `
 .tot-g span{display:block;font-size:8.5px;font-weight:700;letter-spacing:.13em;
   text-transform:uppercase;color:var(--md);margin-bottom:3px;font-family:"JetBrains Mono",monospace}
 .tot-x{margin:11px 0 0;font-size:12.5px;color:var(--md);line-height:1.45;max-width:64ch}
+/* El azul marino se lee sobre blanco y desaparece sobre el fondo oscuro, porque no
+   cambia con el tema. El color de enlace sí cambia. Lo escribí yo esta misma mañana. */
 .baja{display:inline-block;margin:16px 0 4px;font-size:14px;font-weight:650;
-  color:var(--nv3);text-decoration:none;border-bottom:1px solid var(--ln2);padding-bottom:1px}
+  color:var(--enl);text-decoration:none;border-bottom:1px solid var(--ln2);padding-bottom:1px}
 .baja:hover{color:var(--ik)}
 /* La tabla es ancha por naturaleza —son las columnas que pide el SENIAT—, así que en
    un móvil se arrastra ella sola en vez de arrastrar la página entera. */

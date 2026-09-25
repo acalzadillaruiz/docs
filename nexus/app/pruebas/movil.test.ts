@@ -1,5 +1,5 @@
 /**
- * Las pantallas DIBUJADAS, en un teléfono.
+ * Las pantallas DIBUJADAS: en un teléfono, y con los colores medidos.
  *
  * Todas las demás pruebas leen el HTML. Esta lo dibuja en un Chromium de verdad a
  * 360 × 740, que es un teléfono corriente, y mide lo que sale.
@@ -206,4 +206,116 @@ test('la cabecera de la cartera NO vuelve a medir 1077 px', async () => {
   await ctx.close()
   assert.ok(cabecera > 0 && cabecera <= TELEFONO.width,
     `la cabecera mide ${cabecera} px sobre una pantalla de ${TELEFONO.width}`)
+})
+
+
+// ===========================================================================
+// El contraste, medido.
+//
+// Nadie lo había medido nunca: los colores se eligieron mirándolos en una pantalla
+// buena, de noche, dentro de casa. Este portal se usa en un patio de Zulia a
+// mediodía, y ahí un gris claro sobre fondo claro sencillamente no está.
+//
+// El umbral es el de la norma de accesibilidad (WCAG AA): 4.5 a 1 para texto normal,
+// 3 a 1 para texto grande. No es un gusto: es el punto donde la gente con la vista
+// cansada —que en una empresa son unos cuantos— deja de poder leer.
+//
+// Se mide en los DOS temas. Un color que no cambia con el tema se lee en uno y
+// desaparece en el otro, y eso no se ve leyendo el CSS.
+
+/**
+ * Calcula el contraste de cada texto contra su fondo real, dentro del navegador.
+ *
+ * Ojo con las barras: esto es una plantilla de TypeScript, y dentro de una plantilla
+ * `\d` se queda en `d`. Hay que escribir `\\d` para que al navegador le llegue `\d`.
+ * La primera versión se quedó con `[d.]+`, que no casa con nada: todos los colores
+ * salían negros, el contraste daba 1:1 y la prueba «encontró» cien fallos que no
+ * existían. Una prueba que falla de mentira cuesta lo mismo que una que pasa en vano.
+ */
+const MEDIR_CONTRASTE = `(() => {
+  const lum = (c) => {
+    const m = (c.match(/[\\d.]+/g) || ['0','0','0']).map(Number)
+    const f = (v) => { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+    return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2])
+  }
+  // El fondo de verdad: el primero que no sea transparente subiendo por los padres.
+  const fondoDe = (e) => {
+    let p = e
+    while (p) {
+      const b = getComputedStyle(p).backgroundColor
+      const m = b.match(/[\\d.]+/g)
+      if (m && (m.length < 4 || Number(m[3]) > 0.5)) return b
+      p = p.parentElement
+    }
+    return 'rgb(255,255,255)'
+  }
+  const malos = []
+  for (const e of Array.from(document.querySelectorAll('*'))) {
+    const tieneTextoPropio = Array.from(e.childNodes)
+      .some((n) => n.nodeType === 3 && n.textContent.trim())
+    if (!tieneTextoPropio) continue
+    const s = getComputedStyle(e)
+    const c = e.getBoundingClientRect()
+    if (c.width === 0 || c.height === 0 || s.visibility === 'hidden') continue
+    const l1 = lum(s.color), l2 = lum(fondoDe(e))
+    const razon = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+    const px = parseFloat(s.fontSize)
+    const grande = px >= 24 || (px >= 18.66 && Number(s.fontWeight) >= 700)
+    const minimo = grande ? 3 : 4.5
+    if (razon < minimo) {
+      malos.push((e.textContent || '').trim().slice(0, 24) + ' [' + s.color + ' sobre ' +
+        fondoDe(e) + ', ' + px + 'px, ' + (Math.round(razon * 100) / 100) + ':1 < ' + minimo + ']')
+    }
+  }
+  return malos
+})()`
+
+for (const tema of ['light', 'dark'] as const) {
+  test(`todo el texto se lee, en tema ${tema === 'light' ? 'claro' : 'oscuro'}`, async () => {
+    const ctx = await nav.newContext({
+      viewport: { width: 1100, height: 900 }, colorScheme: tema,
+    })
+    await ctx.route('**://**', (r) => r.abort())
+    const page = await ctx.newPage()
+
+    let mirados = 0
+    const problemas: string[] = []
+    for (const ruta of PANTALLAS) {
+      const r = await pedir({ ruta, cookie: gps })
+      await page.setContent(r.cuerpo ?? '', { waitUntil: 'load' })
+      const malos = await page.evaluate(MEDIR_CONTRASTE) as string[]
+      mirados++
+      for (const m of malos) problemas.push(`${ruta} · ${m}`)
+    }
+    await ctx.close()
+
+    // La red contra pasar en vano: si no se dibujó nada, esto no comprobó nada.
+    assert.equal(mirados, PANTALLAS.length)
+    assert.deepEqual(problemas, [],
+      `texto que no se lee en tema ${tema}:\n  ${problemas.join('\n  ')}`)
+  })
+}
+
+test('el color de enlace y el del botón verde CAMBIAN con el tema', async () => {
+  // Los dos fallos que encontró esta prueba eran del mismo tipo: un color fijo que se
+  // lee en un tema y desaparece en el otro. Un azul marino sobre fondo oscuro, y
+  // blanco sobre verde menta. Que el token exista no basta: tiene que cambiar.
+  const leer = async (tema: 'light' | 'dark') => {
+    const ctx = await nav.newContext({ viewport: TELEFONO, colorScheme: tema })
+    await ctx.route('**://**', (r) => r.abort())
+    const page = await ctx.newPage()
+    await page.setContent((await pedir({ ruta: '/', cookie: gps })).cuerpo ?? '',
+      { waitUntil: 'load' })
+    const v = await page.evaluate(`(() => {
+      const s = getComputedStyle(document.documentElement)
+      return [s.getPropertyValue('--enl').trim(), s.getPropertyValue('--sobre-grt').trim()]
+    })()`) as string[]
+    await ctx.close()
+    return v
+  }
+  const claro = await leer('light')
+  const oscuro = await leer('dark')
+  assert.ok(claro[0] && oscuro[0], 'falta el color de enlace')
+  assert.notEqual(claro[0], oscuro[0], 'el color de enlace no cambia con el tema')
+  assert.notEqual(claro[1], oscuro[1], 'el color sobre el verde no cambia con el tema')
 })
