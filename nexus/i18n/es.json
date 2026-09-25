@@ -193,5 +193,20 @@
   "medida.cobertura_explicacion": "Lo vendido que todavía no tiene ningún costo debajo",
   "medida.mediana": "Mediana",
   "medida.peor": "Peor caso",
-  "medida.dias": "días"
+  "medida.dias": "días",
+  "aviso.objecion_nueva.asunto": "El cliente objetó la valuación {valuacion} de {contrato}",
+  "aviso.objecion_nueva.cuerpo": "Hay una objeción sin responder. Mientras siga abierta, esa valuación no se puede facturar.",
+  "aviso.objecion_respondida.asunto": "GPS respondió tu objeción sobre la valuación {valuacion}",
+  "aviso.objecion_respondida.cuerpo": "Ya puedes revisar la respuesta y decidir.",
+  "aviso.valuacion_presentada.asunto": "Valuación {valuacion} de {contrato}, lista para tu revisión",
+  "aviso.valuacion_presentada.cuerpo": "Puedes verla línea por línea, aprobarla u objetarla. Si algo no cuadra, dilo ahí y queda por escrito.",
+  "aviso.valuacion_aprobada.asunto": "El cliente aprobó la valuación {valuacion} de {contrato}",
+  "aviso.valuacion_aprobada.cuerpo": "Ya se puede facturar.",
+  "aviso.evidencia_sin_revisar.asunto": "{dias} días sin revisar un documento de {contrato}",
+  "aviso.evidencia_sin_revisar.cuerpo": "Mientras está sin revisar, el avance que sostiene no cuenta y el contrato parece más atrasado de lo que está.",
+  "aviso.hito_atrasado.asunto": "Se pasó la fecha del hito «{hito}» en {contrato}",
+  "aviso.hito_atrasado.cuerpo": "Lleva {dias} días pasada la fecha prevista y todavía no tiene evidencia.",
+  "aviso.ver": "Verlo en GPS Nexus",
+  "aviso.firma": "Este aviso sale de GPS Nexus. Puedes dejar de recibir este tipo de aviso desde tu perfil.",
+  "aviso.hola": "Hola {nombre},"
 }

@@ -193,5 +193,20 @@
   "medida.cobertura_explicacion": "Sold work with no cost booked underneath it",
   "medida.mediana": "Median",
   "medida.peor": "Worst case",
-  "medida.dias": "days"
+  "medida.dias": "days",
+  "aviso.objecion_nueva.asunto": "The client disputed progress payment {valuacion} on {contrato}",
+  "aviso.objecion_nueva.cuerpo": "There is an unanswered dispute. While it stays open, that progress payment cannot be invoiced.",
+  "aviso.objecion_respondida.asunto": "GPS answered your dispute on progress payment {valuacion}",
+  "aviso.objecion_respondida.cuerpo": "You can now read the answer and decide.",
+  "aviso.valuacion_presentada.asunto": "Progress payment {valuacion} on {contrato} is ready for your review",
+  "aviso.valuacion_presentada.cuerpo": "You can review it line by line, approve it or dispute it. If something is off, say so there and it stays on record.",
+  "aviso.valuacion_aprobada.asunto": "The client approved progress payment {valuacion} on {contrato}",
+  "aviso.valuacion_aprobada.cuerpo": "It can now be invoiced.",
+  "aviso.evidencia_sin_revisar.asunto": "A document on {contrato} has gone {dias} days without review",
+  "aviso.evidencia_sin_revisar.cuerpo": "While it is unreviewed, the progress it supports does not count and the contract looks further behind than it is.",
+  "aviso.hito_atrasado.asunto": "The planned date for milestone “{hito}” on {contrato} has passed",
+  "aviso.hito_atrasado.cuerpo": "It is {dias} days past its planned date and still has no evidence.",
+  "aviso.ver": "Open it in GPS Nexus",
+  "aviso.firma": "This notice comes from GPS Nexus. You can turn off this kind of notice from your profile.",
+  "aviso.hola": "Hi {nombre},"
 }
