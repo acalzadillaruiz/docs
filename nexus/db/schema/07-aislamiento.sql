@@ -115,7 +115,16 @@ create policy renglon_escritura on renglon for all
                        where c.id = renglon.contrato_id
                          and es_interna() and c.organizacion_id = org_actual()));
 create policy valuacion_escritura on valuacion for all using (es_interna() and organizacion_id = org_actual());
-create policy asiento_escritura   on asiento   for all using (es_interna() and organizacion_id = org_actual());
+create policy asiento_escritura   on asiento   for all
+  using (es_interna() and organizacion_id = org_actual())
+  with check (es_interna() and organizacion_id = org_actual());
+
+-- Los documentos fiscales tenian politica de LECTURA y no de escritura, igual que
+-- los renglones. No se noto mientras las facturas solo entraban por SQL; salto el
+-- dia que el importador empezo a crearlas de verdad.
+create policy documento_escritura on documento_fiscal for all
+  using (es_interna() and organizacion_id = org_actual())
+  with check (es_interna() and organizacion_id = org_actual());
 create policy partida_escritura   on partida   for all using (es_interna() and organizacion_id = org_actual());
 
 -- Los permisos por columna viven en 99-permisos.sql, que se carga el ultimo.
