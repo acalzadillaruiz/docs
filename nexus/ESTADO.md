@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 117 de 141 sesiones · **83%**
+**Avance:** 118 de 141 sesiones · **84%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -49,8 +49,13 @@ Y **el mes entero por HTTP**: abrir → importar → libro → bajarlo → cerra
 comprobar que cerrado ya no entra nada. Encajar los tramos sacó **dos fallos reales**
 (abajo).
 
-Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12` y `17a0e0b`.
-**777 comprobaciones** (250 de SQL y diccionario + 527 de TypeScript), todas pasando.
+Y **el barrido de formularios**: cada pantalla, cada formulario, mandado en blanco
+como lo mandaría el navegador. Las once aguantan, las que rechazan lo dicen por
+escrito, y el libro sigue cuadrado después.
+
+Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`
+y `16f9c03`. **793 comprobaciones** (250 de SQL y diccionario + 543 de TypeScript),
+todas pasando.
 
 **Los dos fallos, porque la lección vale más que el arreglo:**
 
@@ -66,9 +71,17 @@ Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12` y `17a0
 **Y por qué no se vieron antes:** la prueba del importador **escribía el formulario a
 mano**, perfectamente alineado. Una prueba que fabrica la entrada en vez de devolver
 la que salió comprueba que el servidor entiende lo que la prueba imagina, no lo que
-la pantalla manda. `pruebas/formulario.ts` existe para eso y se salta los selects
-deshabilitados igual que el navegador. **Usarlo siempre que se devuelva un
-formulario.**
+la pantalla manda. `pruebas/formulario.ts` existe para eso: modela las reglas del
+navegador —`disabled` no se manda, un `<select>` sin marcar manda **la primera**
+opción y no una cadena vacía, una casilla sin marcar no se manda—. **Usarlo siempre
+que se devuelva un formulario.**
+
+**Tercera trampa, de la propia prueba y casi se cuela:** el barrido usaba UNA sesión,
+y el primer formulario de la cartera es el de **salir**. Se quedó sin sesión en la
+pantalla uno y las diez siguientes pasaron **en vano**, contestando 303 a todo. Ahora
+cada pantalla abre su sesión y al final se comprueba que sigue viva. **Una prueba de
+barrido necesita siempre una afirmación que falle si el barrido no comprobó nada** —
+si no, pasa sola y nadie vuelve a mirarla.
 
 **Trampa cara, apuntada aquí porque se va a volver a leer mal:** el signo del
 resultado monetario (REME) se lee **al revés** de lo que parece. **Positivo es
@@ -83,10 +96,7 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **Los demás formularios, devueltos como los devuelve el navegador.** El del
-   importador ya está; el alta de contrato y el mapeo de banco siguen probados con
-   entradas escritas a mano, que es donde se escondían estos dos fallos.
-3. **Los dos destinos que el importador todavía no materializa** (`valuaciones` y
+2. **Los dos destinos que el importador todavía no materializa** (`valuaciones` y
    `cobros`): `validar_lote` ya los conoce, pero `confirmar_lote` no crea nada con
    ellos. Están a la vista en el reparto de `26-importar-ventas.sql`.
 
@@ -310,6 +320,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/26-importar-ventas.sql` | El histórico de ventas por Excel. Aquí el número **no** lo pone la base de datos, al revés que en `siguiente_factura`: estas facturas ya existen, ya las tiene el cliente y ya se declararon. No se asienta lo que ya tiene asiento — cargar el histórico encima de lo vivo **duplicando el ingreso** es el error clásico de esta operación. El ingreso va a la cuenta del **tipo del contrato**, no a un cajón de «ingresos». |
 | `app/src/dominio/libros.ts` · `pantallas/libros.ts` | Los libros de ventas y compras. **Lo único de esta aplicación que sale con destino al SENIAT.** No son una tabla: salen de las facturas que ya existen — un libro tecleado aparte acaba discrepando del sistema, y entonces hay dos verdades. Los totales van **arriba**, que es lo que se copia en la declaración. Una compra **sin número de control** sale señalada: sin control no hay crédito fiscal y la retención pasa al 100%. |
 | `app/pruebas/dia-uno.test.ts` | El día 1: empresa recién creada, base vacía, **sin cargar ni un dato a propósito**. Cada pantalla responde, no suelta «undefined», tiene salida, y el cliente recibe en la contabilidad **el mismo 404 que ante una dirección inventada** — un 403 confirmaría que existe. |
+| `app/pruebas/formulario.ts` · `formularios.test.ts` | Devolver un formulario **como lo devuelve el navegador**, y mandarlos todos en blanco. Modela las reglas que no son intuitivas y que ya escondieron dos fallos. Cada pantalla abre su propia sesión y se comprueba que sigue viva al final: sin eso, el barrido pasa sin comprobar nada. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
