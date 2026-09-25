@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 10:15 (España)
-**Avance:** 93 de 141 sesiones · **66%**
+**Última actualización:** 2026-09-25, 10:55 (España)
+**Avance:** 96 de 141 sesiones · **68%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -12,7 +12,9 @@ bajando sola. La prueba de circuito llega ahora hasta el final: contrato → hit
 verificado → valuación → aprobada → **cobrada**, todo por HTTP y sin tocar la base de
 datos. Y **los meses contables** se abren y cierran desde la
 aplicación, que es lo que desbloquea el día 1 de cada mes. Y **la factura fiscal se emite** desde una
-valuación aprobada, con su correlativo puesto por la base de datos. Commit `c95606e`. **621 comprobaciones.**
+valuación aprobada, con su correlativo puesto por la base de datos. Y **las notas de crédito y débito**, con su
+pantalla: una factura emitida no se toca, se corrige con una nota que deja las dos en
+el libro. Commit `8134db5`. **622 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
@@ -24,11 +26,9 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
    usa la primera semana y se abandona la tercera.
-3. **La pantalla de las notas de crédito y débito.** La base de datos ya las emite y
-   están probadas (`emitir_nota()`); falta el botón desde la factura emitida.
-4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
+3. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
    falta la ruta que lo recibe y la pantalla que manda a la operadora.
-5. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
+4. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
    no lo usa ninguna pantalla.
 
 **Cómo continuar, literalmente:**
@@ -50,7 +50,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-621 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
+622 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -457,6 +457,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 232 | La de débito **suma**: confundirla con la de crédito invierte el signo del mes. |
 | 233 | Una nota no corrige otra nota, y **sin motivo no entra** — ni por la puerta de atrás. |
 | 234 | El motivo **se guarda**: exigirlo y no guardarlo es peor que no exigirlo. |
+| 235 | La pantalla enseña **lo que queda facturado** en cuanto hay una nota, no solo el original. |
+| 236 | El signo va delante y con color: la de crédito en rojo, la de débito en verde. |
+| 237 | El cliente **no corrige** la factura que recibe. |
 
 ## Lo que sigue
 
