@@ -8,12 +8,34 @@ DATOS=${DATOS:-/var/tmp/nexuspg}
 export PATH=/usr/lib/postgresql/16/bin:$PATH
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 
+# El PostgreSQL de pruebas es desechable y vive fuera del repositorio. Entre
+# ejecuciones el contenedor puede haberse llevado el proceso por delante, asi que
+# aqui se contemplan los tres casos: ya esta corriendo, esta el directorio pero el
+# proceso no, y no hay nada. El tercero es el unico que vuelve a inicializar.
+arrancar_postgres() {
+  su postgres -c "PATH=$PATH pg_ctl -D $DATOS -o '-k /var/tmp -p $PUERTO -c listen_addresses=' -l /var/tmp/pg.log start" >/dev/null 2>&1 || true
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    pg_isready -h /var/tmp -p "$PUERTO" -q 2>/dev/null && return 0
+    sleep 1
+  done
+  return 1
+}
+
 if ! pg_isready -h /var/tmp -p "$PUERTO" -q 2>/dev/null; then
-  rm -rf "$DATOS"; mkdir -p "$DATOS"
-  chown postgres:postgres "$DATOS"; chmod 700 "$DATOS"
-  su postgres -c "PATH=$PATH initdb -D $DATOS -U nexus --auth=trust -E UTF8" >/dev/null
-  su postgres -c "PATH=$PATH pg_ctl -D $DATOS -o '-k /var/tmp -p $PUERTO -c listen_addresses=' -l /var/tmp/pg.log start" >/dev/null
-  sleep 2
+  if [ -f "$DATOS/PG_VERSION" ]; then
+    # El directorio esta bien; lo que falta es el proceso. Se quita el pid huerfano,
+    # que si no hace que pg_ctl crea que ya hay otro servidor.
+    rm -f "$DATOS/postmaster.pid"
+    echo "levantando el PostgreSQL de pruebas…"
+    arrancar_postgres || { echo "no se pudo levantar; se reinicializa"; rm -rf "$DATOS"; }
+  fi
+  if ! pg_isready -h /var/tmp -p "$PUERTO" -q 2>/dev/null; then
+    echo "creando el PostgreSQL de pruebas desde cero…"
+    rm -rf "$DATOS"; mkdir -p "$DATOS"
+    chown postgres:postgres "$DATOS"; chmod 700 "$DATOS"
+    su postgres -c "PATH=$PATH initdb -D $DATOS -U nexus --auth=trust -E UTF8" >/dev/null
+    arrancar_postgres || { echo "FALLO · no hay PostgreSQL con el que probar"; exit 1; }
+  fi
 fi
 
 P="psql -h /var/tmp -p $PUERTO -U nexus"
