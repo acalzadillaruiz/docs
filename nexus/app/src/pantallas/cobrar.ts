@@ -111,9 +111,6 @@ export const ESTILOS_COBRAR = `
 .cb-m{margin-top:3px;font-size:12.5px;color:var(--ik2)}
 .cb-i{font-family:"JetBrains Mono",monospace;font-size:14.5px;font-weight:700;
   letter-spacing:-.02em;white-space:nowrap}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);border-left-width:3px;
-  border-radius:11px;padding:13px 17px}
-.mal-caja li{color:var(--rj);font-weight:600;font-size:14px}
 form button{margin-top:16px;font:inherit;font-size:15px;font-weight:700;padding:11px 22px;
   border:0;border-radius:11px;background:var(--nv);color:#E9F0F6;cursor:pointer}
 form button:hover{background:var(--nv3)}

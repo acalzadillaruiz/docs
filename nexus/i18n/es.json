@@ -679,5 +679,13 @@
   "alta.error.renglon": "Cada renglón necesita su descripción en los dos idiomas, su unidad, una cantidad mayor que cero y un precio",
   "alta.error.porcentaje": "Los porcentajes de anticipo, amortización y garantía van del 0 al 100",
   "importar.error.sin_hoja": "No llegó ninguna hoja. Elige el archivo antes de subirlo.",
-  "accion.error.ya_vigente": "Ese contrato ya no es un borrador: ya está en vigor"
+  "accion.error.ya_vigente": "Ese contrato ya no es un borrador: ya está en vigor",
+  "accion.error.estado": "Eso ya se movió: alguien lo cambió mientras tenías la página abierta. Recárgala y mira cómo está ahora.",
+  "accion.error.no_te_toca": "Esa acción la hace la otra parte, no tú",
+  "accion.error.sin_motivo": "Hay que decir por qué, por escrito. Sin motivo, dentro de un mes nadie sabrá de qué iba.",
+  "accion.error.ya_revisada": "Ese documento ya lo revisó alguien",
+  "subir.error.sin_archivo": "No llegó ningún archivo. Elígelo antes de subirlo.",
+  "subir.error.tipo": "Ese tipo de archivo no se acepta como evidencia: un PDF, una foto o una hoja de cálculo sí.",
+  "subir.error.clase": "Hay que decir qué clase de papel es: un acta, una factura, un certificado…",
+  "subir.error.vacio": "Ese archivo está vacío: cero bytes. No respalda nada."
 }

@@ -679,5 +679,13 @@
   "alta.error.renglon": "Every line item needs its description in both languages, its unit, a quantity greater than zero, and a price",
   "alta.error.porcentaje": "The advance, amortisation and retention percentages run from 0 to 100",
   "importar.error.sin_hoja": "No sheet arrived. Choose the file before uploading it.",
-  "accion.error.ya_vigente": "That contract is no longer a draft: it is already active"
+  "accion.error.ya_vigente": "That contract is no longer a draft: it is already active",
+  "accion.error.estado": "That has already moved: somebody changed it while your page was open. Reload it and see where it stands now.",
+  "accion.error.no_te_toca": "That action belongs to the other side, not to you",
+  "accion.error.sin_motivo": "You have to say why, in writing. Without a reason, in a month nobody will know what it was about.",
+  "accion.error.ya_revisada": "Somebody has already reviewed that document",
+  "subir.error.sin_archivo": "No file arrived. Choose it before uploading.",
+  "subir.error.tipo": "That file type is not accepted as evidence: a PDF, a photo or a spreadsheet is.",
+  "subir.error.clase": "You have to say what kind of document it is: a report, an invoice, a certificate…",
+  "subir.error.vacio": "That file is empty: zero bytes. It backs nothing up."
 }

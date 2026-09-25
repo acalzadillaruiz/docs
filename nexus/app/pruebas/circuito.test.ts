@@ -238,6 +238,21 @@ test('de dar de alta un contrato a que el cliente lo apruebe, sin tocar la base 
     metodo: 'POST', ruta: `${rutaVal}/aprobar`, cookie: cli, campos: { af: afC },
   })).codigo, 303)
 
+  // Y si el cliente vuelve a pulsar «Aprobar» —porque tenía la página abierta desde
+  // antes, que es lo que pasa de verdad— se le DICE. Antes se le contestaba con una
+  // página en blanco, y el cliente no tiene a quién preguntarle qué acaba de pasar.
+  const otra = await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/aprobar`, cookie: cli, campos: { af: afC },
+  })
+  assert.equal(otra.codigo, 303)
+  assert.match(otra.cabeceras!['Location']!, /fallo=estado_equivocado/)
+  const conAviso = await pedir({
+    ruta: rutaVal, cookie: cli, campos: { fallo: 'estado_equivocado' },
+  })
+  assert.equal(conAviso.codigo, 200)
+  assert.match(conAviso.cuerpo!, /mientras tenías la página abierta/)
+  assert.equal(conAviso.cuerpo!.includes('‹falta:'), false)
+
   const [final] = (await dentro((q) => q`
     select estado::text, aprobada_por, origen_obra, obra::text
       from valuacion where id = ${val!.id}::uuid
@@ -397,10 +412,17 @@ test('la factura se emite con su correlativo, y el cliente la ve en su valuació
   const rutaVal = emitida.cabeceras!['Location']!
   await pedir({ metodo: 'POST', ruta: `${rutaVal}/presentar`, cookie: gps, campos: { af: afG } })
 
-  // Antes de que el cliente apruebe, no se factura.
-  assert.equal((await pedir({
+  // Antes de que el cliente apruebe, no se factura — y se DICE por qué, en la hoja,
+  // en vez de contestar con una página en blanco.
+  const pronto = await pedir({
     metodo: 'POST', ruta: `${rutaVal}/facturar`, cookie: gps, campos: { af: afG },
-  })).codigo, 409)
+  })
+  assert.equal(pronto.codigo, 303)
+  assert.match(pronto.cabeceras!['Location']!, /fallo=facturar\.error\.sin_aprobar/)
+  const dicho = await pedir({
+    ruta: rutaVal, cookie: gps, campos: { fallo: 'facturar.error.sin_aprobar' },
+  })
+  assert.match(dicho.cuerpo!, /aprobada por el cliente/)
 
   await pedir({ metodo: 'POST', ruta: `${rutaVal}/aprobar`, cookie: cli, campos: { af: afC } })
 
@@ -414,10 +436,12 @@ test('la factura se emite con su correlativo, y el cliente la ve en su valuació
   assert.match(hoja.cuerpo!, /class="factura"/)
   assert.match(hoja.cuerpo!, /\d{8}/)
 
-  // Y no se factura dos veces: se corrige con una nota de crédito.
-  assert.equal((await pedir({
+  // Y no se factura dos veces: se corrige con una nota de crédito, y eso se lee.
+  const otraVez = await pedir({
     metodo: 'POST', ruta: `${rutaVal}/facturar`, cookie: gps, campos: { af: afG },
-  })).codigo, 409)
+  })
+  assert.equal(otraVez.codigo, 303)
+  assert.match(otraVez.cabeceras!['Location']!, /fallo=facturar\.error\.ya/)
 
   // El cliente no factura: una factura que emite quien la recibe no es una factura.
   assert.equal((await pedir({
@@ -498,16 +522,22 @@ test('corregir una factura con una nota: la factura no se toca y las dos quedan'
   assert.match(hoja.cuerpo!, /Queda facturado/)
 
   // Devolver más de lo que queda no pasa: una base negativa no significa nada.
-  assert.equal((await pedir({
+  const pasada = await pedir({
     metodo: 'POST', ruta: `${rutaVal}/nota`, cookie: gps,
     campos: { af: afG, tipo: 'nota_credito', base: '999999', motivo: 'de más' },
-  })).codigo, 409)
+  })
+  assert.equal(pasada.codigo, 303)
+  assert.match(pasada.cabeceras!['Location']!, /fallo=nota\.error\.pasa/)
 
   // Y sin motivo tampoco: una nota sin motivo no explica nada.
-  assert.equal((await pedir({
+  const sinMotivo = await pedir({
     metodo: 'POST', ruta: `${rutaVal}/nota`, cookie: gps,
     campos: { af: afG, tipo: 'nota_credito', base: '100', motivo: '   ' },
-  })).codigo, 409)
+  })
+  assert.equal(sinMotivo.codigo, 303)
+  assert.match(sinMotivo.cabeceras!['Location']!, /fallo=nota\.error\.motivo/)
+  const leido = await pedir({ ruta: rutaVal, cookie: gps, campos: { fallo: 'nota.error.motivo' } })
+  assert.match(leido.cuerpo!, /no explica nada/)
 
   // El cliente no corrige la factura que recibe.
   assert.equal((await pedir({

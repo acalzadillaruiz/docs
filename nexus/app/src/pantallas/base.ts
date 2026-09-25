@@ -73,6 +73,20 @@ body{margin:0;background:var(--bg);color:var(--ik);font-family:Inter,system-ui,s
    foco no lo casa y el anillo no llega a pintarse. Quien tabula por un formulario con fechas no ve
    nada. El que sí se pinta es el de su etiqueta, que envuelve al campo. */
 label:focus-within{outline:2px solid var(--ik);outline-offset:2px;border-radius:10px}
+/* ----------------------------------------------------------------- los errores
+   La caja donde una pantalla dice lo que salió mal. Estaba copiada en ocho
+   pantallas y YA se había desviado en cuatro versiones distintas: una con el color
+   en la lista y otra en la caja, con saltos de línea diferentes. Ocho copias de una
+   regla son ocho sitios donde cambiarla y siete donde olvidarse.
+
+   Va aquí por lo mismo que el anillo del foco: una pantalla nueva que use la clase
+   la tiene bien sin acordarse de copiar nada, y ninguna se queda enseñando el error
+   como texto suelto por haberse olvidado de definirla. */
+.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);
+  border-left-width:3px;border-radius:11px;padding:13px 17px}
+.mal-caja ul{margin:0;padding-left:18px}
+.mal-caja li,.mal-caja p{color:var(--rj);font-weight:600;font-size:14px;margin:0}
+.mal-caja li + li{margin-top:5px}
 .hd :where(a,button,input,select):focus-visible,.hd label:focus-within{
   outline-color:#E9F0F6}
 .hd{background:var(--nv);color:#E9F0F6;padding-block:22px 34px}

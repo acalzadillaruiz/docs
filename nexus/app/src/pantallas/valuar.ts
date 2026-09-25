@@ -128,9 +128,6 @@ export const ESTILOS_VALUAR = `
 .cas{display:flex;align-items:flex-start;gap:11px;padding:10px 4px;cursor:pointer}
 .cas input{margin:2px 0 0;width:17px;height:17px;accent-color:var(--grt);flex:none}
 .cas span{font-size:14.5px}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);border-left-width:3px;
-  border-radius:11px;padding:13px 17px}
-.mal-caja li{color:var(--rj);font-weight:600;font-size:14px}
 form button{margin-top:16px;font:inherit;font-size:15px;font-weight:700;padding:11px 22px;
   border:0;border-radius:11px;background:var(--nv);color:#E9F0F6;cursor:pointer}
 form button:hover{background:var(--nv3)}

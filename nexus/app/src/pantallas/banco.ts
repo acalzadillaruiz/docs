@@ -132,7 +132,4 @@ export const ESTILOS_BANCO = `
   border-radius:8px;background:var(--nv);color:#E9F0F6;cursor:pointer;white-space:nowrap}
 .mv button.sec{background:transparent;color:var(--ik2);border:1px solid var(--ln2)}
 .expl{margin:0 0 11px;font-size:13.5px;color:var(--ik2);line-height:1.45;max-width:66ch}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);border-left-width:3px;
-  border-radius:11px;padding:13px 17px}
-.mal-caja li{color:var(--rj);font-weight:600;font-size:14px}
 `

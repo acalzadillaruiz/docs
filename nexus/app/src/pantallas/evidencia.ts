@@ -308,6 +308,7 @@ export const ESTILOS_AVANCE = `
  */
 export function pintarPaginaAvance(
   a: Avance, cabecera: DatosCabecera, idioma: Idioma, r: Revision | null = null,
+  errores: readonly string[] = [],
 ): string {
   const x = TEXTOS[idioma]
   return pagina({
@@ -322,7 +323,9 @@ export function pintarPaginaAvance(
   <h1>${escapar(cabecera.renglon)}</h1>
   <div class="sub">${escapar(cabecera.cantidad)}</div>
 </div></header>`,
-    cuerpo: `<main class="wrap">${pintarAvance(a, idioma, r)}</main>`,
+    cuerpo: `<main class="wrap">${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
+      errores.map((e) => `<li>${escapar(e)}</li>`).join('')
+    }</ul></div>`}${pintarAvance(a, idioma, r)}</main>`,
   })
 }
 

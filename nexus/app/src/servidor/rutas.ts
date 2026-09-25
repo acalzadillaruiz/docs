@@ -95,7 +95,7 @@ import {
 } from './multipart.ts'
 import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
-import { fecha as formatearFecha, t, type Idioma } from '../i18n/t.ts'
+import { fecha as formatearFecha, t, type Clave, type Idioma } from '../i18n/t.ts'
 
 const MAX_CUERPO = 8 * 1024   // un formulario de entrada no pesa más
 
@@ -925,12 +925,7 @@ export async function resolver(
   if (contrato && p.metodo === 'GET') {
     try {
       const f = await comoQuien((q) => ficha(q, contrato[1]!, p.idioma, !esCliente))
-      // El motivo por el que no se pudo poner en vigor, si viene de vuelta. Se
-      // comprueba contra la lista: lo que llega por la direccion no se pinta tal cual.
-      const fallo = p.campos['fallo']
-      const dicho = fallo === 'sin_hitos' ? [t(p.idioma, 'accion.error.sin_hitos')]
-        : fallo === 'estado_equivocado' ? [t(p.idioma, 'accion.error.ya_vigente')] : []
-      return html(200, pintarContrato(f, p.idioma, esCliente, testigoAnti(testigo), dicho))
+      return html(200, pintarContrato(f, p.idioma, esCliente, testigoAnti(testigo), porque(p)))
     } catch (e) {
       if (e instanceof ContratoNoAlcanzable) return noEncontrado(p.idioma)
       throw e
@@ -950,7 +945,8 @@ export async function resolver(
       // Subir y revisar es de dentro. Al cliente no se le esconden los botones:
       // es que sin esto no hay nada que pintar, así que no pueden salir por descuido.
       return html(200, pintarPaginaAvance(datos.avance, datos.cabecera, p.idioma,
-        esCliente ? null : { antifalsificacion: testigoAnti(testigo), volver: p.ruta }))
+        esCliente ? null : { antifalsificacion: testigoAnti(testigo), volver: p.ruta },
+        porque(p)))
     } catch (e) {
       if (e instanceof HitoNoAlcanzable) return noEncontrado(p.idioma)
       throw e
@@ -969,16 +965,18 @@ export async function resolver(
     }
     if (esCliente) return noEncontrado(p.idioma)
 
+    // Todo lo que rechaza una subida vuelve a la pagina con el motivo. Contestar 400
+    // con el cuerpo vacio dejaba a quien sube un acta viendo una pagina en blanco, sin
+    // saber si el problema era el archivo, el tipo o la clase.
+    const volverA = destinoSeguro(p.campos['volver'])
     const a = p.archivo
-    if (!a) return { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    if (!a) return aOtroSitio(conFallo(volverA, 'subir.error.sin_archivo'))
     // El tipo se comprueba contra una lista cerrada ANTES de tocar el disco. Escribir
     // primero y comprobar después deja el archivo puesto aunque se rechace.
-    if (!tipoAceptado(a.tipoMime)) {
-      return { codigo: 415, cabeceras: CABECERAS_BASE, cuerpo: '' }
-    }
+    if (!tipoAceptado(a.tipoMime)) return aOtroSitio(conFallo(volverA, 'subir.error.tipo'))
     const clase = p.campos['clase'] ?? ''
     if (!(CLASES as readonly string[]).includes(clase)) {
-      return { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' }
+      return aOtroSitio(conFallo(volverA, 'subir.error.clase'))
     }
 
     try {
@@ -996,7 +994,7 @@ export async function resolver(
       }, personaId, p.idioma))
     } catch (e) {
       if (e instanceof HitoNoAlcanzable) return noEncontrado(p.idioma)
-      if (e instanceof DocumentoVacio) return { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' }
+      if (e instanceof DocumentoVacio) return aOtroSitio(conFallo(volverA, 'subir.error.vacio'))
       throw e
     }
     return aOtroSitio(destinoSeguro(p.campos['volver']))
@@ -1017,7 +1015,7 @@ export async function resolver(
       : await comoQuien((q) => rechazar(q, revisar[1]!, personaId, p.campos['motivo'] ?? ''))
 
     if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    if (!r.hecho) return aOtroSitio(conFallo(destinoSeguro(p.campos['volver']), r.motivo))
     return aOtroSitio(destinoSeguro(p.campos['volver']))
   }
 
@@ -1123,7 +1121,10 @@ export async function resolver(
     // Un 409 con el cuerpo vacio era una pagina en blanco: el motivo existia, estaba
     // escrito en el diccionario, y no llegaba a ninguna parte. Vuelve a la ficha con
     // el motivo puesto, que es donde esta el boton que se acaba de pulsar.
-    if (!r.hecho) return aOtroSitio(`/contratos/${activarCtr[1]!}?fallo=${r.motivo}`)
+    if (!r.hecho) {
+      return aOtroSitio(conFallo(`/contratos/${activarCtr[1]!}`,
+        r.motivo === 'estado_equivocado' ? 'ya_vigente' : r.motivo))
+    }
     return aOtroSitio(`/contratos/${activarCtr[1]!}`)
   }
 
@@ -1136,7 +1137,7 @@ export async function resolver(
     }
     const r = await comoQuien((q) => presentar(q, presentarVal[1]!, esCliente))
     if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    if (!r.hecho) return aOtroSitio(conFallo(`/valuaciones/${presentarVal[1]!}`, r.motivo))
     return aOtroSitio(`/valuaciones/${presentarVal[1]!}`)
   }
 
@@ -1189,7 +1190,7 @@ export async function resolver(
           respuesta: o.respuesta,
           respondidaEn: o.respondidaEn ? formatearFecha(p.idioma, o.respondidaEn) : null,
         })),
-      }, p.idioma))
+      }, p.idioma, porque(p)))
     } catch (e) {
       if (e instanceof ValuacionNoAlcanzable) return noEncontrado(p.idioma)
       throw e
@@ -1237,7 +1238,7 @@ export async function resolver(
     if (esCliente) return noEncontrado(p.idioma)
     const r = await comoQuien((q) =>
       facturar(q, facturarVal[1]!, personaId, esCliente, p.idioma))
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    if (!r.hecho) return aOtroSitio(conFallo(`/valuaciones/${facturarVal[1]!}`, r.motivo))
     return aOtroSitio(`/valuaciones/${facturarVal[1]!}`)
   }
 
@@ -1259,7 +1260,7 @@ export async function resolver(
       base: Number((p.campos['base'] ?? '0').replace(',', '.')),
       motivo: p.campos['motivo'] ?? '',
     }, personaId, esCliente, p.idioma))
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    if (!r.hecho) return aOtroSitio(conFallo(`/valuaciones/${notaVal[1]!}`, r.motivo))
     return aOtroSitio(`/valuaciones/${notaVal[1]!}`)
   }
 
@@ -1271,7 +1272,7 @@ export async function resolver(
     const r = await comoQuien((q) =>
       responder(q, responderObj[1]!, personaId, !esCliente, p.campos['respuesta'] ?? ''))
     if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    if (!r.hecho) return aOtroSitio(conFallo(destinoSeguro(p.campos['volver']), r.motivo))
     return aOtroSitio(destinoSeguro(p.campos['volver']))
   }
 
@@ -1290,13 +1291,62 @@ export async function resolver(
         : objetar(q, idVal, personaId, esCliente, p.campos['motivo'] ?? ''))
 
     if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    // Esta es la que ve EL CLIENTE. Aprobar una valuación que ya no está presentada
+    // —porque alguien la movió mientras él tenía la página abierta— le contestaba con
+    // una página en blanco, y el cliente no tiene a quién preguntarle qué pasó.
+    if (!r.hecho) return aOtroSitio(conFallo(`/valuaciones/${idVal}`, r.motivo))
     // Después de escribir se redirige, nunca se responde con la página. Si no,
     // recargar repetiría la acción y el navegador avisaría con un diálogo feo.
     return aOtroSitio(`/valuaciones/${idVal}`)
   }
 
   return noEncontrado(p.idioma)
+}
+
+/**
+ * Lo que salio mal en una accion, dicho con palabras.
+ *
+ * Una accion que no se puede hacer contestaba `409` con el cuerpo vacio: una PAGINA
+ * EN BLANCO. El motivo existia —estaba escrito en el diccionario— y no llegaba a
+ * ninguna parte. Ahora la ruta vuelve a la pagina de donde se pulso, con el motivo
+ * en la direccion, y la pagina lo pinta.
+ *
+ * Lo que llega por la direccion NO se pinta tal cual: solo ELIGE una de estas
+ * claves. Si se pintara lo que llega, cualquiera podria escribir lo que quisiera en
+ * la pantalla de otro mandandole un enlace.
+ */
+const PORQUE: Record<string, Clave> = {
+  sin_hitos: 'accion.error.sin_hitos',
+  estado_equivocado: 'accion.error.estado',
+  no_eres_el_cliente: 'accion.error.no_te_toca',
+  sin_motivo: 'accion.error.sin_motivo',
+  ya_revisada: 'accion.error.ya_revisada',
+  ya_vigente: 'accion.error.ya_vigente',
+  'facturar.error.ya': 'facturar.error.ya',
+  'facturar.error.sin_aprobar': 'facturar.error.sin_aprobar',
+  'facturar.error.objecion': 'facturar.error.objecion',
+  'nota.error.sin_factura': 'nota.error.sin_factura',
+  'nota.error.base': 'nota.error.base',
+  'nota.error.motivo': 'nota.error.motivo',
+  'nota.error.pasa': 'nota.error.pasa',
+  'valuar.error.contrato': 'valuar.error.contrato',
+  'valuar.error.nada': 'valuar.error.nada',
+  'subir.error.sin_archivo': 'subir.error.sin_archivo',
+  'subir.error.tipo': 'subir.error.tipo',
+  'subir.error.clase': 'subir.error.clase',
+  'subir.error.vacio': 'subir.error.vacio',
+}
+
+/** El motivo que viene de vuelta, ya traducido, o nada. */
+function porque(p: Peticion): readonly string[] {
+  const c = p.campos['fallo']
+  const clave = c === undefined ? undefined : PORQUE[c]
+  return clave === undefined ? [] : [t(p.idioma, clave)]
+}
+
+/** Una direccion con el motivo pegado, respetando lo que ya llevara. */
+function conFallo(destino: string, motivo: string): string {
+  return `${destino}${destino.includes('?') ? '&' : '?'}fallo=${encodeURIComponent(motivo)}`
 }
 
 /**

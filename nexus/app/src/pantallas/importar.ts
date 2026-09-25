@@ -208,8 +208,6 @@ export const ESTILOS_IMPORTAR = `
   text-transform:uppercase;color:var(--md);white-space:nowrap}
 .lt-e.confirmado{color:var(--grt)}
 .lt-v{text-decoration:none;color:var(--ik2);font-size:20px}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);border-left-width:3px;
-  border-radius:11px;padding:13px 17px;color:var(--rj);font-weight:600;font-size:14px}
 .botones{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 form button{margin-top:18px;font:inherit;font-size:15px;font-weight:700;padding:11px 22px;
   border:0;border-radius:11px;background:var(--nv);color:#E9F0F6;cursor:pointer}

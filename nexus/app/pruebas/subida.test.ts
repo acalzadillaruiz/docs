@@ -192,11 +192,14 @@ test('lo que no es un tipo aceptado no llega al disco', async () => {
     campos: { af, clase: 'certificado' },
     archivo: { archivo: 'x.svg', tipoMime: 'image/svg+xml', contenido: bytes('<svg onload=1>') },
   })
-  assert.equal(r.codigo, 415)
+  // Vuelve a la página con el motivo, no con una página en blanco: quien sube un
+  // acta tiene que poder saber si el problema era el archivo, el tipo o la clase.
+  assert.equal(r.codigo, 303)
+  assert.match(r.cabeceras!['Location']!, /fallo=subir\.error\.tipo/)
   const [n] = (await dentro((q) => q`
     select count(*)::int as n from evidencia where hito_id = ${H1}::uuid
   `)) as unknown as Array<{ n: number }>
-  assert.equal(n!.n, 0)
+  assert.equal(n!.n, 0, 'y no llegó al disco')
 })
 
 test('una clase inventada no entra', async () => {
@@ -207,7 +210,8 @@ test('una clase inventada no entra', async () => {
     campos: { af: testigoAnti(cookie), clase: 'lo_que_sea' },
     archivo: { archivo: 'a.pdf', tipoMime: 'application/pdf', contenido: bytes('x') },
   })
-  assert.equal(r.codigo, 400)
+  assert.equal(r.codigo, 303)
+  assert.match(r.cabeceras!['Location']!, /fallo=subir\.error\.clase/)
 })
 
 test('subir SIN el testigo antifalsificación no pasa, y no escribe nada', async () => {
@@ -302,7 +306,8 @@ test('rechazar exige motivo, y el avance cae', async () => {
   const sinMotivo = await pedir({
     metodo: 'POST', ruta: `/evidencia/${evi!.id}/rechazar`, cookie, campos: { af, motivo: '  ' },
   })
-  assert.equal(sinMotivo.codigo, 409)
+  assert.equal(sinMotivo.codigo, 303)
+  assert.match(sinMotivo.cabeceras!['Location']!, /fallo=sin_motivo/)
 
   const con = await pedir({
     metodo: 'POST', ruta: `/evidencia/${evi!.id}/rechazar`, cookie,

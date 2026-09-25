@@ -110,3 +110,20 @@ test('un error habla del problema, no de lo que la persona hizo mal', async () =
     }
   }
 })
+
+test('ninguna acción contesta con una página en blanco', async () => {
+  // El barrido que cierra la familia entera de fallos. `409` con el cuerpo vacío es
+  // lo que veía quien pulsaba un botón que no se podía pulsar: una página en blanco,
+  // sin una palabra, y sin nada que hacer. Eran SEIS rutas, y dos de ellas las ve el
+  // cliente: aprobar y objetar una valuación.
+  //
+  // Un 403 sin cuerpo sí se queda: es el testigo antifalsificación, y esa petición no
+  // la manda una persona desde la aplicación, sino otra web intentando colarse.
+  const ruta = new URL('../src/servidor/rutas.ts', import.meta.url)
+  const codigo = await readFile(ruta, 'utf8')
+
+  const enBlanco = [...codigo.matchAll(/codigo: (\d{3}),\s*cabeceras: CABECERAS_BASE,\s*cuerpo: ''/g)]
+  assert.ok(enBlanco.length > 0, 'si no hay ninguna, este barrido no está mirando el archivo')
+  const malas = enBlanco.map((m) => m[1]!).filter((c) => c !== '403' && c !== '404')
+  assert.deepEqual(malas, [], 'estas respuestas dejan al que pulsó sin una palabra')
+})

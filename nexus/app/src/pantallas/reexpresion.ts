@@ -138,7 +138,4 @@ export const ESTILOS_REEX = `
 .rx td.n.mal{color:var(--rj)}
 .expl{margin:12px 0 0;font-size:13px;color:var(--ik2);line-height:1.45;max-width:64ch}
 .nada{padding:17px;color:var(--ik2);font-size:14px;line-height:1.5;margin:0}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);
-  border-left-width:3px;border-radius:11px;padding:13px 17px}
-.mal-caja li{color:var(--rj);font-weight:600;font-size:14px}
 `

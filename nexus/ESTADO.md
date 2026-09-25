@@ -1,12 +1,34 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 22:05 (España)
-**Avance:** 136 de 141 sesiones · **96%**
+**Última actualización:** 2026-09-25, 23:35 (España)
+**Avance:** 137 de 141 sesiones · **97%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **los ochenta textos de error, repasados en conjunto.** Se
+**Lo último terminado:** **se acabaron las páginas en blanco.** Eran **diez rutas**
+que contestaban con el cuerpo vacío cuando la acción no se podía hacer, y **dos las
+ve el cliente**: aprobar y objetar una valuación. El caso real no es raro — el
+cliente tiene la hoja abierta desde ayer, GPS la mueve, él pulsa «Aprobar» y se
+queda mirando una página blanca, sin una palabra y sin nadie a quien preguntar.
+
+Ahora cada una vuelve a la página de donde se pulsó con el motivo puesto, y la
+página lo pinta. Lo que llega por la dirección **no se pinta tal cual**: solo elige
+una clave de una lista cerrada, porque si no bastaría con mandarle un enlace a
+alguien para escribirle lo que uno quiera en su pantalla. Hay prueba de eso también.
+
+Las diez: poner un contrato en vigor, presentar, facturar, la nota de crédito,
+aprobar, objetar, responder una objeción, verificar y rechazar evidencia, y las
+cuatro formas de que una subida se rechace (sin archivo, tipo no aceptado, clase
+inventada, archivo vacío). Todas tenían su motivo escrito y ninguna lo enseñaba.
+
+Y de paso salió una deriva de las de verdad: **`.mal-caja` —la caja donde se dice lo
+que salió mal— estaba copiada en ocho pantallas y ya se había desviado en cuatro
+versiones distintas.** Una con el color en la lista, otra en la caja. Ahora está una
+vez, en `base.ts`, con el anillo del foco. *(Y al escribirlo volví a tropezar con el
+acento grave dentro de una plantilla: quinta vez.)*
+
+**Antes:** **los ochenta textos de error, repasados en conjunto.** Se
 escriben de uno en uno, el día que hacen falta, y nunca se vuelven a mirar juntos.
 Mirándolos juntos salieron cuatro cosas, y de una salió un fallo de verdad:
 
@@ -270,7 +292,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**917 comprobaciones** (250 de SQL y diccionario + 667 de TypeScript), todas pasando.
+**918 comprobaciones** (250 de SQL y diccionario + 668 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno

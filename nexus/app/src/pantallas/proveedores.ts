@@ -111,7 +111,4 @@ export const ESTILOS_PROVEEDORES = `
 .comp{display:block;margin-top:2px;font-size:10.5px;font-weight:400;color:var(--md)}
 .expl{margin:14px 0 0;font-size:13.5px;color:var(--ik2);line-height:1.45;max-width:64ch}
 .expl.aviso-agente{color:var(--am);font-weight:600}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);border-left-width:3px;
-  border-radius:11px;padding:13px 17px}
-.mal-caja li{color:var(--rj);font-weight:600;font-size:14px}
 `

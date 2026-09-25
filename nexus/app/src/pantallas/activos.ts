@@ -104,7 +104,4 @@ export const ESTILOS_ACTIVOS = `
    es una máquina que habría salido más barata parada. */
 .eq-d.bien{color:var(--grt)}
 .eq-d.mal{color:var(--rj)}
-.mal-caja{margin-top:18px;background:var(--cd);border:1px solid var(--rj);border-left-width:3px;
-  border-radius:11px;padding:13px 17px}
-.mal-caja li{color:var(--rj);font-weight:600;font-size:14px}
 `

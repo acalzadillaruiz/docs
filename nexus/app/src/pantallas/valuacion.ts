@@ -89,7 +89,9 @@ const ACCIONES = {
         placeholder: 'For example: line 3 includes 12 crane hours that were not worked on 14 September.' },
 } as const
 
-export function pintarValuacion(d: DatosValuacion, idioma: Idioma): string {
+export function pintarValuacion(
+  d: DatosValuacion, idioma: Idioma, errores: readonly string[] = [],
+): string {
   const t = traductor(idioma)
   const a = ACCIONES[idioma]
   const neto = d.lineas.find((l) => l.total)
@@ -224,6 +226,9 @@ h2.sec{margin:30px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5p
   <div class="est">${escapar(d.estado)}</div>
 </div></header>`,
     cuerpo: `<main class="wrap">
+  ${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
+    errores.map((e) => `<li>${escapar(e)}</li>`).join('')
+  }</ul></div>`}
   <section class="hoja">
     <div class="cab">
       <div class="cn">${escapar(t('valuacion.titulo'))}</div>

@@ -16,7 +16,7 @@
  */
 
 import type { Consulta } from '../db/conexion.ts'
-import { moneda, numero, t, type Idioma } from '../i18n/t.ts'
+import { moneda, numero, t, type Clave, type Idioma } from '../i18n/t.ts'
 
 export type LineaPropuesta = {
   readonly renglonId: string
@@ -239,7 +239,8 @@ export async function presentar(
 
 export type Facturada =
   | { readonly hecho: true; readonly numero: string; readonly control: string }
-  | { readonly hecho: false; readonly motivo: string }
+  /** La CLAVE del diccionario, no el texto: así sobrevive a una redirección. */
+  | { readonly hecho: false; readonly motivo: Clave }
 
 /**
  * Emite la factura de una valuación aprobada.
@@ -256,15 +257,15 @@ export async function facturar(
   q: Consulta, valuacionId: string, personaId: string, esCliente: boolean, idioma: Idioma,
 ): Promise<Facturada> {
   // Factura GPS. Una factura que emite quien la recibe no es una factura.
-  if (esCliente) return { hecho: false, motivo: t(idioma, 'valuar.error.contrato') }
+  if (esCliente) return { hecho: false, motivo: 'valuar.error.contrato' }
 
   const [v] = (await q`
     select estado::text, documento_id from valuacion where id = ${valuacionId}::uuid
   `) as unknown as Array<{ estado: string; documento_id: string | null }>
-  if (!v) return { hecho: false, motivo: t(idioma, 'valuar.error.contrato') }
-  if (v.documento_id) return { hecho: false, motivo: t(idioma, 'facturar.error.ya') }
+  if (!v) return { hecho: false, motivo: 'valuar.error.contrato' }
+  if (v.documento_id) return { hecho: false, motivo: 'facturar.error.ya' }
   if (v.estado !== 'aprobada') {
-    return { hecho: false, motivo: t(idioma, 'facturar.error.sin_aprobar') }
+    return { hecho: false, motivo: 'facturar.error.sin_aprobar' }
   }
 
   const [sin] = (await q`
@@ -272,7 +273,7 @@ export async function facturar(
      where valuacion_id = ${valuacionId}::uuid and respondida_en is null
   `) as unknown as Array<{ n: number }>
   if (Number(sin?.n ?? 0) > 0) {
-    return { hecho: false, motivo: t(idioma, 'facturar.error.objecion') }
+    return { hecho: false, motivo: 'facturar.error.objecion' }
   }
 
   const [doc] = (await q`
@@ -361,7 +362,8 @@ export type NotaNueva = {
 
 export type NotaEmitida =
   | { readonly hecho: true; readonly numero: string }
-  | { readonly hecho: false; readonly motivo: string }
+  /** La CLAVE del diccionario, no el texto: así sobrevive a una redirección. */
+  | { readonly hecho: false; readonly motivo: Clave }
 
 /**
  * Emite la nota. Las condiciones se comprueban aquí antes de llamar: una excepción
@@ -370,16 +372,16 @@ export type NotaEmitida =
 export async function emitirNota(
   q: Consulta, n: NotaNueva, personaId: string, esCliente: boolean, idioma: Idioma,
 ): Promise<NotaEmitida> {
-  if (esCliente) return { hecho: false, motivo: t(idioma, 'nota.error.sin_factura') }
-  if (!(n.base > 0)) return { hecho: false, motivo: t(idioma, 'nota.error.base') }
-  if (n.motivo.trim() === '') return { hecho: false, motivo: t(idioma, 'nota.error.motivo') }
+  if (esCliente) return { hecho: false, motivo: 'nota.error.sin_factura' }
+  if (!(n.base > 0)) return { hecho: false, motivo: 'nota.error.base' }
+  if (n.motivo.trim() === '') return { hecho: false, motivo: 'nota.error.motivo' }
 
   const [f] = (await q`
     select base_ves::text as base, tipo::text, sentido::text
       from documento_fiscal where id = ${n.facturaId}::uuid
   `) as unknown as Array<{ base: string; tipo: string; sentido: string }>
   if (!f || f.tipo !== 'factura' || f.sentido !== 'emitido') {
-    return { hecho: false, motivo: t(idioma, 'nota.error.sin_factura') }
+    return { hecho: false, motivo: 'nota.error.sin_factura' }
   }
 
   if (n.tipo === 'nota_credito') {
@@ -387,7 +389,7 @@ export async function emitirNota(
       select base::text from neto_facturado(${n.facturaId}::uuid)
     `) as unknown as Array<{ base: string }>
     if (n.base > Number(vivo?.base ?? 0) + 0.005) {
-      return { hecho: false, motivo: t(idioma, 'nota.error.pasa') }
+      return { hecho: false, motivo: 'nota.error.pasa' }
     }
   }
 
