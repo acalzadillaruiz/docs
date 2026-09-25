@@ -690,5 +690,15 @@
   "subir.error.vacio": "That file is empty: zero bytes. It backs nothing up.",
   "cartera.rango": "Contracts {a} to {b} of {n}",
   "cartera.anteriores": "Previous",
-  "cartera.siguientes": "Next"
+  "cartera.siguientes": "Next",
+  "log.titulo": "Where the material is",
+  "log.explica": "The question a procurement client asks and no tracking portal answers. Position is set by the last step with paper behind it, not by the last one somebody typed.",
+  "log.nada": "Nothing is in transit: everything under procurement and transport has arrived, or has not started.",
+  "log.sin_empezar": "Not started",
+  "log.exige": "Needs:",
+  "log.dias_parado": "days stalled",
+  "log.peor": "worst, {n} days",
+  "log.dicho_sin_papel": "Claimed, no paper",
+  "log.papel_esperando": "Paper awaiting review",
+  "log.posicion_explica": "If somebody notes that something shipped and there is no bill of lading, here it is still at the factory and gets marked «claimed, no paper». A board that believes what it is told is the board you already have."
 }

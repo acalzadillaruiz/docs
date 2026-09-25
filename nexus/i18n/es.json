@@ -690,5 +690,15 @@
   "subir.error.vacio": "Ese archivo está vacío: cero bytes. No respalda nada.",
   "cartera.rango": "Contratos {a} a {b} de {n}",
   "cartera.anteriores": "Anteriores",
-  "cartera.siguientes": "Siguientes"
+  "cartera.siguientes": "Siguientes",
+  "log.titulo": "Dónde está el material",
+  "log.explica": "La pregunta que hace un cliente de procura y que no contesta ningún portal de seguimiento. La posición la marca el último paso con papel detrás, no el último que alguien escribió.",
+  "log.nada": "No hay material en ruta: todo lo de procura y transporte llegó, o no ha empezado.",
+  "log.sin_empezar": "Sin empezar",
+  "log.exige": "Necesita:",
+  "log.dias_parado": "días parado",
+  "log.peor": "el peor, {n} días",
+  "log.dicho_sin_papel": "Dicho sin papel",
+  "log.papel_esperando": "Papel esperando revisión",
+  "log.posicion_explica": "Si alguien anota que algo se embarcó y no hay conocimiento de embarque, aquí sigue en fábrica y se marca «dicho sin papel». Un tablero que se cree lo que le escriben es el tablero que ya se tiene."
 }

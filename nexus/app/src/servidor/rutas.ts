@@ -66,6 +66,8 @@ import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
 import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
          anotarVale, reponer, cerrar as cerrarCaja, abrirCaja } from '../dominio/caja.ts'
 import { pintarCaja } from '../pantallas/caja.ts'
+import { enRuta, porPaso } from '../dominio/logistica.ts'
+import { pintarLogistica } from '../pantallas/logistica.ts'
 import { iconoPng, iconoSvg } from './icono.ts'
 import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
 import { pintarPagar } from '../pantallas/pagar.ts'
@@ -723,6 +725,23 @@ export async function resolver(
     const lista = await comoQuien((q) => equipos(q, org!.organizacion_id, p.idioma))
     return html(errores.length === 0 ? 200 : 400,
       pintarActivos(lista, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // Donde esta el material. De momento solo de dentro, y es una decision, no un
+  // descuido: el cliente ya ve su propia obra hito a hito en su contrato, y abrir
+  // una pantalla nueva a su lado es ampliar la superficie que ve alguien de fuera de
+  // GPS. Si se decide abrirla, se justifica en el barrido de aislamiento como las
+  // demas y se comprueba que solo le ensena lo suyo.
+  if (p.ruta === '/logistica' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const [lista, resumen] = await Promise.all([
+      comoQuien((q) => enRuta(q, org!.organizacion_id, p.idioma)),
+      comoQuien((q) => porPaso(q, org!.organizacion_id, p.idioma)),
+    ])
+    return html(200, pintarLogistica(lista, resumen, p.idioma))
   }
 
   // Lo que toca pagar, y el sitio donde se paga. Estaban la tabla y el generador y

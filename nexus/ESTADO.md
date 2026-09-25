@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 01:20 (España)
+**Última actualización:** 2026-09-26, 02:05 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -10,7 +10,7 @@
 > avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
 > avance lo que el sistema impide hacer con el de un contrato.
 >
-> Lo que hay construido, contado: **38 direcciones que se pueden abrir** y 25
+> Lo que hay construido, contado: **39 direcciones que se pueden abrir** y 26
 > pantallas, sobre las 119 vistas del plan completo. Lo que está **entero y probado
 > de punta a punta** es la contabilidad —las 36 vistas que el CEO mandó primero— más
 > el núcleo de contratos, evidencia y valuaciones que la sostiene. Lo que **no está**
@@ -31,7 +31,35 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el techo de `/medidas`, investigado y NO tocado — con dos
+**Lo último terminado:** **dónde está el material** — la primera pantalla de la fase
+de logística, y la pregunta que hace un cliente de procura y que no contesta ningún
+portal de seguimiento: «¿dónde está mi cabezal?».
+
+**La máquina ya estaba entera desde el primer día** y nadie lo había mirado así: la
+cadena de procura —orden, fabricado, embarcado, nacionalizado, recibido— vive en las
+plantillas de hitos con el papel que exige cada paso. Lo que faltaba no era la
+máquina: era la vista.
+
+Y la vista lleva la tesis dentro, que es lo que la separa de un tablero cualquiera:
+
+- **La posición la marca el último paso VERIFICADO**, no el último que alguien
+  escribió. Si dicen que se embarcó y no hay conocimiento de embarque, aquí sigue en
+  fábrica, y sale marcado **«dicho sin papel»**. Un tablero que se cree lo que le
+  escriben es el tablero que ya tienen.
+- **«Papel esperando revisión» se distingue de «falta el papel».** No es lo mismo, y
+  confundirlos hace que se persiga al proveedor cuando el atasco está en casa.
+- **Ordenado por días parado, el que más lleva primero.** Lo que lleva cuarenta días
+  sin moverse es lo que está a punto de ser un problema.
+
+De momento solo lo ve GPS, **y es una decisión escrita en la propia ruta, no un
+descuido**: el cliente ya ve su obra hito a hito en su contrato, y abrir una pantalla
+nueva a su lado amplía la superficie que ve alguien de fuera.
+
+*(Al escribir la prueba choqué con la regla que sostiene todo: la base de datos no
+deja marcar un paso como evidenciado sin su papel. El atajo no pasó, y la prueba
+acabó creando la evidencia de verdad, que es como ocurre.)*
+
+**Antes:** **el techo de `/medidas`, investigado y NO tocado — con dos
 hallazgos que valen más que el arreglo.**
 
 La idea era copiar la regla del contrato dentro de la política de fila de `hito`
@@ -368,7 +396,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**933 comprobaciones** (250 de SQL y diccionario + 683 de TypeScript), todas pasando.
+**943 comprobaciones** (250 de SQL y diccionario + 693 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
