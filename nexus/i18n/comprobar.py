@@ -35,6 +35,8 @@ IGUALES_A_PROPOSITO = {
     "libro.control", "libro.total",
     # El signo de porcentaje es el mismo en los dos idiomas.
     "ger.margen_pct",
+    # «Total» se escribe igual en los dos idiomas.
+    "est.total",
 }
 iguales = sorted(k for k in set(es) & set(en)
                  if k not in IGUALES_A_PROPOSITO and es[k] == en[k])

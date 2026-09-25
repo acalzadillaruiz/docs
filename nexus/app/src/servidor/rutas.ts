@@ -68,6 +68,8 @@ import { libro, libroCrudo, aFilas } from '../dominio/libros.ts'
 import { pintarLibro } from '../pantallas/libros.ts'
 import { mes as mesGerencia } from '../dominio/gerencia.ts'
 import { pintarGerencia } from '../pantallas/gerencia.ts'
+import { estados } from '../dominio/estados.ts'
+import { pintarEstados } from '../pantallas/estados.ts'
 import { escribirHoja } from './csv.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
@@ -670,6 +672,25 @@ export async function resolver(
     const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
     return html(errores.length === 0 ? 200 : 400,
       pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // Los estados contables: el balance que pide un banco, el detalle donde mira un
+  // contador, y lo que se cobra y se paga. Nunca lo ve el cliente.
+  if (p.ruta === '/estados' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    // Una fecha que no se entiende se resuelve con hoy: aqui solo se MIRA, no se
+    // escribe nada, asi que adivinar no cuesta un asiento mal puesto.
+    const pedido = (p.campos['al'] ?? '').trim()
+    const al = /^\d{4}-\d{2}-\d{2}$/.test(pedido) && !Number.isNaN(Date.parse(pedido))
+      ? pedido
+      : new Date().toISOString().slice(0, 10)
+
+    const e = await comoQuien((q) => estados(q, org!.organizacion_id, p.idioma, al))
+    return html(200, pintarEstados(e, p.idioma, testigoAnti(testigo)))
   }
 
   // «Como va el mes». Nunca lo ve el cliente: es la contabilidad de GPS.
