@@ -1,30 +1,34 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 08:55 (España)
-**Avance:** 79 de 141 sesiones · **56%**
+**Última actualización:** 2026-09-25, 09:30 (España)
+**Avance:** 85 de 141 sesiones · **60%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el camino de Excel a la contabilidad, entero y por el
-navegador.** Se elige la hoja (CSV), la aplicación propone cómo entendió cada columna
-y lo enseña con la cabecera original y un ejemplo del dato, el humano corrige, se
-comprueba sin escribir nada, y solo entonces entra — creando facturas de proveedor de
-verdad **y asentándolas en el libro en el acto**. Commit `cc6e1b6`. **573 comprobaciones.**
+**Lo último terminado:** **el ciclo del dinero, cerrado.** Excel → factura de
+proveedor asentada; y valuación → asiento → cobro → asiento, con la cuenta por cobrar
+bajando sola. La prueba de circuito llega ahora hasta el final: contrato → hito
+verificado → valuación → aprobada → **cobrada**, todo por HTTP y sin tocar la base de
+datos. Commit `5906cac`. **583 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Facturar y cobrar desde la aplicación.** El botón que emite el documento fiscal
-   desde una valuación aprobada, y el que registra el cobro. Los generadores de
-   asiento existen y están probados.
+1. **Emitir la factura fiscal desde una valuación aprobada.** Hoy se cobra contra la
+   valuación; falta el documento fiscal emitido con su número de control, que es lo
+   que el cliente necesita para pagar. `correlativo_retencion()` ya enseña el patrón:
+   el correlativo lo pone la base de datos, no una persona.
 2. **Caja chica**, que depende de las ocho respuestas del CEO
    (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — sin contestar).
 3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos.
-4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
+4. **Abrir y cerrar periodos contables desde la aplicación.** Hoy se abren por SQL, y
+   sin periodo abierto no entra ni una factura ni un cobro. Es un agujero pequeño que
+   bloquea todo lo demás el día 1 de cada mes.
+5. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
    falta la ruta que lo recibe y la pantalla que manda a la operadora.
 
 **Cómo continuar, literalmente:**
@@ -46,7 +50,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-573 comprobaciones hayan encontrado veinticuatro fallos reales, veintiuno de ellos míos.
+583 comprobaciones hayan encontrado veintiséis fallos reales, veintitrés de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -210,6 +214,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/csv.ts` | Leer la hoja. **No se lee .xlsx, se lee CSV, y es una decisión:** un .xlsx es un ZIP con XML dentro. «Guardar como CSV» son dos clics y deja un archivo legible dentro de diez años. Tres cosas hay que acertar y son donde falla todo lo que lee CSV a mano: **el separador** (Excel en español usa punto y coma, porque la coma es el decimal), **las comillas** (`Cabezal 11" 5M`) y **el BOM** de Excel. |
 | `app/src/dominio/importar.ts` · `pantallas/importar.ts` | El camino de cuatro pasos. La aplicación **propone y enseña**; el humano corrige. El formato se propone mirando el **dato**, que es lo único que lo dice. Y la pantalla enseña la **cabecera original** y un **ejemplo de la hoja** al lado de cada columna: sin el ejemplo no hay forma de saber si «Base» es la base o el total con IVA, y esa confusión mete un 16% de error. |
 | `db/schema/23-importar-facturas.sql` | Lo que hacía falta para que el importador **cree algo**: antes `confirmar_lote` ponía un sello y nada más. **Un proveedor que no existe no se crea solo** — se niega el lote entero y se dice cuál falta. El importe en dólares se calcula con la tasa del día **de la factura**, no con la de hoy. |
+| `app/src/dominio/cobrar.ts` · `pantallas/cobrar.ts` | Registrar un cobro. **La cuenta por cobrar baja sola** — un saldo que alguien marca es un saldo que algún día se queda sin marcar — y el saldo no se guarda, se resta. No se cobra de más: un saldo negativo no significa nada en un libro. El cobro se asienta en la misma transacción en que se registra. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -428,6 +433,11 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 211 | Lo importado **llega al libro**: las facturas quedan asentadas y el libro cuadra. |
 | 212 | **Sin plan de cuentas no se importa**, y se dice por qué antes de crear nada. |
 | 213 | Un mes con el periodo contable cerrado se dice **antes**, con cuántas filas caen en él. |
+| 214 | La cuenta por cobrar baja **sola**, y al llegar a cero la valuación pasa a cobrada. |
+| 215 | **No se cobra de más**, ni cero, ni en un mes sin periodo abierto, ni una valuación sin aprobar. |
+| 216 | El cobro queda **asentado**, y su asiento cuadra. |
+| 217 | El cliente no ve la caja de quien le factura. |
+| 218 | **El circuito hasta el final**, por HTTP: contrato → evidencia → valuación → aprobada → cobrada. |
 
 ## Lo que sigue
 
