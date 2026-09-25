@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 130 de 141 sesiones · **92%**
+**Avance:** 131 de 141 sesiones · **93%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -136,7 +136,18 @@ Y **la primera medición con datos de verdad** (`d74072e`): 500 contratos y 2.00
 renglones sembrados, todas las pantallas recorridas. `/medidas` pesaba **613 KB** y
 ahora pesa 22. Las otras once, por debajo de 15 ms y 10 KB.
 
-**881 comprobaciones** (250 de SQL y diccionario + 628 de TypeScript), todas pasando.
+Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
+aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
+pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
+
+**883 comprobaciones** (250 de SQL y diccionario + 630 de TypeScript), todas pasando.
+
+**Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
+de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
+el estado roto; el segundo (25%) daba por malas pantallas sanas, porque medía título
+y explicación como si fueran menú. El tercero mide **dónde empieza lo suyo de cada
+pantalla**: sanas entre 16% y 35%, rota al 48%, umbral 40%. **Y siempre comprobar que
+la prueba sabe fallar rompiendo el arreglo a propósito.**
 
 **Techo medido y NO arreglado, para que no se descubra tarde:** `/medidas` sigue
 tardando **963 ms** con 500 contratos, y el coste está en las consultas, no en
