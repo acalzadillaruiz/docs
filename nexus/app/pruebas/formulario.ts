@@ -48,3 +48,81 @@ export function mapeoDe(html: string): {
   }
   return { columnas, campos }
 }
+
+/**
+ * Un formulario devuelto **tal como lo mandaría un navegador sin tocar nada**.
+ *
+ * Las reglas no son intuitivas, y cada una de ellas ha escondido ya un fallo o puede
+ * esconderlo:
+ *
+ *   - Un control `disabled` **no se manda**. Ni vacío: no aparece.
+ *   - Un `<select>` sin ninguna opción marcada manda **la primera**, no una cadena
+ *     vacía. Es lo contrario de lo que se supone al escribir la prueba a mano.
+ *   - Una casilla sin marcar **no se manda**; marcada, manda su `value`, o `on` si
+ *     no tiene.
+ *   - Un `<input>` sin `value` manda la cadena vacía, que **sí** se manda.
+ *
+ * Una prueba que no respeta esto comprueba que el servidor entiende lo que la prueba
+ * imagina, no lo que la pantalla manda.
+ */
+export type Enviado = {
+  readonly accion: string
+  readonly metodo: string
+  readonly campos: Record<string, string>
+  readonly repetidos: Record<string, string[]>
+}
+
+/** Los `<form>` de una página, con lo que mandaría cada uno sin tocar nada. */
+export function formularios(html: string): Enviado[] {
+  const salida: Enviado[] = []
+  for (const f of html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/g)) {
+    const atributos = f[1]!
+    const dentro = f[2]!
+    const accion = /action="([^"]*)"/.exec(atributos)?.[1] ?? ''
+    const metodo = (/method="([^"]*)"/.exec(atributos)?.[1] ?? 'get').toUpperCase()
+
+    const campos: Record<string, string> = {}
+    const repetidos: Record<string, string[]> = {}
+    const poner = (nombre: string, valor: string) => {
+      if (nombre in campos) {
+        repetidos[nombre] = [...(repetidos[nombre] ?? [campos[nombre]!]), valor]
+      }
+      campos[nombre] = valor
+    }
+
+    for (const i of dentro.matchAll(/<input\b([^>]*)>/g)) {
+      const a = i[1]!
+      if (/\sdisabled/.test(a)) continue
+      const nombre = /name="([^"]*)"/.exec(a)?.[1]
+      if (!nombre) continue
+      const tipo = (/type="([^"]*)"/.exec(a)?.[1] ?? 'text').toLowerCase()
+      if (tipo === 'submit' || tipo === 'button' || tipo === 'file' || tipo === 'image') continue
+      const valor = /value="([^"]*)"/.exec(a)?.[1] ?? ''
+      if (tipo === 'checkbox' || tipo === 'radio') {
+        if (!/\schecked/.test(a)) continue
+        poner(nombre, valor || 'on')
+        continue
+      }
+      poner(nombre, valor)
+    }
+
+    for (const s of dentro.matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/g)) {
+      if (/\sdisabled/.test(s[1]!)) continue
+      const nombre = /name="([^"]*)"/.exec(s[1]!)?.[1]
+      if (!nombre) continue
+      const opciones = [...s[2]!.matchAll(/<option value="([^"]*)"([^>]*)>/g)]
+      const marcada = opciones.find((o) => /\sselected/.test(o[2]!))
+      // Sin ninguna marcada, el navegador manda la PRIMERA. No una cadena vacía.
+      poner(nombre, (marcada ?? opciones[0])?.[1] ?? '')
+    }
+
+    for (const t of dentro.matchAll(/<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/g)) {
+      if (/\sdisabled/.test(t[1]!)) continue
+      const nombre = /name="([^"]*)"/.exec(t[1]!)?.[1]
+      if (nombre) poner(nombre, t[2]!)
+    }
+
+    salida.push({ accion, metodo, campos, repetidos })
+  }
+  return salida
+}
