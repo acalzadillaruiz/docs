@@ -123,7 +123,7 @@ pinchar—, con el debe y el haber en columnas separadas aunque por dentro sean 
 campo con signo, con **cuándo ocurrió y cuándo se supo**, y con el asiento anulado y
 su reverso **los dos** a la vista.
 
-Y **el mayor de una cuenta** (`b7c8d9e`): el diario recorre el tiempo, el mayor
+Y **el mayor de una cuenta** (`d5427d4`): el diario recorre el tiempo, el mayor
 recorre una cuenta. Es lo que contesta «¿por qué el banco tiene exactamente este
 saldo?», que es la pregunta que se hace cuando algo no cuadra.
 
