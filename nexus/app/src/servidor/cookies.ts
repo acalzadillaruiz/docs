@@ -60,7 +60,18 @@ export function idiomaPedido(
     .map((t) => {
       const [etiqueta, ...resto] = t.trim().split(';')
       const q = resto.find((r) => r.trim().startsWith('q='))
-      return { etiqueta: (etiqueta ?? '').trim().toLowerCase(), q: q ? Number(q.split('=')[1]) : 1 }
+      // La cabecera la escribe quien llama, no nosotros: `q=hola` daría NaN, y un NaN
+      // en el comparador deja la ordenación en manos del orden de llegada —que es lo
+      // que esta función existe para NO hacer—. Lo que no se entiende vale 1, que es
+      // lo que dice la norma para una preferencia sin declarar.
+      // Y ojo con el otro de la familia: `Number('')` NO es NaN, es CERO. Un `q=` sin
+      // valor está mal escrito, pero leído como cero significa «no quiero este
+      // idioma» —que es lo contrario de no haber dicho nada— y manda al visitante al
+      // idioma equivocado. Vacío y ilegible valen los dos 1.
+      const texto = q === undefined ? '' : (q.split('=')[1] ?? '').trim()
+      const n = texto === '' ? NaN : Number(texto)
+      const peso = Number.isFinite(n) ? Math.min(Math.max(n, 0), 1) : 1
+      return { etiqueta: (etiqueta ?? '').trim().toLowerCase(), q: peso }
     })
     .sort((a, b) => b.q - a.q)
   for (const { etiqueta } of idiomas) {

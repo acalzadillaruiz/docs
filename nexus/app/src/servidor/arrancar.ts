@@ -9,7 +9,25 @@ import { resolver, desdeHttp, escribir, CuerpoDemasiadoGrande, CABECERAS_BASE } 
 import { configurarAlmacen } from './almacen.ts'
 import { MultipartMalFormado, DemasiadoGrande } from './multipart.ts'
 
-const PUERTO = Number(process.env.NEXUS_PUERTO ?? 8080)
+/**
+ * Un puerto de una variable de entorno.
+ *
+ * `Number('ocho mil')` devuelve NaN, y `listen(NaN)` no falla: arranca en un puerto
+ * que elige el sistema. El servidor parece encendido y no está donde se le espera,
+ * que es de los fallos más caros de encontrar. Mejor no arrancar y decirlo.
+ */
+function puerto(nombre: string, porDefecto: number): number {
+  const v = process.env[nombre]
+  if (v === undefined || v.trim() === '') return porDefecto
+  const n = Number(v.trim())
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    console.error(`${nombre} tiene que ser un puerto (1-65535), y le llegó «${v}»`)
+    process.exit(1)
+  }
+  return n
+}
+
+const PUERTO = puerto('NEXUS_PUERTO', 8080)
 const SERVICIO = process.env.NEXUS_PERSONA_SERVICIO
 /**
  * La base de datos se puede dar de dos formas, y las dos hacen falta:
@@ -22,7 +40,7 @@ const SERVICIO = process.env.NEXUS_PERSONA_SERVICIO
 const BD: Destino | undefined = process.env.NEXUS_BD_SOCKET
   ? {
       host: process.env.NEXUS_BD_SOCKET,
-      port: Number(process.env.NEXUS_BD_PUERTO ?? 5432),
+      port: puerto('NEXUS_BD_PUERTO', 5432),
       database: process.env.NEXUS_BD_NOMBRE ?? 'nexus',
       username: process.env.NEXUS_BD_USUARIO ?? 'nexus',
     }

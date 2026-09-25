@@ -86,7 +86,11 @@ class Conversacion {
         // El código que cuenta es el de la ÚLTIMA línea: las intermedias solo
         // enumeran lo que el servidor sabe hacer.
         const ultima = entera.split('\r\n').filter((l) => /^\d{3} /.test(l)).pop() ?? entera
-        const codigo = Number(ultima.slice(0, 3))
+        // Lo que contesta el otro lado no lo controlamos. Sin las tres cifras al
+        // principio esto no es una respuesta SMTP, y `Number('hol')` daría NaN —que
+        // no es igual a nada, ni siquiera a sí mismo—, así que el aviso se daría por
+        // bueno cuando no lo es. Un cero nunca coincide con un código esperado.
+        const codigo = /^\d{3}/.test(ultima) ? Number(ultima.slice(0, 3)) : 0
         if (Math.floor(codigo / 100) !== espera) {
           fallar(new CorreoRechazado(paso, codigo, ultima.slice(4)))
           return
