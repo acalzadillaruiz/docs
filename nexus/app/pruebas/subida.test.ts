@@ -420,3 +420,78 @@ test('guardar el perfil SIN el testigo antifalsificación no cambia nada', async
   })
   assert.equal(r.codigo, 403)
 })
+
+test('el alta de contrato: formulario, error con lo escrito, y alta buena', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const af = testigoAnti(cookie)
+
+  const vacio = await pedir({ ruta: '/contratos/nuevo', cookie })
+  assert.equal(vacio.codigo, 200)
+  assert.match(vacio.cuerpo!, /Operadora Subida/)
+
+  // Sin cliente y sin renglones: dos errores, y lo escrito vuelve escrito.
+  const malo = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie,
+    campos: { af, accion: 'crear', codigo: 'RUTA-ALTA-1', titulo_es: 'Cabezales',
+              titulo_en: 'Wellheads', tipo: 'procura', moneda: 'USD', filas: '3' },
+  })
+  assert.equal(malo.codigo, 400)
+  assert.match(malo.cuerpo!, /value="RUTA-ALTA-1"/)
+  assert.match(malo.cuerpo!, /class="mal"/)
+
+  // Pedir más filas NO es enviar: se vuelve a pintar con lo escrito y cinco huecos más.
+  const mas = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie,
+    campos: { af, accion: 'mas', codigo: 'RUTA-ALTA-1', filas: '3' },
+  })
+  assert.equal(mas.codigo, 200)
+  assert.match(mas.cuerpo!, /value="RUTA-ALTA-1"/)
+  assert.match(mas.cuerpo!, /name="filas" value="8"/)
+  assert.equal(mas.cuerpo!.includes('class="mal"'), false, 'pedir filas no es un error')
+
+  // Y ahora bien.
+  const codigo = `RUTA-ALTA-${Date.now() % 1000000}`
+  const bueno = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie,
+    campos: { af, accion: 'crear', codigo, titulo_es: 'Cabezales', titulo_en: 'Wellheads',
+              tipo: 'procura', moneda: 'USD', cliente: CLI, filas: '3',
+              anticipo_pct: '0', amortiza_pct: '0', garantia_pct: '5' },
+    repetidos: {
+      r_desc_es: ['Cabezal', '', ''],
+      r_desc_en: ['Wellhead', '', ''],
+      r_cantidad: ['4', '', ''],
+      r_unidad: ['unidad', '', ''],
+      r_norma: ['API 6A', '', ''],
+      r_espec: ['', '', ''],
+      r_precio: ['120000', '', ''],
+      r_costo: ['74500', '', ''],
+    },
+  })
+  assert.equal(bueno.codigo, 303)
+  assert.match(bueno.cabeceras!['Location']!, /^\/contratos\/[0-9a-f-]{36}$/)
+
+  // La ficha ya se sirve, con sus hitos creados y las filas vacías descartadas.
+  const ficha = await pedir({ ruta: bueno.cabeceras!['Location']!, cookie })
+  assert.equal(ficha.codigo, 200)
+  assert.match(ficha.cuerpo!, /Cabezal/)
+  assert.equal((ficha.cuerpo!.match(/class="rg"/g) ?? []).length, 1,
+    'las filas vacías del formulario no crean renglones fantasma')
+})
+
+test('el cliente no puede dar de alta un contrato', async () => {
+  const cli = await entrar('sub-cli@prueba.test')
+  assert.equal((await pedir({ ruta: '/contratos/nuevo', cookie: cli })).codigo, 404)
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie: cli,
+    campos: { af: testigoAnti(cli), accion: 'crear', codigo: 'X' },
+  })).codigo, 404)
+})
+
+test('dar de alta SIN el testigo antifalsificación no pasa', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const r = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie,
+    campos: { accion: 'crear', codigo: 'X' },
+  })
+  assert.equal(r.codigo, 403)
+})

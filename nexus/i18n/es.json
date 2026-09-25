@@ -233,5 +233,20 @@
   "perfil.organizacion": "Empresa",
   "perfil.espanol": "Español",
   "perfil.ingles": "Inglés",
-  "perfil.solo_tuyo": "Esto solo lo cambias tú. Nadie más ve ni toca tus preferencias."
+  "perfil.solo_tuyo": "Esto solo lo cambias tú. Nadie más ve ni toca tus preferencias.",
+  "alta.titulo": "Nuevo contrato",
+  "alta.crear": "Dar de alta",
+  "alta.nuevo": "Nuevo contrato",
+  "alta.datos": "El contrato",
+  "alta.renglones": "Qué se contrató",
+  "alta.anadir": "Añadir renglón",
+  "alta.monto_calculado": "El monto sale de los renglones. No se teclea: si se teclease, algún día dejaría de cuadrar con ellos.",
+  "alta.sin_hitos_aviso": "Al crearlo se le ponen los hitos de su tipo de contrato, con sus fechas repartidas dentro del plazo.",
+  "alta.error.codigo": "Ya existe un contrato con ese código",
+  "alta.error.cliente": "Hay que decir de qué cliente es",
+  "alta.error.renglones": "Un contrato sin renglones no se puede valuar ni medir",
+  "alta.error.fechas": "La fecha de fin no puede ser anterior a la de inicio",
+  "alta.error.tasa": "No hay tasa del BCV publicada todavía para hoy",
+  "alta.error.campo": "Falta algo obligatorio",
+  "alta.error.amortiza": "Si hay anticipo, hay que decir a qué ritmo se amortiza"
 }

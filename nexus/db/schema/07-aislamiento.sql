@@ -99,7 +99,21 @@ create policy persona_escritura on persona for all
   using (es_interna()) with check (es_interna());
 
 -- Escribir es siempre de dentro.
-create policy contrato_escritura  on contrato  for all using (es_interna() and organizacion_id = org_actual());
+create policy contrato_escritura  on contrato  for all
+  using (es_interna() and organizacion_id = org_actual())
+  with check (es_interna() and organizacion_id = org_actual());
+
+-- Los renglones tenian politica de LECTURA y no de escritura, asi que no habia forma
+-- de crear uno sin ser el dueno de la tabla. No se noto mientras los contratos solo
+-- entraban por SQL; salto el dia que hubo un formulario. Un renglon sigue al contrato
+-- del que cuelga: si puedes escribir el contrato, puedes escribir sus renglones.
+create policy renglon_escritura on renglon for all
+  using (exists (select 1 from contrato c
+                  where c.id = renglon.contrato_id
+                    and es_interna() and c.organizacion_id = org_actual()))
+  with check (exists (select 1 from contrato c
+                       where c.id = renglon.contrato_id
+                         and es_interna() and c.organizacion_id = org_actual()));
 create policy valuacion_escritura on valuacion for all using (es_interna() and organizacion_id = org_actual());
 create policy asiento_escritura   on asiento   for all using (es_interna() and organizacion_id = org_actual());
 create policy partida_escritura   on partida   for all using (es_interna() and organizacion_id = org_actual());

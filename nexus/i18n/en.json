@@ -233,5 +233,20 @@
   "perfil.organizacion": "Company",
   "perfil.espanol": "Spanish",
   "perfil.ingles": "English",
-  "perfil.solo_tuyo": "Only you change this. Nobody else sees or touches your preferences."
+  "perfil.solo_tuyo": "Only you change this. Nobody else sees or touches your preferences.",
+  "alta.titulo": "New contract",
+  "alta.crear": "Create",
+  "alta.nuevo": "New contract",
+  "alta.datos": "The contract",
+  "alta.renglones": "What was contracted",
+  "alta.anadir": "Add line item",
+  "alta.monto_calculado": "The amount comes from the line items. It is not typed in: if it were, one day it would stop matching them.",
+  "alta.sin_hitos_aviso": "On creation it gets the milestones for its contract type, with dates spread across the term.",
+  "alta.error.codigo": "A contract with that code already exists",
+  "alta.error.cliente": "You must say which client it is for",
+  "alta.error.renglones": "A contract with no line items cannot be valued or measured",
+  "alta.error.fechas": "The end date cannot be earlier than the start date",
+  "alta.error.tasa": "No BCV rate has been published for today yet",
+  "alta.error.campo": "Something required is missing",
+  "alta.error.amortiza": "If there is an advance, you must say how fast it is amortised"
 }

@@ -35,6 +35,10 @@ import {
 import { pintarPaginaAvance } from '../pantallas/evidencia.ts'
 import { medidas } from '../dominio/medidas.ts'
 import { perfil, guardarPerfil } from '../dominio/perfil.ts'
+import {
+  crearContrato, clientes, TIPOS, type ContratoNuevo, type RenglonNuevo, type TipoContrato,
+} from '../dominio/alta.ts'
+import { pintarAlta, type Traido } from '../pantallas/alta.ts'
 import { pintarPerfil } from '../pantallas/perfil.ts'
 import { pintarMedidas } from '../pantallas/medidas.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
@@ -246,6 +250,46 @@ export async function resolver(
     await comoQuien((q) => guardarPerfil(q, personaId, idioma, marcados, esCliente))
     const datos = await comoQuien((q) => perfil(q, personaId, idioma, esCliente))
     return html(200, pintarPerfil(datos, idioma, testigoAnti(testigo), true))
+  }
+
+  // Dar de alta un contrato. Solo de dentro: GPS contrata, el cliente no se da de
+  // alta contratos a sí mismo.
+  if (p.ruta === '/contratos/nuevo' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const lista = await comoQuien((q) => clientes(q))
+    return html(200, pintarAlta(lista, p.idioma, testigoAnti(testigo)))
+  }
+
+  if (p.ruta === '/contratos/nuevo' && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    const traido = altaTraida(p)
+    const lista = await comoQuien((q) => clientes(q))
+    const filas = Math.max(Number(p.campos['filas'] ?? 3) || 3, 3)
+
+    // Pedir más filas no es enviar el formulario: se vuelve a pintar con lo escrito
+    // y cinco huecos más. Sin esto haría falta JavaScript, y la política de
+    // seguridad de esta aplicación no deja ejecutar ninguno.
+    if (p.campos['accion'] === 'mas') {
+      return html(200, pintarAlta(lista, p.idioma, testigoAnti(testigo), [], traido, filas + 5))
+    }
+
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const r = await comoQuien((q) =>
+      crearContrato(q, contratoDesdeFormulario(traido), personaId, org!.organizacion_id, p.idioma))
+
+    if (!r.hecho) {
+      // Lo escrito se devuelve escrito. Un formulario que se vacía al fallar es la
+      // forma más rápida de que nadie lo vuelva a usar.
+      return html(400, pintarAlta(lista, p.idioma, testigoAnti(testigo), r.errores, traido, filas))
+    }
+    return aOtroSitio(`/contratos/${r.contratoId}`)
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
@@ -479,6 +523,73 @@ function destinoSeguro(pedido: string | undefined): string {
   if (pedido.includes(':')) return '/'
   if (pedido.includes('\\')) return '/'
   return pedido
+}
+
+/**
+ * Lo que vino del formulario de alta, tal cual, para poder devolverlo escrito.
+ *
+ * Las columnas de los renglones llegan como campos repetidos: `r_desc_es` cinco
+ * veces, `r_cantidad` cinco veces. Se vuelven a cruzar por posición, que es como el
+ * navegador las manda — en el mismo orden en que están en la página.
+ */
+function altaTraida(p: Peticion): Traido {
+  const col = (n: string) => p.repetidos?.[n] ?? (p.campos[n] ? [p.campos[n]!] : [])
+  const desc = col('r_desc_es')
+  const renglones = desc.map((_, i) => ({
+    desc_es: col('r_desc_es')[i] ?? '',
+    desc_en: col('r_desc_en')[i] ?? '',
+    cantidad: col('r_cantidad')[i] ?? '',
+    unidad: col('r_unidad')[i] ?? '',
+    norma: col('r_norma')[i] ?? '',
+    espec: col('r_espec')[i] ?? '',
+    precio: col('r_precio')[i] ?? '',
+    costo: col('r_costo')[i] ?? '',
+  }))
+  const campos: Record<string, string> = {}
+  for (const k of ['cliente', 'codigo', 'tipo', 'moneda', 'titulo_es', 'titulo_en',
+                   'firmado_el', 'inicio', 'fin_previsto', 'anticipo_pct',
+                   'amortiza_pct', 'garantia_pct']) {
+    campos[k] = p.campos[k] ?? ''
+  }
+  return { campos, renglones }
+}
+
+/** Del texto del formulario a lo que el dominio entiende. */
+function contratoDesdeFormulario(tr: Traido): ContratoNuevo {
+  const num = (v: string | undefined) => {
+    const n = Number((v ?? '').replace(',', '.'))
+    return Number.isFinite(n) ? n : 0
+  }
+  const c = tr.campos ?? {}
+  const tipo = (c['tipo'] ?? '') as TipoContrato
+  return {
+    clienteId: c['cliente'] ?? '',
+    codigo: c['codigo'] ?? '',
+    tipo: TIPOS.includes(tipo) ? tipo : ('procura' as TipoContrato),
+    tituloEs: c['titulo_es'] ?? '',
+    tituloEn: c['titulo_en'] ?? '',
+    moneda: c['moneda'] === 'VES' ? 'VES' : 'USD',
+    firmadoEl: c['firmado_el'] || null,
+    inicio: c['inicio'] || null,
+    finPrevisto: c['fin_previsto'] || null,
+    anticipoPct: num(c['anticipo_pct']),
+    amortizaPct: num(c['amortiza_pct']),
+    garantiaPct: num(c['garantia_pct']),
+    // Las filas vacías se tiran aquí: el formulario pinta huecos de más a propósito,
+    // y guardarlos crearía renglones fantasma con cantidad cero.
+    renglones: (tr.renglones ?? [])
+      .filter((r) => (r['desc_es'] ?? '').trim() !== '' || (r['precio'] ?? '').trim() !== '')
+      .map((r): RenglonNuevo => ({
+        descripcionEs: r['desc_es'] ?? '',
+        descripcionEn: (r['desc_en'] ?? '').trim() || (r['desc_es'] ?? ''),
+        cantidad: num(r['cantidad']),
+        unidad: r['unidad'] ?? '',
+        norma: (r['norma'] ?? '').trim() || null,
+        especificacion: (r['espec'] ?? '').trim() || null,
+        precioUnitario: num(r['precio']),
+        costoUnitario: (r['costo'] ?? '').trim() === '' ? null : num(r['costo']),
+      })),
+  }
 }
 
 /**
