@@ -584,5 +584,7 @@
   "mayor.elegir": "Elige una cuenta para ver su mayor.",
   "mayor.sin_movimiento": "Esa cuenta no tuvo ningún movimiento entre esas dos fechas.",
   "mayor.solo_con_movimiento": "Solo se ofrecen las cuentas que tienen movimiento. Ofrecer las ochenta del plan sería ruido.",
-  "mayor.saldo_explica": "El saldo lo arrastra la base de datos, no esta pantalla. Dos sitios sumando lo mismo es como se acaba con dos saldos distintos para la misma cuenta."
+  "mayor.saldo_explica": "El saldo lo arrastra la base de datos, no esta pantalla. Dos sitios sumando lo mismo es como se acaba con dos saldos distintos para la misma cuenta.",
+  "medida.ocultas": "y otras {n} más, ordenadas detrás de estas",
+  "medida.ocultas_explica": "Se enseñan las peores. Una lista de problemas de quinientas filas no es una lista, es una pared, y nadie actúa sobre quinientas cosas. Los totales de arriba sí están calculados sobre TODAS."
 }

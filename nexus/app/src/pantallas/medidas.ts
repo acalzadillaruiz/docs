@@ -46,6 +46,17 @@ function vacio(texto: string): string {
   return `<p class="nada">${escapar(texto)}</p>`
 }
 
+/**
+ * Lo que queda detrás de las que se enseñan.
+ *
+ * Se dice, no se esconde. Una tabla recortada en silencio hace que alguien decida
+ * creyendo que ha visto todo, y eso es peor que una pantalla larga.
+ */
+function yQuedan(n: number, t: ReturnType<typeof traductor>): string {
+  if (n === 0) return ''
+  return `<p class="mas">${escapar(t('medida.ocultas').replace('{n}', String(n)))}</p>`
+}
+
 function bloqueBrecha(filas: readonly FilaBrecha[], idioma: Idioma, t: ReturnType<typeof traductor>): string {
   const x = TEXTOS[idioma]
   if (filas.length === 0) return vacio(t('medida.nada'))
@@ -143,18 +154,23 @@ export function pintarMedidas(m: Medidas, idioma: Idioma): string {
 </div></header>`,
     cuerpo: `<main class="wrap">
 ${seccion(t('medida.brecha'), x.preguntaBrecha, t('medida.brecha_explicacion'),
-  bloqueBrecha(m.brecha, idioma, t))}
+  bloqueBrecha(m.brecha, idioma, t) + yQuedan(m.ocultas.brecha, t))}
 ${seccion(t('medida.tiempo_verdad'), x.preguntaVerdad, x.avisoVerdad,
-  bloqueVerdad(m.verdad, idioma, t))}
+  bloqueVerdad(m.verdad, idioma, t) + yQuedan(m.ocultas.verdad, t))}
 ${seccion(t('medida.cobertura'), x.preguntaCobertura, x.avisoCobertura,
-  bloqueCobertura(m.cobertura, idioma, t))}
+  bloqueCobertura(m.cobertura, idioma, t) + yQuedan(m.ocultas.cobertura, t))}
 ${seccion(t('medida.sin_hitos'), x.preguntaSinHitos, t('medida.sin_hitos_explica'),
-  bloqueSinHitos(m.sinHitos, idioma, t))}
+  bloqueSinHitos(m.sinHitos, idioma, t) + yQuedan(m.ocultas.sinHitos, t))}
+${m.ocultas.brecha + m.ocultas.verdad + m.ocultas.cobertura + m.ocultas.sinHitos === 0
+  ? '' : `<p class="expl">${escapar(t('medida.ocultas_explica'))}</p>`}
 </main>`,
   })
 }
 
 export const ESTILOS_MEDIDAS = `
+.mas{margin:0;padding:11px 17px;border-top:1px solid var(--ln);font-size:13px;
+  color:var(--md);font-family:"JetBrains Mono",monospace;font-size:11.5px}
+.expl{margin:14px 0 0;font-size:12.5px;color:var(--md);line-height:1.45;max-width:64ch}
 .kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;
   margin-top:22px;background:var(--nv3)}
 .kp .d{background:var(--nv);padding:13px 15px}

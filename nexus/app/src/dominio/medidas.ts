@@ -6,6 +6,19 @@
  * lo que más duele. Nada se recalcula: repetir el cálculo aquí sería tener dos
  * verdades sobre lo mismo.
  *
+ * **Cuántas filas se enseñan.** Estas cuatro tablas traen una fila por contrato, y
+ * con quinientos contratos la pantalla tardaba un segundo y pesaba 613 KB. En el
+ * patio, con la cobertura que hay, eso son decenas de segundos.
+ *
+ * Pero el problema de fondo no es el peso: es que **una lista de problemas de
+ * quinientas filas no es una lista, es una pared**. Esta pantalla existe para que
+ * alguien haga algo, y nadie actúa sobre quinientas cosas. Se enseñan las peores y
+ * se dice cuántas quedan detrás — que es distinto de esconderlas.
+ *
+ * Lo que NO se recorta nunca es el total: la brecha en dinero se suma sobre TODAS
+ * las filas. Un titular calculado sobre una lista cortada sería un número falso, y
+ * un número falso en una pantalla de dirección es peor que no tener la pantalla.
+ *
  * Nada de esto sale nunca al cliente. No hace falta esconderlo en la pantalla: la
  * ruta se niega, y además las funciones piden la organización de GPS. Un cliente que
  * llamara aquí obtendría su propia organización, que no es de tipo gps, y por tanto
@@ -57,7 +70,23 @@ export type Medidas = {
   readonly sinHitos: readonly FilaSinHitos[]
   /** El total de la brecha, en cada moneda. No se suman dólares con bolívares. */
   readonly brechaTotal: readonly string[]
+  /** Cuántas filas quedaron fuera de cada tabla. Se dicen, no se esconden. */
+  readonly ocultas: {
+    readonly brecha: number
+    readonly verdad: number
+    readonly cobertura: number
+    readonly sinHitos: number
+  }
 }
+
+/**
+ * Cuántas filas se enseñan de cada tabla.
+ *
+ * Veinticinco es lo que cabe en una pantalla sin que se convierta en una pared, y
+ * las cuatro consultas ya vienen ordenadas con lo peor delante. Si alguien necesita
+ * la lista entera, eso es una exportación, no una pantalla más larga.
+ */
+export const CUANTAS = 25
 
 export async function medidas(
   q: Consulta, orgId: string, idioma: Idioma,
@@ -96,7 +125,13 @@ export async function medidas(
   }
 
   return {
-    brecha: brechaCruda.map((f): FilaBrecha => {
+    ocultas: {
+      brecha: Math.max(0, brechaCruda.length - CUANTAS),
+      verdad: Math.max(0, verdadCruda.length - CUANTAS),
+      cobertura: Math.max(0, coberturaCruda.length - CUANTAS),
+      sinHitos: Math.max(0, sinHitosCrudo.length - CUANTAS),
+    },
+    brecha: brechaCruda.slice(0, CUANTAS).map((f): FilaBrecha => {
       const declarado = Number(f.declarado)
       const evidenciado = Number(f.evidenciado)
       return {
@@ -110,13 +145,13 @@ export async function medidas(
           : Math.round((evidenciado / declarado) * 1000) / 10,
       }
     }),
-    verdad: verdadCruda.map((f): FilaVerdad => ({
+    verdad: verdadCruda.slice(0, CUANTAS).map((f): FilaVerdad => ({
       contrato: f.contrato,
       hechos: Number(f.hechos),
       mediana: Number(f.mediana),
       peor: Number(f.peor),
     })),
-    cobertura: coberturaCruda.map((f): FilaCobertura => {
+    cobertura: coberturaCruda.slice(0, CUANTAS).map((f): FilaCobertura => {
       const vendido = Number(f.vendido)
       const sin = Number(f.sin_respaldo)
       return {
@@ -128,7 +163,7 @@ export async function medidas(
         sinRespaldoPct: vendido === 0 ? 0 : Math.round((sin / vendido) * 1000) / 10,
       }
     }),
-    sinHitos: sinHitosCrudo.map((f): FilaSinHitos => ({
+    sinHitos: sinHitosCrudo.slice(0, CUANTAS).map((f): FilaSinHitos => ({
       renglonId: f.renglon_id,
       contratoId: f.contrato_id,
       contrato: f.contrato,

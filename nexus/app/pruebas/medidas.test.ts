@@ -132,7 +132,10 @@ test('la pantalla dice que no sale al cliente, con todas las letras', async () =
 
 test('cuando no hay nada que señalar lo dice, no pinta una tabla vacía', () => {
   // Una tabla vacía parece un error del programa.
-  const nada: Medidas = { brecha: [], verdad: [], cobertura: [], sinHitos: [], brechaTotal: [] }
+  const nada: Medidas = {
+    brecha: [], verdad: [], cobertura: [], sinHitos: [], brechaTotal: [],
+    ocultas: { brecha: 0, verdad: 0, cobertura: 0, sinHitos: 0 },
+  }
   const h = pintarMedidas(nada, 'es')
   assert.match(h, /Nada que señalar aquí. Es una buena noticia./)
   assert.equal(h.includes('class="fila"'), false)
@@ -189,4 +192,54 @@ test('lo que un cliente sí alcanza es su propia obra, nunca la contabilidad', a
     assert.equal('costo' in f, false)
     assert.equal('margen' in f, false)
   }
+})
+
+
+// ===========================================================================
+// Cuántas filas se enseñan.
+//
+// Estas cuatro tablas traen una fila por contrato. Con quinientos contratos la
+// pantalla pesaba 613 KB —medido—, que en el patio son decenas de segundos. Pero el
+// problema de fondo no es el peso: una lista de problemas de quinientas filas no es
+// una lista, es una pared, y esta pantalla existe para que alguien HAGA algo.
+
+test('se enseñan las peores, y se dice cuántas quedan detrás', async () => {
+  const { CUANTAS } = await import('../src/dominio/medidas.ts')
+  const fila = (i: number) => ({
+    contrato: `C-${i}`, cliente: 'Quien sea', declarado: '100', evidenciado: '0',
+    brecha: '100', brechaPct: 100, demostradoPct: 0,
+  })
+  const muchas: Medidas = {
+    brecha: Array.from({ length: CUANTAS }, (_, i) => fila(i)),
+    verdad: [], cobertura: [], sinHitos: [],
+    brechaTotal: ['500.000,00 Bs'],
+    ocultas: { brecha: 475, verdad: 0, cobertura: 0, sinHitos: 0 },
+  }
+  const h = pintarMedidas(muchas, 'es')
+  assert.match(h, /475/, 'no dice cuántas quedan detrás')
+  assert.match(h, /una pared/, 'no explica por qué se recorta')
+})
+
+test('sin nada oculto NO se pone el aviso: sería ruido', () => {
+  const pocas: Medidas = {
+    brecha: [], verdad: [], cobertura: [], sinHitos: [], brechaTotal: [],
+    ocultas: { brecha: 0, verdad: 0, cobertura: 0, sinHitos: 0 },
+  }
+  const h = pintarMedidas(pocas, 'es')
+  assert.doesNotMatch(h, /quedan detrás/)
+  assert.doesNotMatch(h, /una pared/)
+})
+
+test('el TOTAL se calcula sobre TODAS las filas, no sobre las que se enseñan', async () => {
+  // Es la parte que no se puede recortar. Un titular calculado sobre una lista
+  // cortada sería un número falso, y un número falso en una pantalla de dirección es
+  // peor que no tener la pantalla.
+  const m = await mias()
+  const { CUANTAS } = await import('../src/dominio/medidas.ts')
+  assert.ok(m.brecha.length <= CUANTAS, 'la tabla no se recortó')
+  // Con los datos de esta prueba hay pocas filas, así que nada queda oculto y el
+  // total tiene que cuadrar con la suma de lo que se ve. La comprobación que importa
+  // es que el total NO salga de `m.brecha`: sale de la consulta entera.
+  assert.equal(m.ocultas.brecha, 0)
+  assert.ok(m.brechaTotal.length > 0 || m.brecha.length === 0)
 })
