@@ -100,7 +100,7 @@ Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e
 todas pasando.
 
 Y **los estados contables** (`5b5580f`) y **el resultado abierto y la cartera contrato
-por contrato** (`9e1f0a2`). Con esto, **el barrido ya no devuelve ningún informe de
+por contrato** (`06e7ec9`). Con esto, **el barrido ya no devuelve ningún informe de
 cara al usuario sin pantalla** — esta vez comprobado, no afirmado:
 
 ```bash
