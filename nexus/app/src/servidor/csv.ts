@@ -190,3 +190,34 @@ function armar(anio: number, mes: number, dia: number): string | null {
   if (d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia) return null
   return `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
+
+/**
+ * Escribir una hoja para que la abra Excel en español.
+ *
+ * Tres cosas que parecen manías y no lo son, porque cada una se ha visto romper un
+ * archivo entero al abrirlo:
+ *
+ *   - **Separador punto y coma.** Con coma, un Excel en español mete toda la fila en
+ *     una sola celda, porque para él la coma es el decimal.
+ *   - **Los tres bytes del principio.** Sin ellos, Excel abre el archivo en la
+ *     codificación del sistema y «Depreciación» sale como «DepreciaciÃ³n». No es
+ *     estético: un RIF o un nombre mal leído ya no casa con nada.
+ *   - **Saltos de línea de Windows.** Es lo que espera la herramienta que va a leer
+ *     esto al otro lado, y cambiarlo no aporta nada.
+ *
+ * Lo que va dentro se entrecomilla en cuanto lleva el separador, comillas o un salto
+ * de línea — y las comillas de dentro se doblan, que es como se escribe una comilla
+ * en un CSV. Una descripción como «Cabezal 11" 5M» es lo normal aquí, no un caso
+ * raro.
+ */
+export function escribirHoja(
+  filas: readonly (readonly string[])[], separador: ',' | ';' = ';',
+): string {
+  const celda = (v: string) => {
+    const t = v ?? ''
+    return /["\r\n]/.test(t) || t.includes(separador)
+      ? `"${t.replace(/"/g, '""')}"`
+      : t
+  }
+  return '﻿' + filas.map((f) => f.map(celda).join(separador)).join('\r\n') + '\r\n'
+}

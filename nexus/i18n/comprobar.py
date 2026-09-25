@@ -30,6 +30,9 @@ if vacias:
 IGUALES_A_PROPOSITO = {
     "_nota", "logistica.preservacion", "logistica.expediting",
     "valuacion.periodo", "fiscal.exento",
+    # Cabeceras de los libros fiscales. «Control» y «Total» se escriben igual en los
+    # dos idiomas; traducirlas por traducirlas seria empeorarlas.
+    "libro.control", "libro.total",
 }
 iguales = sorted(k for k in set(es) & set(en)
                  if k not in IGUALES_A_PROPOSITO and es[k] == en[k])

@@ -64,6 +64,9 @@ import { equipos, depreciarMes } from '../dominio/activos.ts'
 import { pintarActivos } from '../pantallas/activos.ts'
 import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
 import { pintarReexpresion } from '../pantallas/reexpresion.ts'
+import { libro, libroCrudo, aFilas } from '../dominio/libros.ts'
+import { pintarLibro } from '../pantallas/libros.ts'
+import { escribirHoja } from './csv.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
@@ -644,6 +647,46 @@ export async function resolver(
     const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
     return html(errores.length === 0 ? 200 : 400,
       pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // Los libros de ventas y compras. Es lo unico de esta aplicacion que sale de la
+  // empresa con destino al SENIAT, y nunca lo ve el cliente.
+  if ((p.ruta === '/libros' || p.ruta === '/libros/hoja') && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date()
+    const cual: 'ventas' | 'compras' = p.campos['cual'] === 'compras' ? 'compras' : 'ventas'
+    const anio = Number(p.campos['anio'] ?? 0) || hoy.getUTCFullYear()
+    const mes = Number(p.campos['mes'] ?? 0) || hoy.getUTCMonth() + 1
+    if (mes < 1 || mes > 12 || anio < 2000 || anio > 2100) return noEncontrado(p.idioma)
+
+    if (p.ruta === '/libros') {
+      const l = await comoQuien((q) => libro(q, org!.organizacion_id, cual, anio, mes, p.idioma))
+      return html(200, pintarLibro(l, p.idioma, testigoAnti(testigo)))
+    }
+
+    // La hoja. Los importes van SIN formatear: esto lo abre una hoja de calculo, y
+    // «1.234,56» leido por una hoja en ingles se convierte en otra cosa. Quien lo
+    // lee es una maquina, no una persona.
+    const l = await comoQuien((q) => libro(q, org!.organizacion_id, cual, anio, mes, p.idioma))
+    const crudos = await comoQuien((q) => libroCrudo(q, org!.organizacion_id, cual, anio, mes))
+    const { cabeceras, filas } = aFilas(l, p.idioma, crudos)
+    const texto = escribirHoja([cabeceras, ...filas])
+    const bytes = new TextEncoder().encode(texto)
+    const nombre = `libro-${cual}-${anio}-${String(mes).padStart(2, '0')}.csv`
+    return {
+      codigo: 200,
+      bytes,
+      cabeceras: {
+        ...CABECERAS_BASE,
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(nombre)}`,
+        'Content-Length': String(bytes.length),
+      },
+    }
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)

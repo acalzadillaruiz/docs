@@ -143,3 +143,36 @@ test('una hoja de facturas de proveedor real entra entera', () => {
   assert.equal(leerNumero(h.filas[1]![5]!, 'ven'), 1200000)
   assert.equal(leerFecha(h.filas[2]![0]!, 'dmy'), '2026-04-15')
 })
+
+// ---------------------------------------------------------------- escribir
+
+test('lo que se escribe se vuelve a leer igual: ida y vuelta', async () => {
+  const { escribirHoja } = await import('../src/servidor/csv.ts')
+  const original = [
+    ['Fecha', 'RIF', 'Descripción', 'Base'],
+    ['2026-04-03', 'J-30111111-1', 'Cabezal 11" 5M', '1200000.00'],
+    ['2026-04-15', 'J-30222222-2', 'Flete; con punto y coma', '350000.00'],
+    ['2026-04-20', 'J-30333333-3', 'Nota\ncon salto', '10.00'],
+  ]
+  const texto = escribirHoja(original)
+  assert.deepEqual(leerHoja(texto).filas, original)
+})
+
+test('el archivo lleva los tres bytes que Excel necesita para los acentos', async () => {
+  // Sin ellos, «Depreciación» sale «DepreciaciÃ³n», y un nombre mal leído ya no casa.
+  const { escribirHoja } = await import('../src/servidor/csv.ts')
+  assert.equal(escribirHoja([['Depreciación']]).charCodeAt(0), 0xfeff)
+})
+
+test('separa con punto y coma, porque la coma es el decimal', async () => {
+  const { escribirHoja } = await import('../src/servidor/csv.ts')
+  const t = escribirHoja([['a', 'b']])
+  assert.ok(t.includes('a;b'))
+  assert.equal(escribirHoja([['a', 'b']], ',').includes('a,b'), true)
+})
+
+test('una celda vacía no desplaza las columnas', async () => {
+  const { escribirHoja } = await import('../src/servidor/csv.ts')
+  const h = leerHoja(escribirHoja([['a', 'b', 'c'], ['1', '', '3']]))
+  assert.deepEqual(h.filas[1], ['1', '', '3'])
+})
