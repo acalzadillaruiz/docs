@@ -58,6 +58,8 @@ import {
   facturasDeProveedor, conceptosIslr, retener, esAgenteDeRetencion,
 } from '../dominio/proveedores.ts'
 import { pintarProveedores } from '../pantallas/proveedores.ts'
+import { conciliacion, casar, aceptarConNota } from '../dominio/banco.ts'
+import { pintarBanco } from '../pantallas/banco.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
@@ -539,6 +541,41 @@ export async function resolver(
     }))
     return html(errores.length === 0 ? 200 : 400, pintarProveedores(
       datos.lista, datos.conceptos, p.idioma, testigoAnti(testigo), errores, datos.esAgente))
+  }
+
+  // Conciliación bancaria. La máquina propone; casar lo hace una persona.
+  if (p.ruta === '/banco' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date().toISOString().slice(0, 10)
+    const desde = /^\d{4}-\d{2}-\d{2}$/.test(p.campos['desde'] ?? '')
+      ? p.campos['desde']! : `${hoy.slice(0, 7)}-01`
+    const hasta = /^\d{4}-\d{2}-\d{2}$/.test(p.campos['hasta'] ?? '')
+      ? p.campos['hasta']! : hoy
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const mov = p.campos['movimiento'] ?? ''
+      if (!/^[0-9a-f-]{36}$/.test(mov)) return noEncontrado(p.idioma)
+      const r = p.campos['accion'] === 'nota'
+        ? await comoQuien((q) => aceptarConNota(q, mov, p.campos['nota'] ?? '',
+            personaId, p.idioma))
+        : await comoQuien((q) => casar(q, mov,
+            p.campos['clase'] === 'pago' ? 'pago' : 'cobro',
+            p.campos['candidato'] ?? '', personaId, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    }
+
+    const c = await comoQuien((q) =>
+      conciliacion(q, org!.organizacion_id, desde, hasta, p.idioma))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarBanco(c, p.idioma, testigoAnti(testigo), errores))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)

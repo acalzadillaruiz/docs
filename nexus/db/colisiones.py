@@ -32,20 +32,40 @@ PREFIJO = re.compile(r"'([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 # la base de datos solo admite una tasa por dia, se escriba como se escriba.
 TASA = re.compile(r"tasa_bcv[^;]*?('\d{4}-\d{2}-\d{2}'|current_date)", re.S)
 
+# El correo de una persona es unico en toda la base. Dos archivos que INSERTEN el
+# mismo chocan igual que si compartieran el prefijo de UUID, y el error que sale
+# —«clave duplicada»— no dice cual es el otro archivo.
+#
+# Solo cuentan los que se insertan. Varios archivos usan a proposito un correo que NO
+# existe, para comprobar que entrar con el falla igual que con una clave mala, y esos
+# no chocan con nada porque nunca llegan a la tabla.
+INSERTA_PERSONA = re.compile(r"insert\s+into\s+persona\b.*?(?:;|`)", re.S | re.I)
+CORREO = re.compile(r"'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]*prueba\.test)'")
+
+# El RIF de una organizacion tambien es unico.
+RIF = re.compile(r"'(J-\d{9}-\d)'")
+
 RELLENO = {'00000000', 'ffffffff'}
 
 
-def duenos(patron: re.Pattern[str], descarta: set[str] = set()) -> dict[str, set[str]]:
+def duenos(
+    patron: re.Pattern[str], descarta: set[str] = set(),
+    dentro_de: re.Pattern[str] | None = None,
+) -> dict[str, set[str]]:
     de_quien: dict[str, set[str]] = defaultdict(set)
     for carpeta in CARPETAS:
         for archivo in sorted(carpeta.glob('*')):
             if not archivo.name.endswith('.test.ts'):
                 continue
             texto = archivo.read_text(encoding='utf-8')
-            for valor in patron.findall(texto):
-                if valor in descarta:
-                    continue
-                de_quien[valor].add(archivo.name)
+            # Cuando se pide, solo se mira dentro de cierto tipo de instruccion: un
+            # correo escrito para comprobar que NO existe no choca con nada.
+            trozos = dentro_de.findall(texto) if dentro_de else [texto]
+            for trozo in trozos:
+                for valor in patron.findall(trozo):
+                    if valor in descarta:
+                        continue
+                    de_quien[valor].add(archivo.name)
     return de_quien
 
 
@@ -65,6 +85,20 @@ def main() -> int:
                 f'la tasa del BCV del {fecha} la insertan {len(archivos)} archivos: '
                 + ', '.join(sorted(archivos))
                 + ' — solo cabe una tasa por dia'
+            )
+
+    for correo, archivos in sorted(duenos(CORREO, dentro_de=INSERTA_PERSONA).items()):
+        if len(archivos) > 1:
+            problemas.append(
+                f'el correo {correo} lo usan {len(archivos)} archivos: '
+                + ', '.join(sorted(archivos)) + ' — y es unico en toda la base'
+            )
+
+    for rif, archivos in sorted(duenos(RIF).items()):
+        if len(archivos) > 1:
+            problemas.append(
+                f'el RIF {rif} lo usan {len(archivos)} archivos: '
+                + ', '.join(sorted(archivos)) + ' — y es unico en toda la base'
             )
 
     if problemas:
