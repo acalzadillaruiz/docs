@@ -78,9 +78,42 @@ create table validacion_fila (
 create or replace function leer_fecha(p_texto text, p_formato text)
 returns date
 language plpgsql immutable as $$
+declare
+  patron text;
+  d      date;
+  dia    int;
+  mes    int;
 begin
   if p_texto is null or btrim(p_texto) = '' then return null; end if;
-  return to_date(btrim(p_texto), coalesce(p_formato, 'DD/MM/YYYY'));
+
+  -- El vocabulario es el MISMO que usa la aplicacion al leer la hoja: 'dmy', 'mdy',
+  -- 'iso'. Tener dos nombres para lo mismo en dos capas es como se acaba mandando
+  -- 'dmy' a una funcion que esperaba 'DD/MM/YYYY' y recibiendo null sin saber por
+  -- que. Se siguen aceptando los patrones de PostgreSQL por si alguien los usa.
+  patron := case lower(coalesce(p_formato, 'dmy'))
+              when 'dmy' then 'DD/MM/YYYY'
+              when 'mdy' then 'MM/DD/YYYY'
+              when 'iso' then 'YYYY-MM-DD'
+              else p_formato
+            end;
+
+  -- Los separadores se unifican: la gente escribe 03/04/2026, 03-04-2026 y 03.04.2026.
+  d := to_date(regexp_replace(btrim(p_texto), '[.\-]', '/', 'g'),
+               replace(patron, '-', '/'));
+
+  -- to_date es indulgente: '31/02/2026' le devuelve el 3 de marzo sin quejarse, y
+  -- eso es un dia equivocado que entra en la contabilidad en silencio. Se comprueba
+  -- que lo que salio es lo que estaba escrito.
+  if lower(coalesce(p_formato,'dmy')) in ('dmy','mdy') then
+    dia := (regexp_match(regexp_replace(btrim(p_texto), '[.\-]', '/', 'g'),
+            '^(\d{1,2})/(\d{1,2})/'))[case when lower(p_formato) = 'mdy' then 2 else 1 end]::int;
+    mes := (regexp_match(regexp_replace(btrim(p_texto), '[.\-]', '/', 'g'),
+            '^(\d{1,2})/(\d{1,2})/'))[case when lower(p_formato) = 'mdy' then 1 else 2 end]::int;
+    if extract(day from d)::int <> dia or extract(month from d)::int <> mes then
+      return null;
+    end if;
+  end if;
+  return d;
 exception when others then
   return null;
 end $$;
@@ -96,7 +129,8 @@ begin
   if p_texto is null or btrim(p_texto) = '' then return null; end if;
   t := btrim(p_texto);
   t := regexp_replace(t, '[^0-9.,\-]', '', 'g');
-  if coalesce(p_formato, 've') = 've' then
+  -- Mismo vocabulario que la aplicacion: 've' y 'ven' son lo mismo.
+  if lower(coalesce(p_formato, 've')) in ('ve', 'ven') then
     t := replace(t, '.', '');
     t := replace(t, ',', '.');
   else
