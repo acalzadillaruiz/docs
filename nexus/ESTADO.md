@@ -1,29 +1,41 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 06:10 (España)
-**Avance:** 45 de 141 sesiones · **32%**
+**Última actualización:** 2026-09-25, 07:15 (España)
+**Avance:** 53 de 141 sesiones · **38%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** `db/schema/19-evidencia.sql` y `db/pruebas/16-evidencia.sql`
-— **la tesis del proyecto**, entera y probada en la base de datos: hitos con su peso,
-evidencia identificada por su huella SHA-256, y el avance calculado **solo** desde lo
-verificado. Con las tres medidas que nadie más da: brecha de evidencia, tiempo hasta
-la verdad y cobertura. 14 comprobaciones, todas pasando.
+**Lo último terminado:** la evidencia **de punta a punta**. Base de datos, dominio,
+pantallas y rutas. Ya se puede abrir un renglón y ver de dónde sale su porcentaje,
+hito por hito, hasta el documento y su huella. El cliente también lo ve — menos la
+factura del proveedor, que lleva dentro el precio de compra. Commit `aa0f848`.
+
+De paso se arregló una avería que ya estaba corriendo: los colores estaban escritos
+cuatro veces, una por pantalla, y habían derivado. Ahora hay una sola envoltura en
+`app/src/pantallas/base.ts`, y tres pruebas impiden que vuelva a pasar.
 
 **Lo siguiente, en este orden exacto:**
 
-1. **La evidencia por arriba: dominio y pantallas.** La base de datos ya se niega a
-   dar por verificado un hito sin su documento; falta el camino humano:
-   `app/src/dominio/evidencia.ts` (subir un archivo, calcular su huella, rechazar el
-   duplicado porque la huella ya es la identidad, y la cola de verificación) y
-   `app/src/pantallas/evidencia.ts` (el hito con lo que le falta dicho en una línea,
-   y el avance con el enlace al documento que lo sostiene).
-2. **Avisar por correo** cuando algo entra en la bandeja o una valuación queda
-   presentada. Hoy hay que abrir la aplicación para enterarse, y eso deja el circuito
-   dependiendo de que alguien se acuerde de mirar.
-3. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
+1. **Subir el archivo de verdad, por HTTP.** `subir()` existe y está probado, pero
+   ninguna ruta acepta todavía un `multipart/form-data`, así que el circuito no se
+   puede recorrer desde un navegador. Hace falta: leer el multipart sin armazón
+   (igual que el resto del servidor), un límite de tamaño, una lista blanca de tipos,
+   y decidir **dónde viven los bytes** — hoy solo se guarda la huella, el nombre, el
+   tamaño y el tipo. La huella es la identidad, así que el almacén puede cambiar
+   después sin tocar nada de esto.
+2. **Verificar y rechazar desde la pantalla.** Los dos botones, con su testigo
+   antifalsificación, en la cola de revisión de la cartera. Rechazar exige motivo:
+   el formulario tiene que pedirlo, no dejar que la base de datos sea quien diga que
+   no.
+3. **Avisar por correo** cuando algo entra en la bandeja, cuando una valuación queda
+   presentada, o cuando un documento lleva días sin revisar. Hoy hay que abrir la
+   aplicación para enterarse, y eso deja el circuito dependiendo de que alguien se
+   acuerde de mirar.
+4. **Las tres medidas, en pantalla.** `brecha_evidencia()`, `tiempo_hasta_la_verdad()`
+   y `cobertura()` existen y están probadas en la base de datos, pero no las enseña
+   ninguna pantalla todavía. Solo para dentro.
+5. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
    (caja chica, y el importador atado a valuaciones de verdad).
 
 **Cómo continuar, literalmente:**
@@ -34,11 +46,30 @@ cd /home/user/docs/nexus/app && npx tsc --noEmit
 ```
 
 `probar.sh` levanta un PostgreSQL desechable, carga el esquema, corre las pruebas de
-base de datos, el diccionario bilingüe y las de la aplicación. Si algo falla ahí, eso
-es lo primero, antes que cualquier cosa nueva.
+base de datos, el diccionario bilingüe, el buscador de colisiones y las de la
+aplicación. Si algo falla ahí, eso es lo primero, antes que cualquier cosa nueva.
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-311 comprobaciones hayan encontrado seis fallos reales, cuatro de ellos míos.
+355 comprobaciones hayan encontrado once fallos reales, nueve de ellos míos.
+
+### Trampas con las que ya se tropezó — no repetirlas
+
+- **Las pruebas se lanzan con `db/probar.sh`**, nunca con `node --test` a secas: sin
+  eso la base de datos no está cargada y los fallos no significan nada.
+- **Cada archivo de prueba de la aplicación necesita su propio prefijo de UUID y su
+  propia fecha de tasa del BCV.** Las de TypeScript corren todas seguidas contra una
+  sola base; dos archivos que compartan identificadores se pisan en silencio, porque
+  el `on conflict do nothing` hace que el segundo se quede con las filas del primero.
+  `db/colisiones.py` lo busca ahora antes de correr nada. Fechas ya usadas: 09-01 a
+  09-07.
+- **`avance_renglon()` es `stable`**: llamada en la MISMA instrucción que
+  `recalcular_hito()` lee la foto de antes del cambio y devuelve el avance viejo. Van
+  en instrucciones separadas.
+- **Al cliente se le conceden columnas, no tablas.** Un `select e.*` funciona desde
+  dentro y falla desde fuera. Las columnas se nombran una a una para que la misma
+  consulta sirva a los dos.
+- **Las fechas llegan como fechas, no como texto.** Se les da formato en el dominio,
+  en el idioma de quien mira.
 
 ---
 
@@ -158,6 +189,12 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/schema/19-evidencia.sql` | **La tesis del proyecto.** El avance no se declara: se calcula desde los hitos que tienen su documento **y alguien lo revisó**. Un hito exige unas clases de evidencia concretas y un disparador se niega a darlo por bueno sin ellas, diciendo cuál falta. La evidencia se identifica por su **huella SHA-256**, no por su nombre de archivo: dos nombres distintos del mismo papel son el mismo papel. Rechazar exige decir por qué. Y de aquí salen las tres medidas que nadie más da: **brecha de evidencia** (lo declarado menos lo verificado, en dinero), **tiempo hasta la verdad** (mediana de lo que tarda un hecho en llegar al sistema) y **cobertura** (lo vendido arriba sin costo abajo). |
 | `db/pruebas/16-evidencia.sql` | Catorce intentos de hacer trampa al avance: declarar 30% sin nada hecho, verificar sin el documento, subir una de las dos evidencias que se exigen, colar una huella que no es un SHA-256, contar una evidencia rechazada. Ninguno pasa. |
+| `app/src/dominio/evidencia.ts` | El camino humano de la evidencia. **La huella se calcula aquí, sobre los bytes que llegan, y no se recibe**: si la enviara el navegador bastaría con mentir en un campo para que un archivo cualquiera pasara por el certificado de colada. El mismo archivo no entra dos veces en el mismo hito, y decirlo no es un error: se devuelve el que ya estaba, porque quien lo sube otra vez casi siempre es alguien que no sabía. Y el estado del hito no se escribe desde aquí — se le pide a la base de datos que lo derive, porque escribirlo aquí sería tener dos verdades sobre lo mismo. |
+| `app/src/pantallas/evidencia.ts` | **La pantalla que justifica el proyecto.** La barra lleva dos tramos: el sólido es lo verificado, el rayado lo declarado sin respaldo. Una sola barra obligaría a elegir qué número enseñar, y cualquiera de los dos sería media verdad. Lo que falta va delante y en color, porque es la razón de que el avance no suba. El documento se nombra con su huella acortada: es lo que permite a dos personas en dos sitios comprobar que miran el mismo papel. |
+| `app/src/pantallas/base.ts` | **Una sola envoltura para todas las pantallas.** Existe porque ya había dejado de haberla: los colores estaban escritos cuatro veces y las cuatro copias habían derivado. Es la misma avería que «dos plantillas, una de móvil y otra de escritorio», solo que más lenta de ver. |
+| `app/pruebas/base.test.ts` | Que ninguna pantalla declare sus colores, monte su propio documento ni tenga su propio `escapar`. **Dos versiones de escapar es como se cuela sin escapar el texto de un cliente por una de las dos.** |
+| `app/pruebas/evidencia.test.ts` · `pantalla-avance.test.ts` | Que el camino humano no abra ningún atajo que la base de datos ya había cerrado, y que la pantalla no se pueda leer como un porcentaje suelto. |
+| `db/colisiones.py` | Busca dos archivos de prueba que compartan prefijo de UUID o fecha de tasa del BCV. **Es el fallo más caro de los encontrados aquí, porque no se ve:** el segundo archivo se queda con las filas del primero y la prueba pasa o falla según el orden en que corran. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -287,6 +324,22 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 122 | Brecha de evidencia: de 100.000 declarados, **40.000 sin respaldo**. |
 | 123 | Tiempo hasta la verdad: mediana de 7,5 días, el peor caso 12. |
 | 124 | Cobertura: 200.000 vendidos arriba **sin nada comprado debajo**. |
+| 125 | Recalcular no mueve un hito que sigue estando bien. |
+| 126 | Rechazada la evidencia, el hito **cae** y el avance vuelve a 0%. |
+| 127 | El cliente ve sus hitos y **ninguna factura de proveedor**. |
+| 128 | La huella se calcula sobre los bytes: el vector oficial de SHA-256 sale exacto. |
+| 129 | El mismo archivo con otro nombre no entra dos veces: es el mismo papel. |
+| 130 | Rechazar sin decir por qué no pasa. |
+| 131 | Un documento ya revisado no se vuelve a revisar. |
+| 132 | Un documento vacío no prueba nada. |
+| 133 | Un hito que no existe y uno que no te toca dan el **mismo** error. |
+| 134 | El cliente **no puede** subir ni verificar nada: eso volvería el avance a ser lo que alguien diga. |
+| 135 | La cola de revisión pone delante lo que lleva más tiempo parado, no lo de más importe. |
+| 136 | La barra lleva dos tramos, y sin brecha no se enseña una insignia diciendo que no hay brecha. |
+| 137 | Lo que falta va **antes** que la lista de documentos, no detrás. |
+| 138 | Un hito sin empezar se atenúa, no desaparece: si desapareciera, los pesos visibles no sumarían 100. |
+| 139 | Ninguna pantalla declara sus propios colores, ni monta su documento, ni repite `escapar`. |
+| 140 | El avance de un renglón se sirve en su ruta, y uno que no te toca devuelve 404, no 403. |
 
 ## Lo que sigue
 
