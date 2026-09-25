@@ -111,7 +111,6 @@ export function pintarValuacion(d: DatosValuacion, idioma: Idioma): string {
     idioma,
     titulo: `${t('valuacion.titulo')} ${d.numero} · ${d.contrato}`,
     estilos: `
-.wrap{max-width:780px;margin:0 auto;padding:0 18px}
 .hd .rt{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;
   letter-spacing:.17em;text-transform:uppercase;color:#7691A8}
 .hd .rt b{color:#48E2AA;font-weight:700}
