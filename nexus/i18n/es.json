@@ -208,5 +208,19 @@
   "aviso.hito_atrasado.cuerpo": "Lleva {dias} días pasada la fecha prevista y todavía no tiene evidencia.",
   "aviso.ver": "Verlo en GPS Nexus",
   "aviso.firma": "Este aviso sale de GPS Nexus. Puedes dejar de recibir este tipo de aviso desde tu perfil.",
-  "aviso.hola": "Hola {nombre},"
+  "aviso.hola": "Hola {nombre},",
+  "medida.titulo": "Lo que nadie más mide",
+  "medida.subtitulo": "Tres cifras que no salen de ningún portal de seguimiento",
+  "medida.declarado": "Declarado",
+  "medida.evidenciado": "Demostrable",
+  "medida.sin_demostrar": "Sin demostrar",
+  "medida.vendido": "Vendido",
+  "medida.con_respaldo": "Con costo debajo",
+  "medida.sin_respaldo": "Sin nada debajo",
+  "medida.hechos": "Hechos medidos",
+  "medida.nada": "Nada que señalar aquí. Es una buena noticia.",
+  "medida.sin_hitos": "Renglones sin hitos",
+  "medida.sin_hitos_explica": "Su avance sale cero, el mismo cero que un renglón que no ha empezado. Hasta que se les creen los hitos, nadie puede distinguir una cosa de la otra.",
+  "medida.crear_hitos": "Crear sus hitos",
+  "medida.solo_dentro": "Solo para GPS. Nada de esta pantalla sale al cliente."
 }

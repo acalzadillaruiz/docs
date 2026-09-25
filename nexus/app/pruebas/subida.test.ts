@@ -355,3 +355,26 @@ test('el mismo documento subido dos veces no duplica la fila', async () => {
   `)) as unknown as Array<{ n: number }>
   assert.equal(n!.n, 1, 'el mismo papel con dos nombres es el mismo papel')
 })
+
+test('el cliente no llega a las medidas: 404, igual que a un contrato ajeno', async () => {
+  // Son el margen de GPS mirado desde otro ángulo.
+  const cli = await entrar('sub-cli@prueba.test')
+  const r = await pedir({ ruta: '/medidas', cookie: cli })
+  assert.equal(r.codigo, 404)
+})
+
+test('de dentro, las medidas se sirven y la cartera lleva a ellas', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const m = await pedir({ ruta: '/medidas', cookie })
+  assert.equal(m.codigo, 200)
+  assert.match(m.cuerpo!, /Solo para GPS/)
+
+  const cartera = await pedir({ ruta: '/', cookie })
+  assert.match(cartera.cuerpo!, /href="\/medidas"/)
+})
+
+test('al cliente la cartera no le ofrece las medidas', async () => {
+  const cli = await entrar('sub-cli@prueba.test')
+  const r = await pedir({ ruta: '/', cookie: cli })
+  assert.equal(r.cuerpo!.includes('/medidas'), false)
+})

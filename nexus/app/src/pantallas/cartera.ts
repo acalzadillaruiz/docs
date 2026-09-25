@@ -144,9 +144,15 @@ ${ESTILOS_AVANCE}
   .pie{flex-direction:column;align-items:stretch;gap:10px}
   .der{flex-direction:row;justify-content:space-between;align-items:baseline;text-align:left}
 }
+/* El enlace a las medidas va en la cabecera y no en un menú: un cuadro de mando al
+   que hay que navegar se mira el día que se instala y nunca más. */
+.medidas{display:inline-block;margin-right:14px;color:#A2B7C9;text-decoration:none;
+  font-size:13.5px;font-weight:600}
+.medidas:hover{color:#E9F0F6}
 `,
     cabecera: `<header class="hd"><div class="wrap">
   <h1>${escapar(titulo)}</h1>
+  ${esCliente ? '' : `<a class="medidas" href="/medidas">${escapar(t('medida.titulo'))} →</a>`}
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
 </div></header>`,
     cuerpo: `<main class="wrap">

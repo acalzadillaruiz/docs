@@ -208,5 +208,19 @@
   "aviso.hito_atrasado.cuerpo": "It is {dias} days past its planned date and still has no evidence.",
   "aviso.ver": "Open it in GPS Nexus",
   "aviso.firma": "This notice comes from GPS Nexus. You can turn off this kind of notice from your profile.",
-  "aviso.hola": "Hi {nombre},"
+  "aviso.hola": "Hi {nombre},",
+  "medida.titulo": "What nobody else measures",
+  "medida.subtitulo": "Three numbers no tracking portal gives you",
+  "medida.declarado": "Claimed",
+  "medida.evidenciado": "Provable",
+  "medida.sin_demostrar": "Unproven",
+  "medida.vendido": "Sold",
+  "medida.con_respaldo": "With cost booked",
+  "medida.sin_respaldo": "Nothing underneath",
+  "medida.hechos": "Events measured",
+  "medida.nada": "Nothing to flag here. That is good news.",
+  "medida.sin_hitos": "Line items with no milestones",
+  "medida.sin_hitos_explica": "Their progress reads zero — the same zero as a line item that has not started. Until their milestones are created, nobody can tell the two apart.",
+  "medida.crear_hitos": "Create its milestones",
+  "medida.solo_dentro": "GPS only. Nothing on this screen reaches the client."
 }

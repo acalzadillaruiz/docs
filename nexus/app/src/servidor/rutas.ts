@@ -32,7 +32,9 @@ import {
   avanceDelRenglon, cabeceraDelRenglon, porRevisar, subir, verificar, rechazar,
   HitoNoAlcanzable, DocumentoVacio, type Clase, CLASES,
 } from '../dominio/evidencia.ts'
-import { pintarPaginaAvance, pintarPorRevisar } from '../pantallas/evidencia.ts'
+import { pintarPaginaAvance } from '../pantallas/evidencia.ts'
+import { medidas } from '../dominio/medidas.ts'
+import { pintarMedidas } from '../pantallas/medidas.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
 import {
   almacen, tipoAceptado, DocumentoAusente, HuellaInvalida,
@@ -201,6 +203,18 @@ export async function resolver(
     return html(200, pintarCartera(
       datos.lista, p.idioma, esCliente, datos.pendientes, datos.cola,
     ))
+  }
+
+  // Las tres cifras. Solo de dentro, y no por pudor: son el margen de GPS mirado
+  // desde otro ángulo. Un cliente que llegara aquí vería 404, igual que a un
+  // contrato que no es suyo.
+  if (p.ruta === '/medidas' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const m = await comoQuien((q) => medidas(q, org!.organizacion_id, p.idioma))
+    return html(200, pintarMedidas(m, p.idioma))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
