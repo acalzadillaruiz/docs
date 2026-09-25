@@ -100,11 +100,11 @@ export function pintarMapeo(
     <div class="mp-h">${escapar(p.cabecera)}</div>
     <div class="mp-e">${escapar(t('importar.muestra'))}: <b>${escapar(p.muestra)}</b></div>
   </div>
-  <select name="campo" aria-label="${escapar(t('importar.campo'))}">
+  <select name="campo_${p.columna}" aria-label="${escapar(t('importar.campo'))}">
     <option value="">— ${escapar(t('importar.ignorar'))} —</option>
     ${opciones}
   </select>
-  <select name="formato" aria-label="${escapar(t('importar.formato'))}"${
+  <select name="formato_${p.columna}" aria-label="${escapar(t('importar.formato'))}"${
     formatos.length === 0 ? ' disabled' : ''}>
     <option value=""></option>
     ${formatos.map((f) => `<option value="${f}"${p.formato === f ? ' selected' : ''}>${

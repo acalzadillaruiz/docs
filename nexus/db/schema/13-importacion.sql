@@ -80,17 +80,26 @@ returns date
 language plpgsql immutable as $$
 declare
   patron text;
+  fmt    text;
   d      date;
   dia    int;
   mes    int;
 begin
   if p_texto is null or btrim(p_texto) = '' then return null; end if;
 
+  -- Un formato VACIO no es 'dmy': es que nadie dijo como se lee esta columna.
+  -- `coalesce` no lo atrapa —solo mira el null—, asi que la cadena vacia caia al
+  -- `else` de abajo, llegaba a to_date como patron vacio, y to_date devolvia
+  -- '0001-01-01 BC' sin quejarse. Esa fecha imposible entraba en un documento
+  -- fiscal en silencio, que es exactamente lo que este sistema existe para evitar.
+  fmt := lower(nullif(btrim(coalesce(p_formato, '')), ''));
+  if fmt is null then fmt := 'dmy'; end if;
+
   -- El vocabulario es el MISMO que usa la aplicacion al leer la hoja: 'dmy', 'mdy',
   -- 'iso'. Tener dos nombres para lo mismo en dos capas es como se acaba mandando
   -- 'dmy' a una funcion que esperaba 'DD/MM/YYYY' y recibiendo null sin saber por
   -- que. Se siguen aceptando los patrones de PostgreSQL por si alguien los usa.
-  patron := case lower(coalesce(p_formato, 'dmy'))
+  patron := case fmt
               when 'dmy' then 'DD/MM/YYYY'
               when 'mdy' then 'MM/DD/YYYY'
               when 'iso' then 'YYYY-MM-DD'
@@ -104,14 +113,21 @@ begin
   -- to_date es indulgente: '31/02/2026' le devuelve el 3 de marzo sin quejarse, y
   -- eso es un dia equivocado que entra en la contabilidad en silencio. Se comprueba
   -- que lo que salio es lo que estaba escrito.
-  if lower(coalesce(p_formato,'dmy')) in ('dmy','mdy') then
+  if fmt in ('dmy','mdy') then
     dia := (regexp_match(regexp_replace(btrim(p_texto), '[.\-]', '/', 'g'),
-            '^(\d{1,2})/(\d{1,2})/'))[case when lower(p_formato) = 'mdy' then 2 else 1 end]::int;
+            '^(\d{1,2})/(\d{1,2})/'))[case when fmt = 'mdy' then 2 else 1 end]::int;
     mes := (regexp_match(regexp_replace(btrim(p_texto), '[.\-]', '/', 'g'),
-            '^(\d{1,2})/(\d{1,2})/'))[case when lower(p_formato) = 'mdy' then 1 else 2 end]::int;
+            '^(\d{1,2})/(\d{1,2})/'))[case when fmt = 'mdy' then 1 else 2 end]::int;
     if extract(day from d)::int <> dia or extract(month from d)::int <> mes then
       return null;
     end if;
+  end if;
+
+  -- Y una ultima red, para cualquier patron que no sea ninguno de los tres: una
+  -- factura del ano 1 o del 3000 no es una fecha mal escrita, es basura. Mas vale
+  -- decir «no se entiende» que meterla en el libro.
+  if d is null or extract(year from d)::int not between 1990 and 2200 then
+    return null;
   end if;
   return d;
 exception when others then

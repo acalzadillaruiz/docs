@@ -89,6 +89,15 @@ begin
                     then coalesce(leer_numero(r.celdas[(col->'iva'->>0)::int], col->'iva'->>1), 0)
                     else 0 end;
 
+    -- Una fecha que no se entiende no entra «como se pueda»: se para. Dejarla pasar
+    -- pone un documento fiscal con fecha imposible en el libro, y eso no se ve hasta
+    -- que hay que declarar.
+    if v_fecha is null then
+      raise exception 'La fecha de la factura % no se entiende. Revisa el formato de '
+        'esa columna en el mapeo.', coalesce(nullif(btrim(
+          r.celdas[(col->'numero'->>0)::int]), ''), '(sin número)');
+    end if;
+
     select id into v_tasa from tasa_bcv
      where vigente_el <= v_fecha order by vigente_el desc limit 1;
     if v_tasa is null then

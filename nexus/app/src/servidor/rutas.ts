@@ -467,8 +467,9 @@ export async function resolver(
 
     const datos = await comoQuien(async (q) => {
       const [l] = (await q`
-        select archivo, estado::text from lote_importacion where id = ${lote[1]!}::uuid
-      `) as unknown as Array<{ archivo: string; estado: string }>
+        select archivo, estado::text, destino from lote_importacion
+         where id = ${lote[1]!}::uuid
+      `) as unknown as Array<{ archivo: string; estado: string; destino: string }>
       return l
     })
     if (!datos) return noEncontrado(p.idioma)
@@ -476,7 +477,10 @@ export async function resolver(
     // Lo que el humano acaba de corregir se guarda antes de comprobar nada: si no,
     // se validaría el mapeo viejo y los errores no cuadrarían con lo que se ve.
     if (p.metodo === 'POST') {
-      const columnas = mapeoDelFormulario(p)
+      const suyo: Destino = DESTINOS.includes(datos.destino as Destino)
+        ? (datos.destino as Destino)
+        : 'facturas_recibidas'
+      const columnas = mapeoDelFormulario(p, suyo)
       await comoQuien((q) => guardarMapeo(q, lote[1]!, columnas))
     }
 
@@ -1081,23 +1085,40 @@ function destinoSeguro(pedido: string | undefined): string {
 }
 
 /** Lo que el humano dejó en los desplegables del mapeo, columna por columna. */
-function mapeoDelFormulario(p: Peticion): Array<{
+/**
+ * El mapeo tal como lo devolvió el formulario.
+ *
+ * Cada casilla lleva el número de su columna en el NOMBRE: `campo_3`, `formato_3`.
+ * Antes iban en tres listas paralelas que se emparejaban por posición, y eso se
+ * rompía solo: un `<select>` deshabilitado —el del formato, en las columnas de
+ * texto— no lo manda el navegador, así que llegaban menos formatos que campos y a
+ * partir de ahí cada formato caía en la columna equivocada. La fecha de una factura
+ * se leía con el formato de otra columna, y una fecha ilegible entraba como
+ * «0001-01-01» sin que nadie viera nada.
+ *
+ * El tipo de cada campo se busca en la lista del DESTINO de esa hoja, no en una fija.
+ * Estaba fija en «facturas_recibidas», y funcionaba por casualidad: los campos del
+ * histórico de ventas que llevan fecha o número se llaman igual en los dos destinos.
+ * El día que un destino traiga un campo numérico que el otro no tenga, el mapeo se
+ * guardaría como texto y la validación comprobaría otra cosa —sin avisar de nada,
+ * que es lo peor que puede hacer una validación.
+ */
+function mapeoDelFormulario(p: Peticion, destino: Destino): Array<{
   columna: number; campo: Campo | null; tipo: string; formato: string | null
 }> {
   const col = (n: string) => p.repetidos?.[n] ?? (p.campos[n] ? [p.campos[n]!] : [])
   const columnas = col('columna')
-  const campos = col('campo')
-  const formatos = col('formato')
   const tipoDe = (campo: string) =>
-    CAMPOS['facturas_recibidas'].find((c) => c.campo === campo)?.tipo ?? 'texto'
+    CAMPOS[destino].find((c) => c.campo === campo)?.tipo ?? 'texto'
 
-  return columnas.map((c, i) => {
-    const campo = (campos[i] ?? '') as Campo | ''
+  return columnas.map((c) => {
+    const n = Number(c)
+    const campo = (p.campos[`campo_${n}`] ?? '') as Campo | ''
     return {
-      columna: Number(c),
+      columna: n,
       campo: campo === '' ? null : campo,
       tipo: campo === '' ? 'texto' : tipoDe(campo),
-      formato: (formatos[i] ?? '') || null,
+      formato: (p.campos[`formato_${n}`] ?? '') || null,
     }
   })
 }

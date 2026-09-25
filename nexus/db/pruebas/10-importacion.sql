@@ -123,3 +123,26 @@ end $$;
 -- ============================================================ la hoja original sigue ahí
 select case when count(*) = 4 then 'OK · la hoja original sigue guardada, fila por fila'
             else 'FALLO' end as resultado from fila_cruda where lote_id = :lote;
+
+-- ============================================================ formato vacio
+-- Un formato VACIO no es «dmy por defecto»: es que nadie dijo como se lee esa
+-- columna. `coalesce` no lo atrapaba —solo mira el null—, asi que la cadena vacia
+-- llegaba a to_date como patron vacio y to_date devolvia '0001-01-01 BC' sin
+-- quejarse. Esa fecha imposible entraba en un documento fiscal en silencio.
+select case when leer_fecha('05/11/2026','') = '2026-11-05'
+            then 'OK · un formato vacio se lee como dmy, no como basura'
+            else 'FALLO · dio ' || coalesce(leer_fecha('05/11/2026','')::text,'null') end as resultado;
+
+select case when leer_fecha('05/11/2026', null) = '2026-11-05'
+            then 'OK · un formato nulo tambien'
+            else 'FALLO' end as resultado;
+
+-- Y la red de seguridad para cualquier patron que no sea ninguno de los tres: una
+-- factura del ano 1 o del 3000 no es una fecha mal escrita, es basura.
+select case when leer_fecha('05/11/2026','vaya usted a saber') is null
+            then 'OK · un patron que no se entiende devuelve nada, NUNCA una fecha rara'
+            else 'FALLO · dio ' || leer_fecha('05/11/2026','vaya usted a saber')::text end as resultado;
+
+select case when leer_fecha('05/11/1850','dmy') is null
+            then 'OK · el ano 1850 no es una factura'
+            else 'FALLO' end as resultado;

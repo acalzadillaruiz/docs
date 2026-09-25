@@ -19,6 +19,7 @@ import { cifrarClave } from '../src/dominio/clave.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
 import { testigoAnti } from '../src/servidor/csrf.ts'
+import { mapeoDe } from './formulario.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const ORG = '3c4d5e6f-0000-0000-0000-00000000000a'
@@ -538,15 +539,19 @@ test('el importador, desde el navegador: hoja → mapeo → comprobar → import
   assert.match(mapeo.cuerpo!, /value="ven" selected/)
   assert.match(mapeo.cuerpo!, /value="dmy" selected/)
 
-  // Comprobar, con el mapeo tal cual vino propuesto.
-  const columnas = ['1', '2', '3', '4', '5', '6', '7']
-  const campos = ['fecha', 'proveedor', 'proveedor_nombre', 'numero', 'control', 'base', 'iva']
-  const formatos = ['dmy', '', '', '', '', 'ven', 'ven']
+  // Comprobar, DEVOLVIENDO el formulario tal como salió de la pantalla — no una
+  // versión escrita a mano. Esta prueba tenía las tres listas a mano, perfectamente
+  // alineadas, y por eso no vio que el navegador no manda los selects
+  // deshabilitados: los formatos llegaban corridos y la fecha se leía con el formato
+  // de otra columna.
+  const { columnas, campos } = mapeoDe(mapeo.cuerpo!)
+  assert.equal(campos['campo_1'], 'fecha')
+  assert.equal(campos['formato_1'], 'dmy')
 
   const comprobado = await pedir({
     metodo: 'POST', ruta: rutaLote, cookie,
-    campos: { af, accion: 'validar' },
-    repetidos: { columna: columnas, campo: campos, formato: formatos },
+    campos: { af, accion: 'validar', ...campos },
+    repetidos: { columna: columnas },
   })
   assert.equal(comprobado.codigo, 200)
   assert.match(comprobado.cuerpo!, /filas correctas/)
@@ -555,8 +560,8 @@ test('el importador, desde el navegador: hoja → mapeo → comprobar → import
   // Importar de verdad.
   const importado = await pedir({
     metodo: 'POST', ruta: rutaLote, cookie,
-    campos: { af, accion: 'confirmar' },
-    repetidos: { columna: columnas, campo: campos, formato: formatos },
+    campos: { af, accion: 'confirmar', ...campos },
+    repetidos: { columna: columnas },
   })
   assert.equal(importado.codigo, 303)
 
