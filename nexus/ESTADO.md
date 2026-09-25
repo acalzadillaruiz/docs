@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 32 de 141 sesiones · **23%**
+**Avance:** 34 de 141 sesiones · **24%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -59,7 +59,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las ciento nueve pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las ciento veinte pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -90,6 +90,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/12-activos.sql` | Cinco años de depreciación mes a mes, hasta agotar exactamente lo depreciable. |
 | `db/pruebas/13-reexpresion.sql` | Índice que se duplica en el año: qué se reexpresa, qué no, y que el balance vuelva a cuadrar. |
 | `db/pruebas/14-sesiones.sql` | Un atacante falla veinte veces contra un correo y **el dueño entra igual**. |
+| `app/pruebas/contrato.test.ts` | Que el cliente no llegue al margen ni pidiéndolo, y que «no existe» y «no es tuyo» den el mismo error palabra por palabra. |
 | `app/pruebas/cartera.test.ts` | Que el avance salga del libro, que el orden ponga delante lo que espera, y que el cliente de A no alcance a B ni contando. |
 | `app/pruebas/rutas.test.ts` | El camino completo de la petición a la respuesta: que sin cookie todo redirija, que el testigo **solo** viaje en la cookie, y que salir cierre la sesión de verdad y no solo borre la cookie. |
 | `app/pruebas/cookies.test.ts` | Que una cookie con nombre parecido no se confunda con la nuestra, y que el idioma respete el orden de preferencia del navegador. |
@@ -127,6 +128,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/arrancar.ts` | El servidor de red, la capa más fina posible. Nunca devuelve el detalle de un error al navegador: un mensaje de la base de datos lleva dentro nombres de tablas y hasta valores. |
 | `app/src/dominio/cartera.ts` | La cartera de contratos. **No enseña un porcentaje suelto: enseña qué está esperando a quién.** Un 58% no contesta ninguna pregunta —ni cuándo llega lo suyo, ni si hay algo parado, ni si tiene que hacer algo—. Y el orden no es alfabético: primero lo que espera a alguien, y dentro de eso lo que lleva más tiempo esperando. **La misma función sirve para dentro y para el cliente sin una sola rama**: el aislamiento lo hacen las políticas de fila. |
 | `app/src/pantallas/cartera.ts` | La pantalla de la cartera. **Lo que espera a alguien va arriba y en color; el avance va detrás y en pequeño.** Es al revés de como se suele hacer, y a propósito: el porcentaje es lo bonito de enseñar y lo que menos ayuda. Lo que espera al cliente se marca distinto de lo que espera a GPS: uno es «tienes que hacer algo», el otro es «estamos en ello». |
+| `app/src/dominio/contrato.ts` · `pantallas/contrato.ts` | La ficha. **El costo no se pide cuando pregunta un cliente**, y no es que se filtre después: el rol no tiene permiso sobre esa columna, así que pedirla da un error. Un error es ruidoso; un hueco en la respuesta se cuela sin que nadie lo note. La norma y la especificación van a la vista: que un cabezal sea API 6A PSL-3 es la mitad de lo que se compró, y lo primero que se discute cuando algo llega y no encaja. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |

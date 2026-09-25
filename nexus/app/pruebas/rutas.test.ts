@@ -195,3 +195,33 @@ test('la raíz enseña la cartera, no un texto de relleno', async () => {
   // Y trae el botón de salir, que es la única forma de cerrar sesión de verdad.
   assert.match(raiz.cuerpo!, /action="\/salir"/)
 })
+
+test('una dirección de contrato que no te corresponde devuelve 404, no 403', async () => {
+  // Con 403 para «existe pero no es tuyo» y 404 para «no existe», probando
+  // identificadores se puede averiguar cuáles existen. Un solo 404 para los dos
+  // casos no dice nada.
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+  const inventado = await pedir({
+    ruta: '/contratos/99999999-9999-9999-9999-999999999999', cookie: testigo,
+  })
+  assert.equal(inventado.codigo, 404)
+  assert.match(inventado.cuerpo!, /No se encuentra esa página/)
+})
+
+test('una dirección con forma rara no llega a la base de datos', async () => {
+  // Si el patrón no exigiera la forma de un identificador, cualquier texto acabaría
+  // en una consulta y el error de conversión saldría por pantalla.
+  const r = await pedir({ ruta: "/contratos/' or 1=1--", cookie: null })
+  assert.equal(r.codigo, 303)   // sin sesión, ni siquiera se mira
+})

@@ -20,7 +20,10 @@ import { comoPersona, type Consulta } from '../db/conexion.ts'
 import { iniciar, completar, quienEs } from '../dominio/sesion.ts'
 import { pintarEntrada } from '../pantallas/entrada.ts'
 import { pintarCartera } from '../pantallas/cartera.ts'
+import { pintarContrato } from '../pantallas/contrato.ts'
 import { cartera } from '../dominio/cartera.ts'
+import { ficha, ContratoNoAlcanzable } from '../dominio/contrato.ts'
+import { hojaDeValuacion, ValuacionNoAlcanzable } from '../dominio/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
 import type { Idioma } from '../i18n/t.ts'
 
@@ -150,23 +153,62 @@ export async function resolver(
     return aOtroSitio('/entrar', { 'Set-Cookie': borrarCookie(seguro) })
   }
 
+  // A partir de aquí se consulta COMO la persona, no como el servicio: es lo que
+  // hace que las políticas de fila devuelvan lo que a ella le toca y nada más.
+  const [quien] = (await dentro((q) => q`
+    select o.tipo = 'operadora' as es_cliente from persona pe
+      join organizacion o on o.id = pe.organizacion_id where pe.id = ${personaId}::uuid
+  `)) as unknown as Array<{ es_cliente: boolean }>
+  // Ante la duda se trata como cliente, que es el alcance más estrecho. Equivocarse
+  // hacia adentro enseña de más; equivocarse hacia afuera solo enseña de menos.
+  const esCliente = quien?.es_cliente ?? true
+  const comoQuien = <T>(f: (q: Consulta) => Promise<T>) =>
+    comoPersona<T>({ id: personaId }, esCliente ? 'nexus_cliente' : 'nexus_interno', f)
+
   if (p.ruta === '/') {
-    // A partir de aquí se consulta COMO la persona, no como el servicio: es lo que
-    // hace que las políticas de fila devuelvan lo que a ella le toca y nada más.
-    const [quien] = (await dentro((q) => q`
-      select o.tipo = 'operadora' as es_cliente from persona pe
-        join organizacion o on o.id = pe.organizacion_id where pe.id = ${personaId}::uuid
-    `)) as unknown as Array<{ es_cliente: boolean }>
-    const esCliente = quien?.es_cliente ?? true
-    const lista = await comoPersona(
-      { id: personaId }, esCliente ? 'nexus_cliente' : 'nexus_interno',
-      (q) => cartera(q, p.idioma),
-    )
-    return html(200, pintarCartera(lista, p.idioma, esCliente))
+    return html(200, pintarCartera(await comoQuien((q) => cartera(q, p.idioma)), p.idioma, esCliente))
   }
 
-  return html(404, `<!doctype html><html lang="${p.idioma}"><meta charset="utf-8">` +
-    `<title>404</title><p>404`)
+  const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
+  if (contrato && p.metodo === 'GET') {
+    try {
+      const f = await comoQuien((q) => ficha(q, contrato[1]!, p.idioma, !esCliente))
+      return html(200, pintarContrato(f, p.idioma, esCliente))
+    } catch (e) {
+      if (e instanceof ContratoNoAlcanzable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
+  const valuacion = /^\/valuaciones\/([0-9a-f-]{36})$/.exec(p.ruta)
+  if (valuacion && p.metodo === 'GET') {
+    try {
+      const lineas = await comoQuien((q) =>
+        hojaDeValuacion(q, valuacion[1]!, p.idioma, 'VES', esCliente))
+      return html(200, `<!doctype html><html lang="${p.idioma}"><meta charset="utf-8">` +
+        `<title>${lineas.length}</title>`)
+    } catch (e) {
+      if (e instanceof ValuacionNoAlcanzable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
+  return noEncontrado(p.idioma)
+}
+
+/**
+ * Una sola respuesta para «no existe» y para «no te corresponde».
+ *
+ * Distinguirlas convertiría las direcciones en un detector de contratos ajenos:
+ * probando identificadores, un 403 diría «este existe» y un 404 «este no».
+ */
+function noEncontrado(idioma: Idioma): Respuesta {
+  return html(404, `<!doctype html><html lang="${idioma}"><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<title>404 · GPS Nexus</title>` +
+    `<p style="font-family:system-ui;padding:40px;text-align:center">` +
+    (idioma === 'es' ? 'No se encuentra esa página.' : 'That page was not found.') +
+    ` <a href="/">${idioma === 'es' ? 'Volver' : 'Back'}</a>`)
 }
 
 // Se importa aquí abajo para no crear un ciclo con sesion.ts.
