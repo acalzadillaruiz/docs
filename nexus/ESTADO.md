@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 116 de 141 sesiones · **82%**
+**Avance:** 117 de 141 sesiones · **83%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -45,8 +45,30 @@ SENIAT**. Con su hoja de cálculo para bajarlos, y con el escritor de CSV probad
 ida y vuelta. *(Corrección: ayer dije que no quedaba nada sin pantalla. Quedaba
 esto.)*
 
-Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e` y `9420d12`.
-**772 comprobaciones** (246 de SQL y diccionario + 526 de TypeScript), todas pasando.
+Y **el mes entero por HTTP**: abrir → importar → libro → bajarlo → cerrar → y
+comprobar que cerrado ya no entra nada. Encajar los tramos sacó **dos fallos reales**
+(abajo).
+
+Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12` y `17a0e0b`.
+**777 comprobaciones** (250 de SQL y diccionario + 527 de TypeScript), todas pasando.
+
+**Los dos fallos, porque la lección vale más que el arreglo:**
+
+1. **Un `<select>` deshabilitado no lo manda el navegador.** El mapeo del importador
+   iba en tres listas paralelas que el servidor emparejaba **por posición**, y el
+   select del formato va deshabilitado en las columnas de texto. A partir de la
+   primera columna de texto, cada formato caía en la columna de al lado. Ahora cada
+   casilla lleva su columna en el nombre: `campo_3`, `formato_3`.
+2. **`coalesce` no atrapa la cadena vacía**, solo el null. Un formato vacío llegaba a
+   `to_date` como patrón vacío y salía `0001-01-01 BC` **sin error**, metiendo una
+   fecha imposible en un documento fiscal en silencio.
+
+**Y por qué no se vieron antes:** la prueba del importador **escribía el formulario a
+mano**, perfectamente alineado. Una prueba que fabrica la entrada en vez de devolver
+la que salió comprueba que el servidor entiende lo que la prueba imagina, no lo que
+la pantalla manda. `pruebas/formulario.ts` existe para eso y se salta los selects
+deshabilitados igual que el navegador. **Usarlo siempre que se devuelva un
+formulario.**
 
 **Trampa cara, apuntada aquí porque se va a volver a leer mal:** el signo del
 resultado monetario (REME) se lee **al revés** de lo que parece. **Positivo es
@@ -61,10 +83,9 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **El camino del día 1 de MES, recorrido entero por HTTP**: abrir el periodo →
-   importar la hoja → valuar → facturar → mirar el libro → cerrar el mes. Lo que hay
-   probado es cada tramo por su lado y el circuito del contrato; el mes completo no.
-   Mirar `pruebas/circuito.test.ts`, que es el patrón exacto.
+2. **Los demás formularios, devueltos como los devuelve el navegador.** El del
+   importador ya está; el alta de contrato y el mapeo de banco siguen probados con
+   entradas escritas a mano, que es donde se escondían estos dos fallos.
 3. **Los dos destinos que el importador todavía no materializa** (`valuaciones` y
    `cobros`): `validar_lote` ya los conoce, pero `confirmar_lote` no crea nada con
    ellos. Están a la vista en el reparto de `26-importar-ventas.sql`.
