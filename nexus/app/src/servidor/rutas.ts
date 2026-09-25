@@ -23,7 +23,11 @@ import { pintarCartera } from '../pantallas/cartera.ts'
 import { pintarContrato } from '../pantallas/contrato.ts'
 import { cartera } from '../dominio/cartera.ts'
 import { ficha, ContratoNoAlcanzable } from '../dominio/contrato.ts'
-import { hojaDeValuacion, cabeceraDeValuacion, ValuacionNoAlcanzable } from '../dominio/valuacion.ts'
+import {
+  hojaDeValuacion, cabeceraDeValuacion, objecionesDe, ValuacionNoAlcanzable,
+} from '../dominio/valuacion.ts'
+import { aprobar, objetar } from '../dominio/aprobacion.ts'
+import { testigoAnti, testigoAntiValido } from './csrf.ts'
 import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
 import { fecha as formatearFecha, t, type Idioma } from '../i18n/t.ts'
@@ -188,9 +192,16 @@ export async function resolver(
         // La cabecera primero: de ahí sale la moneda con la que se formatea la hoja.
         const cab = await cabeceraDeValuacion(q, valuacion[1]!)
         const lineas = await hojaDeValuacion(q, valuacion[1]!, p.idioma, cab.moneda, esCliente)
-        return { cab, lineas }
+        const objeciones = await objecionesDe(q, valuacion[1]!)
+        return { cab, lineas, objeciones }
       })
+      // El botón solo aparece si de verdad se puede pulsar. Enseñar uno que va a
+      // rebotar enseña que la acción existe y esconde que no te corresponde.
+      const puedeDecidir = esCliente &&
+        (datos.cab.estado === 'presentada' || datos.cab.estado === 'objetada')
       return html(200, pintarValuacion({
+        id: valuacion[1]!,
+        contratoId: datos.cab.contratoId,
         contrato: datos.cab.contrato,
         cliente: datos.cab.cliente,
         numero: datos.cab.numero,
@@ -198,12 +209,42 @@ export async function resolver(
         hasta: formatearFecha(p.idioma, datos.cab.hasta),
         moneda: datos.cab.moneda,
         estado: t(p.idioma, `valuacion.estado.${datos.cab.estado}` as never),
+        estadoCrudo: datos.cab.estado,
         lineas: datos.lineas,
+        puedeDecidir,
+        antifalsificacion: testigoAnti(testigo),
+        objeciones: datos.objeciones.map((o) => ({
+          motivo: o.motivo,
+          cuando: formatearFecha(p.idioma, o.cuando),
+          respuesta: o.respuesta,
+          respondidaEn: o.respondidaEn ? formatearFecha(p.idioma, o.respondidaEn) : null,
+        })),
       }, p.idioma))
     } catch (e) {
       if (e instanceof ValuacionNoAlcanzable) return noEncontrado(p.idioma)
       throw e
     }
+  }
+
+  const decidir = /^\/valuaciones\/([0-9a-f-]{36})\/(aprobar|objetar)$/.exec(p.ruta)
+  if (decidir && p.metodo === 'POST') {
+    // Toda ruta que escribe exige el testigo antifalsificación. Va antes que nada:
+    // si la petición no viene de nuestra propia pantalla, no se mira ni qué pedía.
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    const idVal = decidir[1]!
+    const accion = decidir[2]!
+    const r = await comoQuien((q) =>
+      accion === 'aprobar'
+        ? aprobar(q, idVal, personaId, esCliente)
+        : objetar(q, idVal, personaId, esCliente, p.campos['motivo'] ?? ''))
+
+    if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    // Después de escribir se redirige, nunca se responde con la página. Si no,
+    // recargar repetiría la acción y el navegador avisaría con un diálogo feo.
+    return aOtroSitio(`/valuaciones/${idVal}`)
   }
 
   return noEncontrado(p.idioma)

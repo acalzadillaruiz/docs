@@ -9,7 +9,7 @@
 
 import { writeFileSync } from 'node:fs'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
-import { hojaDeValuacion } from '../src/dominio/valuacion.ts'
+import { hojaDeValuacion, objecionesDe } from '../src/dominio/valuacion.ts'
 import { pintarValuacion } from '../src/pantallas/valuacion.ts'
 import { t, fecha as formatearFecha, type Idioma } from '../src/i18n/t.ts'
 
@@ -28,20 +28,23 @@ conectar({ host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 try {
   const html = await comoPersona({ id: persona }, 'nexus_interno', async (q) => {
     const [cab] = (await q`
-      select c.codigo as contrato, o.nombre as cliente, v.numero,
+      select c.id as contrato_id, c.codigo as contrato, o.nombre as cliente, v.numero,
              v.periodo_desde, v.periodo_hasta, v.moneda, v.estado
         from valuacion v
         join contrato c on c.id = v.contrato_id
         join organizacion o on o.id = c.cliente_id
        where v.id = ${valuacionId}::uuid
     `) as unknown as Array<{
-      contrato: string; cliente: string; numero: number
+      contrato_id: string; contrato: string; cliente: string; numero: number
       periodo_desde: Date; periodo_hasta: Date; moneda: 'VES' | 'USD'; estado: string
     }>
     if (!cab) throw new Error('no se encuentra esa valuación')
 
     const lineas = await hojaDeValuacion(q, valuacionId, idioma, cab.moneda)
+    const objs = await objecionesDe(q, valuacionId)
     return pintarValuacion({
+      id: valuacionId,
+      contratoId: cab.contrato_id,
       contrato: cab.contrato,
       cliente: cab.cliente,
       numero: cab.numero,
@@ -49,7 +52,17 @@ try {
       hasta: formatearFecha(idioma, cab.periodo_hasta),
       moneda: cab.moneda,
       estado: t(idioma, `valuacion.estado.${cab.estado}` as never),
+      estadoCrudo: cab.estado,
       lineas,
+      puedeDecidir: process.env.NEXUS_COMO_CLIENTE === '1' &&
+        (cab.estado === 'presentada' || cab.estado === 'objetada'),
+      antifalsificacion: 'ejemplo-para-mirar',
+      objeciones: objs.map((o) => ({
+        motivo: o.motivo,
+        cuando: formatearFecha(idioma, o.cuando),
+        respuesta: o.respuesta,
+        respondidaEn: o.respondidaEn ? formatearFecha(idioma, o.respondidaEn) : null,
+      })),
     }, idioma)
   })
   writeFileSync(salida, html, 'utf-8')

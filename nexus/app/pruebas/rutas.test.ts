@@ -245,3 +245,35 @@ test('la hoja de valuación se sirve en su ruta, con el neto calculado', async (
   })
   assert.equal(r.codigo, 404)
 })
+
+test('aprobar SIN el testigo antifalsificación devuelve 403 y no cambia nada', async () => {
+  // Es la prueba que justifica que exista csrf.ts. Sin ella, otra web podría
+  // provocar que el navegador del cliente apruebe una valuación sin que lo sepa.
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+  const ruta = '/valuaciones/77777777-7777-7777-7777-777777777777/aprobar'
+  for (const campos of [{}, { af: '' }, { af: 'me-lo-invento' }]) {
+    const r = await pedir({ metodo: 'POST', ruta, cookie: testigo, campos })
+    assert.equal(r.codigo, 403, `debería rechazar: ${JSON.stringify(campos)}`)
+    assert.equal(r.cuerpo, '', 'y no debería contar nada en el cuerpo')
+  }
+})
+
+test('sin sesión, una ruta que escribe ni se mira', async () => {
+  const r = await pedir({
+    metodo: 'POST', ruta: '/valuaciones/77777777-7777-7777-7777-777777777777/aprobar',
+    cookie: null, campos: { af: 'lo-que-sea' },
+  })
+  assert.equal(r.codigo, 303)
+  assert.equal(r.cabeceras?.['Location'], '/entrar')
+})

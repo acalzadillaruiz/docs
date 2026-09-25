@@ -15,6 +15,8 @@ import type { LineaHoja } from '../dominio/valuacion.ts'
 import { traductor, type Idioma } from '../i18n/t.ts'
 
 export type DatosValuacion = {
+  readonly id: string
+  readonly contratoId: string
   readonly contrato: string
   readonly cliente: string
   readonly numero: number
@@ -22,14 +24,44 @@ export type DatosValuacion = {
   readonly hasta: string
   readonly moneda: 'VES' | 'USD'
   readonly estado: string
+  readonly estadoCrudo: string
   readonly lineas: readonly LineaHoja[]
+  /**
+   * Los botones solo aparecen cuando la persona puede pulsarlos de verdad.
+   * Enseñar un botón que va a rebotar es peor que no enseñarlo: enseña que existe
+   * una acción y esconde que no te corresponde.
+   */
+  readonly puedeDecidir: boolean
+  readonly antifalsificacion: string
+  readonly objeciones: readonly ObjecionVista[]
+}
+
+export type ObjecionVista = {
+  readonly motivo: string
+  readonly cuando: string
+  readonly respuesta: string | null
+  readonly respondidaEn: string | null
 }
 
 const escapar = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+const ACCIONES = {
+  es: { aprobar: 'Aprobar esta valuación', objetar: 'Objetar', motivo: 'Qué no cuadra',
+        ayuda: 'Al aprobarla queda constancia de quién y cuándo. Esto no se deshace.',
+        objecionTitulo: 'Objeciones', sinRespuesta: 'Sin responder todavía',
+        respondida: 'Respondida', volver: 'Volver al contrato',
+        placeholder: 'Por ejemplo: el renglón 3 incluye 12 horas de grúa que no se ejecutaron el 14 de septiembre.' },
+  en: { aprobar: 'Approve this progress payment', objetar: 'Dispute', motivo: 'What does not add up',
+        ayuda: 'Approving records who and when. This cannot be undone.',
+        objecionTitulo: 'Disputes', sinRespuesta: 'Not answered yet',
+        respondida: 'Answered', volver: 'Back to the contract',
+        placeholder: 'For example: line 3 includes 12 crane hours that were not worked on 14 September.' },
+} as const
+
 export function pintarValuacion(d: DatosValuacion, idioma: Idioma): string {
   const t = traductor(idioma)
+  const a = ACCIONES[idioma]
   const neto = d.lineas.find((l) => l.total)
   const cuerpo = d.lineas.filter((l) => !l.total)
 
@@ -115,6 +147,36 @@ body{margin:0;background:var(--bg);color:var(--ik);font-family:Inter,system-ui,s
 .nota{margin:22px 0 60px;font-size:13px;color:var(--ik2);line-height:1.6;
   padding-left:12px;border-left:2px solid var(--ln2)}
 
+h2.sec{margin:30px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;
+  font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--md)}
+.objs{display:grid;gap:10px}
+.obj{background:var(--cd);border:1px solid var(--ln);border-radius:13px;padding:14px 16px}
+.obj.abierta{border-left:3px solid #946307}
+.obj-m{font-size:14.5px;line-height:1.5}
+.obj-f{margin-top:6px;font-family:"JetBrains Mono",monospace;font-size:10px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--md)}
+.obj-e{margin-top:8px;font-size:13px;color:#946307;font-weight:600}
+.obj-r{margin-top:10px;padding-top:10px;border-top:1px solid var(--ln);font-size:14px;
+  color:var(--ik2);line-height:1.5}
+.acc{margin-top:26px;background:var(--cd);border:1px solid var(--ln);border-radius:15px;
+  padding:20px 18px}
+.acc form{margin:0}
+.acc button{width:100%;font:inherit;font-size:16px;font-weight:700;padding:14px;border:0;
+  border-radius:11px;cursor:pointer;letter-spacing:-.012em}
+.acc button.ap{background:var(--grt);color:#fff}
+.acc button.ob{background:transparent;color:var(--ik);border:1px solid var(--ln2);margin-top:10px}
+.ayuda{margin:10px 0 0;font-size:12.5px;color:var(--md);text-align:center;line-height:1.45}
+.obj-nueva{margin-top:16px;border-top:1px solid var(--ln);padding-top:14px}
+.obj-nueva summary{cursor:pointer;font-size:14px;color:var(--ik2);text-align:center;
+  list-style:none}
+.obj-nueva summary::-webkit-details-marker{display:none}
+.obj-nueva label{display:block;margin-top:14px;font-family:"JetBrains Mono",monospace;
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--md)}
+.obj-nueva textarea{width:100%;margin-top:7px;font:inherit;font-size:15px;padding:12px;
+  border:1px solid var(--ln2);border-radius:11px;background:transparent;color:var(--ik);
+  resize:vertical}
+.volver{margin-top:28px;text-align:center}
+.volver a{color:var(--ik2);text-decoration:none;font-size:14px}
 @media(max-width:620px){
   .cab{display:none}
   .ln{grid-template-columns:minmax(0,1fr) auto;row-gap:2px;padding:14px 16px}
@@ -154,6 +216,38 @@ ${filas}
       ? 'Cada cifra sale del contrato y de la evidencia registrada. Ninguna se escribe a mano. Si algo no cuadra, se señala la línea.'
       : 'Every figure comes from the contract and the recorded evidence. None is typed in by hand. If something does not add up, point at the line.'
   }</p>
+
+  ${d.objeciones.length === 0 ? '' : `<h2 class="sec">${escapar(a.objecionTitulo)}</h2>
+  <div class="objs">${d.objeciones.map((o) => `
+    <div class="obj${o.respuesta === null ? ' abierta' : ''}">
+      <div class="obj-m">${escapar(o.motivo)}</div>
+      <div class="obj-f">${escapar(o.cuando)}</div>
+      ${o.respuesta === null
+        ? `<div class="obj-e">${escapar(a.sinRespuesta)}</div>`
+        : `<div class="obj-r">${escapar(o.respuesta)}</div>
+           <div class="obj-f">${escapar(a.respondida)} · ${escapar(o.respondidaEn ?? '')}</div>`}
+    </div>`).join('')}</div>`}
+
+  ${!d.puedeDecidir ? '' : `
+  <section class="acc">
+    <form method="post" action="/valuaciones/${escapar(d.id)}/aprobar">
+      <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
+      <button type="submit" class="ap">${escapar(a.aprobar)}</button>
+      <p class="ayuda">${escapar(a.ayuda)}</p>
+    </form>
+    <details class="obj-nueva">
+      <summary>${escapar(a.objetar)}</summary>
+      <form method="post" action="/valuaciones/${escapar(d.id)}/objetar">
+        <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
+        <label for="motivo">${escapar(a.motivo)}</label>
+        <textarea id="motivo" name="motivo" rows="4" required
+                  placeholder="${escapar(a.placeholder)}"></textarea>
+        <button type="submit" class="ob">${escapar(a.objetar)}</button>
+      </form>
+    </details>
+  </section>`}
+
+  <p class="volver"><a href="/contratos/${escapar(d.contratoId)}">← ${escapar(a.volver)}</a></p>
 </main>
 </html>`
 }

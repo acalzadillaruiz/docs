@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 37 de 141 sesiones · **26%**
+**Avance:** 39 de 141 sesiones · **28%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -59,7 +59,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento cuarenta reglas duras, el diccionario bilingüe y las ciento treinta y ocho pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento cuarenta reglas duras, el diccionario bilingüe y las ciento cuarenta y siete pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 

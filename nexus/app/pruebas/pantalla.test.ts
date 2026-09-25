@@ -7,6 +7,12 @@ const linea = (o: number, c: string, m: string, resta = false, total = false): L
   ({ orden: o, concepto: c, base: null, porcentaje: null, monto: m, resta, total })
 
 const DATOS: DatosValuacion = {
+  id: '11111111-1111-1111-1111-111111111111',
+  contratoId: '22222222-2222-2222-2222-222222222222',
+  estadoCrudo: 'aprobada',
+  puedeDecidir: false,
+  antifalsificacion: 'af-de-prueba',
+  objeciones: [],
   contrato: 'GPS-2026-001',
   cliente: 'Operadora <Ejemplo> & Cía',
   numero: 1,
@@ -61,4 +67,56 @@ test('funciona en modo oscuro sin que el usuario elija nada', () => {
 test('el título de la pestaña dice de qué valuación se trata', () => {
   assert.match(pintarValuacion(DATOS, 'es'), /<title>Valuación 1 · GPS-2026-001<\/title>/)
   assert.match(pintarValuacion(DATOS, 'en'), /<title>Progress payment 1 · GPS-2026-001<\/title>/)
+})
+
+test('los botones solo aparecen cuando se pueden pulsar de verdad', () => {
+  // Enseñar un botón que va a rebotar enseña que la acción existe y esconde que no
+  // te corresponde. Peor que no enseñarlo.
+  const sin = pintarValuacion(DATOS, 'es')
+  assert.equal(sin.includes('Aprobar esta valuación'), false)
+
+  const con = pintarValuacion({ ...DATOS, puedeDecidir: true, estadoCrudo: 'presentada' }, 'es')
+  assert.match(con, /Aprobar esta valuación/)
+  assert.match(con, /action="\/valuaciones\/11111111-1111-1111-1111-111111111111\/aprobar"/)
+})
+
+test('los formularios que escriben llevan el testigo antifalsificación', () => {
+  const h = pintarValuacion({ ...DATOS, puedeDecidir: true }, 'es')
+  const cuantos = (h.match(/name="af" value="af-de-prueba"/g) ?? []).length
+  assert.equal(cuantos, 2, 'lo llevan el de aprobar y el de objetar')
+})
+
+test('se avisa de que aprobar no se deshace, antes de pulsar', () => {
+  const h = pintarValuacion({ ...DATOS, puedeDecidir: true }, 'es')
+  assert.match(h, /Esto no se deshace/)
+  assert.match(pintarValuacion({ ...DATOS, puedeDecidir: true }, 'en'), /cannot be undone/)
+})
+
+test('objetar exige escribir qué no cuadra', () => {
+  const h = pintarValuacion({ ...DATOS, puedeDecidir: true }, 'es')
+  assert.match(h, /<textarea[^>]*required/)
+})
+
+test('una objeción sin responder se marca distinto de una respondida', () => {
+  const h = pintarValuacion({ ...DATOS, objeciones: [
+    { motivo: 'Faltan 12 horas de grúa', cuando: '14/09/2026', respuesta: null, respondidaEn: null },
+    { motivo: 'Falta el acta', cuando: '10/09/2026',
+      respuesta: 'Se adjunta firmada', respondidaEn: '12/09/2026' },
+  ] }, 'es')
+  assert.match(h, /class="obj abierta"/)
+  assert.match(h, /Sin responder todavía/)
+  assert.match(h, /Se adjunta firmada/)
+})
+
+test('el texto de una objeción se escapa: lo escribe el cliente', () => {
+  const h = pintarValuacion({ ...DATOS, objeciones: [
+    { motivo: '<script>alert(1)</script>', cuando: '14/09/2026', respuesta: null, respondidaEn: null },
+  ] }, 'es')
+  assert.equal(h.includes('<script>alert(1)</script>'), false)
+  assert.match(h, /&lt;script&gt;/)
+})
+
+test('desde la valuación se puede volver al contrato', () => {
+  assert.match(pintarValuacion(DATOS, 'es'),
+    /href="\/contratos\/22222222-2222-2222-2222-222222222222"/)
 })

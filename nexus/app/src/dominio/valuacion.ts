@@ -148,3 +148,29 @@ export async function cabeceraDeValuacion(
     estado: c.estado,
   }
 }
+
+export type ObjecionFila = {
+  readonly motivo: string
+  readonly cuando: Date
+  readonly respuesta: string | null
+  readonly respondidaEn: Date | null
+}
+
+/** Las objeciones de una valuación, de la más nueva a la más vieja. */
+export async function objecionesDe(
+  q: Consulta, valuacionId: string,
+): Promise<readonly ObjecionFila[]> {
+  const filas = (await q`
+    select motivo, objetada_en, respuesta, respondida_en
+      from objecion where valuacion_id = ${valuacionId}::uuid
+     order by objetada_en desc
+  `) as unknown as Array<{
+    motivo: string; objetada_en: Date; respuesta: string | null; respondida_en: Date | null
+  }>
+  return filas.map((f) => ({
+    motivo: f.motivo,
+    cuando: f.objetada_en,
+    respuesta: f.respuesta,
+    respondidaEn: f.respondida_en,
+  }))
+}
