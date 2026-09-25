@@ -74,3 +74,7 @@ revoke all on peticion_sso from nexus_cliente;
 
 -- La contabilidad no se concede en absoluto.
 revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;
+
+-- Y la caja chica menos que nada: lleva dentro a quien se le pago, por que concepto
+-- y a que contrato se imputo. Es lo que cuesta de verdad un contrato por dentro.
+revoke all on caja_chica, vale, reposicion from nexus_cliente;

@@ -1,12 +1,47 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 131 de 141 sesiones · **93%**
+**Última actualización:** 2026-09-25, 12:10 (España)
+**Avance:** 132 de 141 sesiones · **94%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **los equipos, en pantalla.** Cada activo con lo que
+**Lo último terminado:** **la caja chica**, que llevaba semanas parada esperando
+ocho respuestas del CEO. Eso fue un error mío: había que construirla con **supuestos
+declarados** en vez de esperar. Así está hecha. Son seis, están escritos en el
+módulo, en la pantalla (bloque «Seis supuestos, no seis decisiones») y cada uno tiene
+su prueba — un supuesto sin prueba es una intención:
+
+1. **Fondo fijo.** El gasto **no entra al libro cuando ocurre**, sino cuando se
+   repone. Es lo que permite auditar la caja contando el efectivo una vez, sin mirar
+   el libro. Lo comprueba la prueba «anotar un vale NO toca el libro».
+2. **Sin papel no se repone.** Un vale sin soporte baja el efectivo —el dinero salió
+   igual— pero no entra en la reposición. Es la tesis del sistema aplicada al
+   efectivo: sin evidencia no hay avance; aquí, sin evidencia no se devuelve el
+   dinero. Y **se ve en pantalla**, en ámbar, al lado del efectivo.
+3. **Sin IVA:** el vale va íntegro a gasto y no genera crédito fiscal.
+4. **La reposición sale del banco.**
+5. **Una caja, una moneda**, elegida al abrirla.
+6. **Un vale grande no es caja chica:** por encima del 10% del fondo se avisa, pero
+   no se bloquea. Quien está en el pozo no puede pararse porque el sistema opine.
+
+Al cerrar la caja, lo gastado sin papel **no desaparece**: va a su propia cuenta,
+`5.2.12 Faltantes de caja`, nueva en el plan. Una caja que cuadra sola escondiendo lo
+injustificado no sirve para nada.
+
+La cifra por la que existe el módulo es **lo que se ha ido por contrato**: el margen
+no se pierde en la factura grande, se pierde en cien gastos pequeños que nadie
+imputó. Por eso el vale se imputa a su contrato y el asiento de la reposición lleva
+el `contrato_id` pegado.
+
+**Trampa que volvió a salir aquí:** un `try/catch` alrededor de una consulta **no
+sirve dentro de una transacción**. La excepción la aborta entera y la biblioteca la
+vuelve a lanzar al cerrarla, así que el `catch` devolvía un mensaje bonito y la
+prueba fallaba igual con el error crudo de PostgreSQL. Se comprueba **antes** de
+llamar, una condición por línea, como ya hacía `depreciarMes`. Está escrito en el
+propio módulo para que no se vuelva a intentar.
+
+**Antes:** **los equipos, en pantalla.** Cada activo con lo que
 queda en libros y, si está alquilado, **lo que deja**: lo facturado del contrato menos
 el desgaste del periodo, en verde si es positivo y en rojo si no. Es la única cifra que
 contesta «¿alquilar esto sale a cuenta?», y no estaba en ningún sitio. Depreciar el mes
@@ -140,7 +175,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**883 comprobaciones** (250 de SQL y diccionario + 630 de TypeScript), todas pasando.
+**892 comprobaciones** (250 de SQL y diccionario + 642 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -250,6 +285,15 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Un `try/catch` alrededor de una consulta no sirve dentro de una transacción.** La
+  excepción de PostgreSQL la aborta entera, y `postgres.js` la vuelve a lanzar al
+  cerrarla: el `catch` devuelve su mensaje amable y el error crudo sale igual. Las
+  condiciones se comprueban **antes** de llamar, una por línea, con su texto del
+  diccionario.
+- **Una prueba que suma sobre toda la organización se rompe sola el segundo día.** Un
+  asiento no se borra nunca, así que la suma crece en cada corrida. Se suma sobre
+  **el asiento que acaba de crear la prueba**, cuyo id devuelve la propia función.
 
 - **Las pruebas se lanzan con `db/probar.sh`**, nunca con `node --test` a secas: sin
   eso la base de datos no está cargada y los fallos no significan nada.

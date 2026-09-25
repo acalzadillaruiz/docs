@@ -63,6 +63,9 @@ import { pintarBanco } from '../pantallas/banco.ts'
 import { equipos, depreciarMes } from '../dominio/activos.ts'
 import { pintarActivos } from '../pantallas/activos.ts'
 import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
+import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
+         anotarVale, reponer, cerrar as cerrarCaja, abrirCaja } from '../dominio/caja.ts'
+import { pintarCaja } from '../pantallas/caja.ts'
 import { pintarReexpresion } from '../pantallas/reexpresion.ts'
 import { libro, libroCrudo, aFilas } from '../dominio/libros.ts'
 import { pintarLibro } from '../pantallas/libros.ts'
@@ -644,6 +647,73 @@ export async function resolver(
       pintarActivos(lista, p.idioma, testigoAnti(testigo), anio, mes, errores))
   }
 
+  // La caja chica. Nunca la ve el cliente: lleva dentro a quien se le pago, por que
+  // concepto y a que contrato se imputo — lo que cuesta de verdad un contrato.
+  if (p.ruta === '/caja' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const orgId = org!.organizacion_id
+    const hoy = new Date().toISOString().slice(0, 10)
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const caja = (p.campos['caja'] ?? '').trim()
+      const fecha = (p.campos['fecha'] ?? '').trim()
+      const que = p.campos['que']
+      // Un identificador que no tiene forma de identificador no llega a la base de
+      // datos: alli seria un error de servidor, y aqui es un «eso no vale».
+      const esId = /^[0-9a-f-]{36}$/i.test(caja)
+
+      if (que === 'abrir') {
+        const fondo = decimal(p.campos['fondo'])
+        const mon = p.campos['moneda'] === 'USD' ? 'USD' : 'VES'
+        if (fondo === null) errores = [t(p.idioma, 'caja.error.monto')]
+        else {
+          const r = await comoQuien((q) => abrirCaja(q, orgId, p.campos['nombre'] ?? '',
+            mon, fondo, personaId, fecha, personaId, p.idioma))
+          if (!r.hecho) errores = [r.motivo]
+        }
+      } else if (!esId) {
+        errores = [t(p.idioma, 'caja.error.generico')]
+      } else if (que === 'vale') {
+        const monto = decimal(p.campos['monto'])
+        const contrato = (p.campos['contrato'] ?? '').trim()
+        if (monto === null) errores = [t(p.idioma, 'caja.error.monto')]
+        else {
+          const r = await comoQuien((q) => anotarVale(q, {
+            cajaId: caja, fecha, concepto: p.campos['concepto'] ?? '', monto,
+            cuenta: (p.campos['cuenta'] ?? '').trim(),
+            contratoId: /^[0-9a-f-]{36}$/i.test(contrato) ? contrato : null,
+            beneficiario: (p.campos['beneficiario'] ?? '').trim() || null,
+            soporte: (p.campos['soporte'] ?? '').trim() || null,
+          }, personaId, p.idioma))
+          if (!r.hecho) errores = [r.motivo]
+        }
+      } else if (que === 'reponer') {
+        const r = await comoQuien((q) => reponer(q, caja, fecha, personaId, p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      } else if (que === 'cerrar') {
+        const r = await comoQuien((q) => cerrarCaja(q, caja, fecha, personaId, p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      }
+    }
+
+    const [lista, cuentas, contratos, porCtr] = await Promise.all([
+      comoQuien((q) => cajas(q, orgId, p.idioma)),
+      comoQuien((q) => cuentasDeGasto(q, orgId, p.idioma)),
+      comoQuien((q) => contratosAbiertos(q, orgId)),
+      comoQuien((q) => porContrato(q, orgId, `${hoy.slice(0, 4)}-01-01`, hoy, p.idioma)),
+    ])
+    return html(errores.length === 0 ? 200 : 400,
+      pintarCaja({ cajas: lista, cuentas, contratos, porContrato: porCtr, hoy },
+        p.idioma, testigoAnti(testigo), errores))
+  }
+
   // La reexpresion por inflacion. Nunca la ve el cliente: es contabilidad.
   if (p.ruta === '/reexpresion' && (p.metodo === 'GET' || p.metodo === 'POST')) {
     if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
@@ -1218,6 +1288,22 @@ function entero(v: string | undefined): number | null {
   if (v === undefined) return null
   const t = v.trim()
   return /^-?\d{1,9}$/.test(t) ? Number(t) : null
+}
+
+/**
+ * Un importe venido de un formulario, o nada.
+ *
+ * El hermano decimal de `entero()`, y con el mismo motivo: `Number('')` es CERO, no
+ * `NaN`, así que una casilla vacía se colaría como un importe de cero. Se acepta la
+ * coma además del punto porque en castellano el decimal es la coma y quien teclea
+ * «12,50» no está escribiendo mal.
+ */
+function decimal(v: string | undefined): number | null {
+  if (v === undefined) return null
+  const t = v.trim().replace(',', '.')
+  if (!/^\d{1,15}(\.\d{1,2})?$/.test(t)) return null
+  const n = Number(t)
+  return Number.isFinite(n) ? n : null
 }
 
 /** Año y mes de un formulario; `null` si alguno no se entiende o no existe. */
