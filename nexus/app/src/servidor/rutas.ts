@@ -70,6 +70,8 @@ import { mes as mesGerencia } from '../dominio/gerencia.ts'
 import { pintarGerencia } from '../pantallas/gerencia.ts'
 import { estados } from '../dominio/estados.ts'
 import { pintarEstados } from '../pantallas/estados.ts'
+import { diario } from '../dominio/diario.ts'
+import { pintarDiario } from '../pantallas/diario.ts'
 import { escribirHoja } from './csv.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
@@ -672,6 +674,21 @@ export async function resolver(
     const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
     return html(errores.length === 0 ? 200 : 400,
       pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // El libro diario: donde termina de abrirse cualquier cifra del sistema.
+  if (p.ruta === '/diario' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date()
+    const cuando = anioMes(p)
+    const anio = cuando?.anio ?? hoy.getUTCFullYear()
+    const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
+    const d = await comoQuien((q) => diario(q, org!.organizacion_id, anio, mes, p.idioma))
+    return html(200, pintarDiario(d, p.idioma, testigoAnti(testigo)))
   }
 
   // Los estados contables: el balance que pide un banco, el detalle donde mira un

@@ -163,6 +163,7 @@ ${ESTILOS_AVANCE}
   <nav class="menu">
   ${esCliente ? '' : `<a class="medidas" href="/gerencia">${escapar(t('ger.nombre'))} →</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/estados">${escapar(t('est.nombre'))}</a>`}
+  ${esCliente ? '' : `<a class="medidas" href="/diario">${escapar(t('diario.nombre'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/medidas">${escapar(t('medida.titulo'))} →</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/contratos/nuevo">${escapar(t('alta.nuevo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/importar">${escapar(t('importar.titulo'))}</a>`}
