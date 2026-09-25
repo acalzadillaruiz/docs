@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 124 de 141 sesiones · **88%**
+**Avance:** 126 de 141 sesiones · **89%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -98,6 +98,18 @@ Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e
 `16f9c03`, `c0aa778`, `dd3822b`, `a768a76`, `33196cc`, `587f3d0`, `20b40bc` y
 `4db6418`. **843 comprobaciones** (250 de SQL y diccionario + 593 de TypeScript),
 todas pasando.
+
+Y **los estados contables** (`5b5580f`) y **el resultado abierto y la cartera contrato
+por contrato** (`9e1f0a2`). Con esto, **el barrido ya no devuelve ningún informe de
+cara al usuario sin pantalla** — esta vez comprobado, no afirmado:
+
+```bash
+cd nexus && for f in $(grep -rhoE "create or replace function [a-z_]+" db/schema/*.sql \
+  | awk '{print $NF}' | sort -u); do grep -rqF "$f" app/src/ || echo "$f"; done
+```
+
+Lo que salga ahí son disparadores, generadores y ayudantes que se llaman desde SQL:
+ahí es donde tienen que estar.
 
 **Decisión pendiente del CEO:** las tablas de rentabilidad son **acumuladas**, no del
 mes — `margen_contrato` ignora su `p_desde`. Está marcado en la pantalla, pero si se
