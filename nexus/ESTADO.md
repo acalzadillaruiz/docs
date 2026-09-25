@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 31 de 141 sesiones · **22%**
+**Avance:** 32 de 141 sesiones · **23%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -59,7 +59,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las ciento ocho pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento treinta y dos reglas duras, el diccionario bilingüe y las ciento nueve pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -126,6 +126,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/cookies.ts` | La cookie de sesión con los cuatro atributos que la hacen segura, y **sin caducidad dentro**: la caducidad de verdad vive en la base de datos, donde no se puede falsificar. |
 | `app/src/servidor/arrancar.ts` | El servidor de red, la capa más fina posible. Nunca devuelve el detalle de un error al navegador: un mensaje de la base de datos lleva dentro nombres de tablas y hasta valores. |
 | `app/src/dominio/cartera.ts` | La cartera de contratos. **No enseña un porcentaje suelto: enseña qué está esperando a quién.** Un 58% no contesta ninguna pregunta —ni cuándo llega lo suyo, ni si hay algo parado, ni si tiene que hacer algo—. Y el orden no es alfabético: primero lo que espera a alguien, y dentro de eso lo que lleva más tiempo esperando. **La misma función sirve para dentro y para el cliente sin una sola rama**: el aislamiento lo hacen las políticas de fila. |
+| `app/src/pantallas/cartera.ts` | La pantalla de la cartera. **Lo que espera a alguien va arriba y en color; el avance va detrás y en pequeño.** Es al revés de como se suele hacer, y a propósito: el porcentaje es lo bonito de enseñar y lo que menos ayuda. Lo que espera al cliente se marca distinto de lo que espera a GPS: uno es «tienes que hacer algo», el otro es «estamos en ello». |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |

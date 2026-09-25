@@ -19,6 +19,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { comoPersona, type Consulta } from '../db/conexion.ts'
 import { iniciar, completar, quienEs } from '../dominio/sesion.ts'
 import { pintarEntrada } from '../pantallas/entrada.ts'
+import { pintarCartera } from '../pantallas/cartera.ts'
+import { cartera } from '../dominio/cartera.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
 import type { Idioma } from '../i18n/t.ts'
 
@@ -149,8 +151,18 @@ export async function resolver(
   }
 
   if (p.ruta === '/') {
-    return html(200, `<!doctype html><html lang="${p.idioma}"><meta charset="utf-8">` +
-      `<title>GPS Nexus</title><p>dentro: ${personaId}`)
+    // A partir de aquí se consulta COMO la persona, no como el servicio: es lo que
+    // hace que las políticas de fila devuelvan lo que a ella le toca y nada más.
+    const [quien] = (await dentro((q) => q`
+      select o.tipo = 'operadora' as es_cliente from persona pe
+        join organizacion o on o.id = pe.organizacion_id where pe.id = ${personaId}::uuid
+    `)) as unknown as Array<{ es_cliente: boolean }>
+    const esCliente = quien?.es_cliente ?? true
+    const lista = await comoPersona(
+      { id: personaId }, esCliente ? 'nexus_cliente' : 'nexus_interno',
+      (q) => cartera(q, p.idioma),
+    )
+    return html(200, pintarCartera(lista, p.idioma, esCliente))
   }
 
   return html(404, `<!doctype html><html lang="${p.idioma}"><meta charset="utf-8">` +

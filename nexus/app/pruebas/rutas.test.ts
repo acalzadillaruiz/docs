@@ -174,3 +174,24 @@ test('la pantalla sale en el idioma del navegador', async () => {
   assert.match((await pedir({ ruta: '/entrar', idioma: 'en' })).cuerpo!, /Sign in to your account/)
   assert.match((await pedir({ ruta: '/entrar', idioma: 'es' })).cuerpo!, /Entra a tu cuenta/)
 })
+
+test('la raíz enseña la cartera, no un texto de relleno', async () => {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+  const raiz = await pedir({ ruta: '/', cookie: testigo })
+  assert.equal(raiz.codigo, 200)
+  assert.match(raiz.cuerpo!, /<title>Cartera · GPS Nexus<\/title>/)
+  assert.equal(raiz.cuerpo!.includes('dentro:'), false, 'no debería quedar el relleno')
+  // Y trae el botón de salir, que es la única forma de cerrar sesión de verdad.
+  assert.match(raiz.cuerpo!, /action="\/salir"/)
+})
