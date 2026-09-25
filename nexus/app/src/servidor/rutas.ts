@@ -72,6 +72,8 @@ import { estados } from '../dominio/estados.ts'
 import { pintarEstados } from '../pantallas/estados.ts'
 import { diario } from '../dominio/diario.ts'
 import { pintarDiario } from '../pantallas/diario.ts'
+import { mayor } from '../dominio/mayor.ts'
+import { pintarMayor } from '../pantallas/mayor.ts'
 import { escribirHoja } from './csv.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
@@ -674,6 +676,32 @@ export async function resolver(
     const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
     return html(errores.length === 0 ? 200 : 400,
       pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // El mayor de una cuenta: por que el banco tiene exactamente este saldo.
+  if (p.ruta === '/mayor' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    // Aqui solo se MIRA, asi que una fecha ilegible se resuelve con un rango
+    // razonable en vez de parar: el año en curso.
+    const hoy = new Date()
+    const buena = (v: string | undefined, porDefecto: string) => {
+      const t = (v ?? '').trim()
+      return /^\d{4}-\d{2}-\d{2}$/.test(t) && !Number.isNaN(Date.parse(t)) ? t : porDefecto
+    }
+    const desde = buena(p.campos['desde'], `${hoy.getUTCFullYear()}-01-01`)
+    const hasta = buena(p.campos['hasta'], hoy.toISOString().slice(0, 10))
+    // El codigo de cuenta viene de un desplegable, pero llega por la direccion: se
+    // comprueba la FORMA antes de usarlo, y la existencia la comprueba el dominio.
+    const pedida = (p.campos['cuenta'] ?? '').trim()
+    const cuenta = /^[0-9.]{1,20}$/.test(pedida) ? pedida : ''
+
+    const m = await comoQuien((q) =>
+      mayor(q, org!.organizacion_id, cuenta, desde, hasta, p.idioma))
+    return html(200, pintarMayor(m, p.idioma, testigoAnti(testigo)))
   }
 
   // El libro diario: donde termina de abrirse cualquier cifra del sistema.

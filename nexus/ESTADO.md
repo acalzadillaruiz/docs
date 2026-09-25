@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 127 de 141 sesiones · **90%**
+**Avance:** 128 de 141 sesiones · **91%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -105,8 +105,13 @@ cara al usuario sin pantalla** — esta vez comprobado, no afirmado:
 
 ```bash
 cd nexus && for f in $(grep -rhoE "create or replace function [a-z_]+" db/schema/*.sql \
-  | awk '{print $NF}' | sort -u); do grep -rqF "$f" app/src/ || echo "$f"; done
+  | awk '{print $NF}' | sort -u); do grep -rqE "\b${f}\s*\(" app/src/ || echo "$f"; done
 ```
+
+**Ojo con ese comando: la primera versión que escribí aquí usaba `grep -F` y buscaba
+el nombre suelto**, así que un nombre corto como `mayor` o `diario` casaba con
+cualquier comentario en castellano y la función salía por usada sin estarlo. Así se
+me escapó el mayor. Tiene que buscar el nombre **seguido de un paréntesis**.
 
 Lo que salga ahí son disparadores, generadores y ayudantes que se llaman desde SQL:
 ahí es donde tienen que estar.
@@ -118,7 +123,12 @@ pinchar—, con el debe y el haber en columnas separadas aunque por dentro sean 
 campo con signo, con **cuándo ocurrió y cuándo se supo**, y con el asiento anulado y
 su reverso **los dos** a la vista.
 
-**863 comprobaciones** (250 de SQL y diccionario + 610 de TypeScript), todas pasando.
+Y **el mayor de una cuenta** (`b7c8d9e`): el diario recorre el tiempo, el mayor
+recorre una cuenta. Es lo que contesta «¿por qué el banco tiene exactamente este
+saldo?», que es la pregunta que se hace cuando algo no cuadra.
+
+**871 comprobaciones** (250 de SQL y diccionario + 618 de TypeScript), todas pasando.
+Avisado al CEO el **90%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 
 **Decisión pendiente del CEO:** las tablas de rentabilidad son **acumuladas**, no del
 mes — `margen_contrato` ignora su `p_desde`. Está marcado en la pantalla, pero si se
