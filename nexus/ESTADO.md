@@ -1,27 +1,33 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 10:00 (España)
-**Avance:** 110 de 141 sesiones · **78%**
+**Última actualización:** 2026-09-25, 09:25 (España)
+**Avance:** 111 de 141 sesiones · **79%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el ciclo del dinero, cerrado.** Excel → factura de
-proveedor asentada; y valuación → asiento → cobro → asiento, con la cuenta por cobrar
-bajando sola. La prueba de circuito llega ahora hasta el final: contrato → hito
-verificado → valuación → aprobada → **cobrada**, todo por HTTP y sin tocar la base de
-datos. Y **los meses contables** se abren y cierran desde la
-aplicación, que es lo que desbloquea el día 1 de cada mes. Y **la factura fiscal se emite** desde una
-valuación aprobada, con su correlativo puesto por la base de datos. Y **las notas de crédito y débito**, con su
-pantalla: una factura emitida no se toca, se corrige con una nota que deja las dos en
-el libro. Y **la comprobación de firma del testigo de
-identidad**, que es la mitad de SSO que faltaba. Y **el camino entero de entrar con la cuenta
-de la empresa**, probado con testigos firmados de verdad. Con **sus dos rutas HTTP** y el cambio de
-código por testigo: el circuito de entrada con la empresa se recorre entero.
-Y **las retenciones a proveedores**, con su
-pantalla. Y **la conciliación bancaria**. Commit `ea2cd0d`. **702 comprobaciones.**
+**Lo último terminado:** **los equipos, en pantalla.** Cada activo con lo que
+queda en libros y, si está alquilado, **lo que deja**: lo facturado del contrato menos
+el desgaste del periodo, en verde si es positivo y en rojo si no. Es la única cifra que
+contesta «¿alquilar esto sale a cuenta?», y no estaba en ningún sitio. Depreciar el mes
+se hace desde ahí, comprobando antes las tres cosas que lo impedirían, para que el
+error salga explicado y no después de pulsar.
 
-Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
+Y salieron **dos fallos reales de la contabilidad** al usarla, los dos arreglados:
+
+- «El mes ya está depreciado. Para rehacerlo, **reversa su asiento**» era mentira: el
+  guardia no miraba si el asiento tenía reverso, así que quien seguía la instrucción al
+  pie de la letra chocaba con el mismo error y sin salida. El mismo fallo estaba en la
+  reexpresión por inflación. Los dos corregidos.
+- Al rehacer el mes quedaban las filas de `depreciacion` del intento reversado, y la
+  cuota se calculaba sobre una acumulada que no ocurrió. El asiento se queda en el
+  libro para siempre — eso es la contabilidad — pero esa tabla no es el libro.
+
+Con esto, de los tres módulos «construidos y sin pantalla» queda **uno y medio**.
+Commit `632b9b0`. **707 comprobaciones** (246 de SQL y diccionario + 461 de
+TypeScript), todas pasando.
+
+Avisado al CEO el **70%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
@@ -31,14 +37,24 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
    usa la primera semana y se abandona la tercera.
-3. **Activos fijos y depreciación en pantalla.** Igual: `15-activos.sql` construido y
-   probado, sin pantalla. Importa más de lo que parece — alquiler de equipos es uno de
-   los cinco tipos de contrato.
+3. **Reexpresión por inflación en pantalla.** `16-reexpresion.sql` construido y
+   probado, sin pantalla. El patrón está hecho: mirar `src/pantallas/activos.ts` y
+   `src/dominio/activos.ts`, que son exactamente el mismo caso resuelto ayer — una
+   función de base de datos que cierra un mes, con sus comprobaciones previas en
+   TypeScript para que el error salga explicado antes de pulsar.
+4. **La importación de destinos que no sean facturas de proveedor**, también sin
+   pantalla.
 
-**Patrón que se repite y conviene ver entero:** quedan tres módulos de base de datos
-construidos y probados que **no usa ninguna pantalla**: activos fijos, reexpresión por
-inflación, y la importación de destinos que no sean facturas de proveedor. El trabajo que queda es, en su
-mayor parte, ponerles la pantalla encima — no inventar nada nuevo.
+**Trampa que se acaba de pagar dos veces, y que se va a volver a pagar:** dentro de una
+función `plpgsql`, un alias de tabla que se llame igual que una variable declarada
+(`a`, `r`) lo resuelve PostgreSQL como la variable, y el error que da es
+`record "a" is not assigned yet` — que no señala a nada. Los alias dentro de funciones
+van con nombre largo: `asi`, `rev`.
+
+**Y otra:** la base de datos **no se vacía entre ejecuciones de un mismo archivo de
+pruebas**. Un fixture que crea asientos tiene que dejar limpio lo suyo al empezar, y
+como un asiento no se borra, la única forma correcta es **reversarlo** — que es lo que
+haría una persona. Si se intenta borrar, salta `Un asiento no se modifica ni se borra`.
 
 **Cómo continuar, literalmente:**
 
@@ -65,6 +81,16 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 
 - **Las pruebas se lanzan con `db/probar.sh`**, nunca con `node --test` a secas: sin
   eso la base de datos no está cargada y los fallos no significan nada.
+- **Dentro de una función `plpgsql`, un alias de tabla que coincida con una variable
+  declarada** (`a`, `r`) lo resuelve PostgreSQL como la variable, y el error es
+  `record "a" is not assigned yet`, que no señala a nada. Alias largos: `asi`, `rev`.
+- **La base de datos no se vacía entre ejecuciones de un mismo archivo de pruebas.** Un
+  fixture que crea asientos limpia lo suyo al empezar, y como un asiento no se borra, la
+  única forma correcta es **reversarlo** — lo mismo que haría una persona.
+- **Las cuentas del plan tienen cuatro niveles.** `1.2.01` no es imputable; lo que se
+  usa es `1.2.01.04`, y la depreciación acumulada es `1.2.02`, no `1.2.09`. Inventarse
+  un código da un error de clave foránea que aparece como *todas* las pruebas del
+  archivo fallando a la vez, porque revienta el `before()`.
 - **Cada archivo de prueba de la aplicación necesita su propio prefijo de UUID y su
   propia fecha de tasa del BCV.** Las de TypeScript corren todas seguidas contra una
   sola base; dos archivos que compartan identificadores se pisan en silencio, porque
@@ -233,6 +259,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/proveedores.ts` | Microsoft y Google configurados. **El `client_secret` sale del entorno:** escribirlo en el código es escribirlo en el historial del repositorio para siempre, y un secreto que estuvo en un repositorio está quemado aunque se borre. **Medio configurado es peor que nada**, así que un cliente sin secreto no cuenta como configurado — se ofrecería el botón y fallaría al volver. |
 | `app/src/dominio/proveedores.ts` · `pantallas/proveedores.ts` | Retener el IVA y el ISLR a los proveedores. **No retener cuando toca lo paga GPS de su bolsillo, con multa.** La pantalla avisa antes de pulsar de lo que más se discute: **sin número de control la retención es del 100%, no del 75%**. Y si la empresa no consta como agente de retención en esa fecha, el botón no se ofrece y se dice por qué — un botón que aparece y revienta hace pensar que el sistema está roto. |
 | `app/src/dominio/banco.ts` · `pantallas/banco.ts` | Conciliación bancaria. **La máquina propone; casar lo hace una persona** — dos movimientos del mismo importe el mismo día son más frecuentes de lo que parece, y una conciliación automática que se equivoca una vez al mes es peor que ninguna. **Lo que no casa no se esconde**, a los dos lados, y queda señalado hasta que alguien lo explique por escrito. La nota solo se ofrece en los movimientos del banco: un cobro que el banco no tiene no se arregla con una nota. |
+| `app/src/dominio/activos.ts` · `pantallas/activos.ts` | Los equipos. Cada uno con lo que queda en libros y, si está alquilado, **lo que deja**: lo facturado del contrato menos el desgaste del periodo. Un equipo que deja menos de lo que se gasta no es una pérdida contable abstracta: es **una máquina que habría salido más barata parada**, y esa cifra no estaba en ningún sitio. Depreciar el mes se hace desde aquí, y las tres cosas que lo impedirían se comprueban **antes** de pulsar, no después. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
