@@ -114,13 +114,20 @@ export function pintarMapeo(
   }).join('')
 
   const resultado = !revision ? '' : `
-<div class="rev ${revision.malas === 0 && revision.proveedoresFaltan.length === 0 ? 'bien' : 'mal'}">
+<div class="rev ${revision.malas === 0 && revision.proveedoresFaltan.length === 0
+    && revision.mesesSinPeriodo.length === 0 ? 'bien' : 'mal'}">
   <div class="rev-n"><b>${revision.buenas}</b> ${escapar(t('importar.buenas'))}${
     revision.malas === 0 ? '' : ` · <b>${revision.malas}</b> ${escapar(t('importar.malas'))}`
   }</div>
   ${revision.malas === 0 ? '' : `<ul class="rev-l">${
     revision.errores.map((e) => `<li>${escapar(String(e.fila))}: ${escapar(e.motivo)}</li>`).join('')
   }</ul><p class="expl">${escapar(t('importar.todo_o_nada'))}</p>`}
+  ${revision.mesesSinPeriodo.length === 0 ? '' : `
+  <h3>${escapar(t('importar.error.sin_periodo'))}</h3>
+  <ul class="rev-l">${revision.mesesSinPeriodo.map((m) =>
+    `<li><b>${String(m.mes).padStart(2, '0')}/${m.anio}</b> · ${m.filas} ${escapar(x.filas)}</li>`
+  ).join('')}</ul>
+  <p class="expl">${escapar(t('importar.abrir_periodo'))}</p>`}
   ${revision.proveedoresFaltan.length === 0 ? '' : `
   <h3>${escapar(t('importar.sin_proveedor'))}</h3>
   <ul class="rev-l">${revision.proveedoresFaltan.map((p) =>
@@ -130,7 +137,8 @@ export function pintarMapeo(
 </div>`
 
   const puedeConfirmar = revision !== null && revision.malas === 0 &&
-    revision.proveedoresFaltan.length === 0 && revision.filas > 0
+    revision.proveedoresFaltan.length === 0 && revision.mesesSinPeriodo.length === 0 &&
+    revision.filas > 0
 
   return pagina({
     idioma,

@@ -315,5 +315,8 @@
   "importar.error.sin_validar": "Hay que comprobar la hoja antes de importarla",
   "importar.error.filas_malas": "Hay filas con error. Corrígelas en la hoja y vuelve a traerla: si entra una a medias, nadie sabe por dónde se quedó.",
   "importar.error.proveedores": "Hay proveedores sin dar de alta",
-  "importar.error.ya": "Esa hoja ya se importó"
+  "importar.error.ya": "Esa hoja ya se importó",
+  "importar.error.sin_plan": "Esta empresa todavía no tiene plan de cuentas instalado. Sin él, una factura importada quedaría registrada y sin asentar, que es el peor sitio donde dejarla: parece que cuenta y no cuenta.",
+  "importar.error.sin_periodo": "Hay facturas de meses que no tienen su periodo contable abierto",
+  "importar.abrir_periodo": "Abre esos meses antes de importar. Un asiento en un mes que no existe es un asiento que nadie va a encontrar cuando lo busque."
 }

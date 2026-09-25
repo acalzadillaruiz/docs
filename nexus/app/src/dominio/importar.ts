@@ -227,6 +227,8 @@ export type Revision = {
   readonly malas: number
   readonly errores: readonly { fila: number; motivo: string }[]
   readonly proveedoresFaltan: readonly { rif: string; nombre: string; filas: number }[]
+  /** Los meses de la hoja cuyo periodo contable no está abierto. */
+  readonly mesesSinPeriodo: readonly { anio: number; mes: number; filas: number }[]
 }
 
 export async function validar(q: Consulta, loteId: string): Promise<Revision> {
@@ -243,12 +245,17 @@ export async function validar(q: Consulta, loteId: string): Promise<Revision> {
     select rif, nombre, filas from proveedores_desconocidos(${loteId}::uuid)
   `) as unknown as Array<{ rif: string; nombre: string; filas: number }>
 
+  const meses = (await q`
+    select anio, mes, filas from meses_sin_periodo(${loteId}::uuid)
+  `) as unknown as Array<{ anio: number; mes: number; filas: number }>
+
   return {
     filas: Number(r?.filas ?? 0),
     buenas: Number(r?.buenas ?? 0),
     malas: Number(r?.malas ?? 0),
     errores,
     proveedoresFaltan: faltan,
+    mesesSinPeriodo: meses,
   }
 }
 
@@ -282,6 +289,33 @@ export async function confirmar(
   `) as unknown as Array<{ n: number }>
   if (Number(malas?.n ?? 0) > 0) {
     return { hecho: false, motivo: t(idioma, 'importar.error.filas_malas') }
+  }
+
+  // Sin plan de cuentas no hay dónde asentar, y una factura registrada y sin asentar
+  // es el peor sitio donde dejarla: parece que cuenta y no cuenta. Se dice antes de
+  // crear nada, no a mitad.
+  const [plan] = (await q`
+    select count(*)::int as n from mapa_cuenta
+     where organizacion_id = (select organizacion_id from lote_importacion
+                               where id = ${loteId}::uuid)
+       and concepto = 'gasto'
+  `) as unknown as Array<{ n: number }>
+  if (Number(plan?.n ?? 0) === 0) {
+    return { hecho: false, motivo: t(idioma, 'importar.error.sin_plan') }
+  }
+
+  // Un asiento en un mes que no existe es un asiento que nadie va a encontrar
+  // cuando lo busque. Y descubrirlo a mitad de la carga deja media hoja dentro.
+  const meses = (await q`
+    select anio, mes from meses_sin_periodo(${loteId}::uuid)
+  `) as unknown as Array<{ anio: number; mes: number }>
+  if (meses.length > 0) {
+    const lista = meses.map((m) => `${String(m.mes).padStart(2, '0')}/${m.anio}`).join(', ')
+    return {
+      hecho: false,
+      motivo: `${t(idioma, 'importar.error.sin_periodo')}: ${lista}. ${
+        t(idioma, 'importar.abrir_periodo')}`,
+    }
   }
 
   const faltan = (await q`

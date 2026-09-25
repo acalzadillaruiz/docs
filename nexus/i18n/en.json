@@ -315,5 +315,8 @@
   "importar.error.sin_validar": "The sheet must be checked before importing it",
   "importar.error.filas_malas": "Some rows have errors. Fix them in the sheet and import it again: a half-done import leaves nobody knowing where it stopped.",
   "importar.error.proveedores": "Some suppliers are not registered",
-  "importar.error.ya": "That sheet was already imported"
+  "importar.error.ya": "That sheet was already imported",
+  "importar.error.sin_plan": "This company has no chart of accounts installed yet. Without it, an imported invoice would be recorded but never posted — the worst place to leave it: it looks like it counts and it does not.",
+  "importar.error.sin_periodo": "Some invoices fall in months whose accounting period is not open",
+  "importar.abrir_periodo": "Open those months before importing. An entry in a month that does not exist is an entry nobody will find when they look for it."
 }

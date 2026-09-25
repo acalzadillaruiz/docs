@@ -106,6 +106,9 @@ before(async () => {
         ('${H1}','${RG}', 1,'fabricado','Fabricado','Manufactured', 40.00,'{certificado}'),
         ('${H2}','${RG}', 2,'recibido','Recibido','Received', 60.00,'{acta,foto}')
         on conflict (id) do update set peso = excluded.peso, exige = excluded.exige;
+      select instalar_plan_cuentas('${ORG}');
+      insert into periodo (organizacion_id, anio, mes) values ('${ORG}', 2026, 4)
+        on conflict do nothing;
     `)
   })
 })

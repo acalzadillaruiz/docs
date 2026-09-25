@@ -43,6 +43,11 @@ insert into mapeo_columna (lote_id, columna, campo, tipo, formato) values
  (:lote, 6,'iva','numero','ven'),
  (:lote, 7,'contrato','texto', null);
 
+-- Sin plan de cuentas no hay donde asentar, y una factura registrada y sin asentar
+-- es el peor sitio donde dejarla: parece que cuenta y no cuenta.
+select instalar_plan_cuentas(:org) as _;
+insert into periodo (organizacion_id, anio, mes) values (:org, 2026, 4), (:org, 2026, 5);
+
 select set_config('app.persona_id', :yo, false);
 
 -- ============================================================ validar primero

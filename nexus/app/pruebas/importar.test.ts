@@ -58,6 +58,12 @@ before(async () => {
         values ('${CTR}','${G}','${CLI}','IMP-APP-001','procura','Cabezales','Wellheads',
                 'vigente','USD', 100000.00,'${TASA}','${YO}')
         on conflict (id) do update set codigo = excluded.codigo;
+      -- Sin plan de cuentas no hay donde asentar, y una factura sin asentar no cuenta.
+      select instalar_plan_cuentas('${G}');
+      -- Y el periodo contable de abril abierto: un asiento en un mes que no existe
+      -- es un asiento que nadie va a encontrar cuando lo busque.
+      insert into periodo (organizacion_id, anio, mes) values ('${G}', 2026, 4)
+        on conflict do nothing;
     `)
   })
 })
@@ -244,4 +250,83 @@ test('las hojas traídas quedan listadas, con su estado', async () => {
   assert.equal(lista[0]!.archivo, 'abril.csv')
   assert.equal(lista[0]!.estado, 'cargado')
   assert.equal(lista[0]!.filas, 2)
+})
+
+test('lo importado LLEGA AL LIBRO: la factura queda asentada, no solo registrada', async () => {
+  await limpio()
+  const r = await dentro((q) => cargar(q, G, YO, 'abril.csv', bytes(HOJA), 'facturas_recibidas'))
+  await dentro((q) => guardarMapeo(q, r.loteId,
+    proponerMapeo(r.cabeceras, r.muestras, 'facturas_recibidas')))
+  await dentro((q) => validar(q, r.loteId))
+  assert.equal((await dentro((q) => confirmar(q, r.loteId, YO))).hecho, true)
+
+  // Una factura registrada y sin asentar es el peor sitio donde dejarla: parece
+  // que cuenta y no cuenta.
+  const filas = (await dentro((q) => q`
+    select numero, asiento_id from documento_fiscal
+     where organizacion_id = ${G}::uuid order by numero
+  `)) as unknown as Array<{ numero: string; asiento_id: string | null }>
+  assert.equal(filas.length, 2)
+  assert.equal(filas.every((f) => f.asiento_id !== null), true, 'las dos asentadas')
+
+  // Y el asiento cuadra, que es lo único que hace que valga de algo.
+  const [cuadre] = (await dentro((q) => q`
+    select sum(p.monto_ves)::text as descuadre
+      from partida p join asiento a on a.id = p.asiento_id
+     where a.organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ descuadre: string }>
+  assert.equal(Number(cuadre!.descuadre), 0)
+})
+
+test('sin plan de cuentas NO se importa, y se dice por qué', async () => {
+  await limpio()
+  // Una organización recién creada no tiene dónde asentar.
+  const SIN = '4b5c6d7e-0000-0000-0000-00000000000f'
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`insert into organizacion (id, tipo, nombre, rif)
+            values (${SIN},'gps','GPS Sin Plan','J-900500000-0') on conflict (id) do nothing`
+    await q`delete from mapa_cuenta where organizacion_id = ${SIN}::uuid`
+    await q`delete from lote_importacion where organizacion_id = ${SIN}::uuid`
+    await q`insert into persona (id, organizacion_id, correo, nombre, metodo, clave_hash, totp_secreto)
+            values ('4b5c6d7e-0000-0000-0000-0000000000ff', ${SIN},'sinplan@prueba.test',
+                    'Interno','clave_2fa','(h)','(s)') on conflict (id) do nothing`
+  })
+  const comoOtro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
+    comoPersona<T>({ id: '4b5c6d7e-0000-0000-0000-0000000000ff' }, 'nexus_interno', f)
+
+  const r = await comoOtro((q) => cargar(q, SIN, '4b5c6d7e-0000-0000-0000-0000000000ff',
+    'sinplan.csv', bytes(HOJA), 'facturas_recibidas'))
+  await comoOtro((q) => guardarMapeo(q, r.loteId,
+    proponerMapeo(r.cabeceras, r.muestras, 'facturas_recibidas')))
+  await comoOtro((q) => validar(q, r.loteId))
+
+  const c = await comoOtro((q) => confirmar(q, r.loteId,
+    '4b5c6d7e-0000-0000-0000-0000000000ff'))
+  assert.equal(c.hecho, false)
+  assert.match((c as { motivo: string }).motivo, /plan de cuentas/)
+})
+
+test('un mes con el periodo contable cerrado se dice ANTES, no a mitad', async () => {
+  await limpio()
+  // Mayo no está abierto en esta organización.
+  const mayo = HOJA.replace(/03\/04\/2026/g, '03/05/2026').replace(/15\/04\/2026/g, '15/05/2026')
+  const r = await dentro((q) => cargar(q, G, YO, 'mayo.csv', bytes(mayo), 'facturas_recibidas'))
+  await dentro((q) => guardarMapeo(q, r.loteId,
+    proponerMapeo(r.cabeceras, r.muestras, 'facturas_recibidas')))
+
+  const v = await dentro((q) => validar(q, r.loteId))
+  assert.equal(v.mesesSinPeriodo.length, 1)
+  assert.equal(v.mesesSinPeriodo[0]!.mes, 5)
+  assert.equal(v.mesesSinPeriodo[0]!.filas, 2)
+
+  const c = await dentro((q) => confirmar(q, r.loteId, YO))
+  assert.equal(c.hecho, false)
+  // Un asiento en un mes que no existe es un asiento que nadie va a encontrar.
+  assert.match((c as { motivo: string }).motivo, /05\/2026/)
+
+  const [n] = (await dentro((q) => q`
+    select count(*)::int as n from documento_fiscal where organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(n!.n, 0, 'no quedó media hoja dentro')
 })

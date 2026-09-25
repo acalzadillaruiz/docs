@@ -154,6 +154,11 @@ begin
   -- dice estar confirmado sin haber creado nada.
   n := materializar_facturas_recibidas(p_lote, p_persona);
 
+  -- Y se asientan en el acto. Una factura registrada y sin asentar es el peor sitio
+  -- donde dejarla: parece que cuenta y no cuenta. Va en la misma transaccion, asi
+  -- que o entran las dos cosas o no entra ninguna.
+  perform asentar_lote(p_lote, p_persona);
+
   update lote_importacion
      set estado = 'confirmado', confirmado_en = now()
    where id = p_lote;
@@ -165,3 +170,90 @@ end $$;
 -- sin ella la pantalla de mapeo no puede ensenar como se llamaba cada columna en el
 -- Excel original, que es justo lo que el humano necesita para reconocerla.
 alter table lote_importacion add column if not exists cabeceras text[];
+
+-- -----------------------------------------------------------------------------
+-- Asentar lo importado.
+--
+-- Hasta aqui las facturas entraban en 'documento_fiscal' y se quedaban ahi: no
+-- llegaban al libro, asi que el costo no aparecia, y sin costo no hay margen. Que
+-- una factura exista y no este asentada es el peor sitio donde dejarla — parece
+-- registrada y no cuenta para nada.
+--
+-- La cuenta de gasto sale de la hoja si la trae, y si no del concepto 'gasto' del
+-- mapa de cuentas. Adivinar la cuenta mirando el concepto de la factura seria
+-- rapido y seria exactamente como se ensucia un plan de cuentas.
+
+create or replace function asentar_lote(p_lote uuid, p_persona uuid) returns int
+language plpgsql as $$
+declare
+  l       record;
+  d       record;
+  col_cta int;
+  cta     text;
+  n       int := 0;
+begin
+  select * into l from lote_importacion where id = p_lote;
+  if l is null then raise exception 'El lote % no existe', p_lote; end if;
+  if l.destino <> 'facturas_recibidas' then return 0; end if;
+
+  select columna into col_cta from mapeo_columna
+   where lote_id = p_lote and campo = 'cuenta';
+
+  for d in
+    select df.id, df.numero, fc.celdas
+      from documento_fiscal df
+      join fila_cruda fc on fc.lote_id = p_lote
+       and btrim(fc.celdas[(select columna from mapeo_columna
+                             where lote_id = p_lote and campo = 'numero')]) = df.numero
+     where df.organizacion_id = l.organizacion_id
+       and df.sentido = 'recibido'
+       and df.asiento_id is null
+  loop
+    cta := null;
+    if col_cta is not null then
+      cta := nullif(btrim(d.celdas[col_cta]), '');
+    end if;
+    -- Sin cuenta en la hoja, la del concepto 'gasto'. Es una cuenta de verdad y no
+    -- un cajon de sastre: quien quiera partirla por tipo de gasto, que mapee la
+    -- columna. Lo que no puede pasar es que la factura se quede sin asentar.
+    if cta is null then
+      cta := cuenta_de(l.organizacion_id, 'gasto');
+    end if;
+
+    perform asentar_factura_proveedor(d.id, cta, p_persona);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+/**
+ * Los meses de la hoja que no tienen su periodo contable abierto.
+ *
+ * Se pregunta ANTES de importar. Un asiento en un mes que no existe es un asiento
+ * que nadie va a encontrar cuando lo busque, y descubrirlo a mitad de la carga
+ * significa quedarse con media hoja dentro.
+ */
+create or replace function meses_sin_periodo(p_lote uuid)
+returns table (anio int, mes int, filas int)
+language sql stable as $$
+  with f as (
+    select leer_fecha(
+             fc.celdas[(select columna from mapeo_columna
+                         where lote_id = p_lote and campo = 'fecha')],
+             (select formato from mapeo_columna
+               where lote_id = p_lote and campo = 'fecha')) as fecha
+      from fila_cruda fc where fc.lote_id = p_lote
+  )
+  select extract(year from f.fecha)::int, extract(month from f.fecha)::int, count(*)::int
+    from f
+   where f.fecha is not null
+     and not exists (
+       select 1 from periodo pe
+        where pe.organizacion_id = (select organizacion_id from lote_importacion
+                                     where id = p_lote)
+          and pe.anio = extract(year from f.fecha)::int
+          and pe.mes  = extract(month from f.fecha)::int
+          and pe.estado = 'abierto')
+   group by 1, 2
+   order by 1, 2
+$$;
