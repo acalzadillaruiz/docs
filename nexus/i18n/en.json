@@ -339,5 +339,17 @@
   "cobrar.error.tasa": "No BCV rate has been published for that date",
   "cobrar.error.periodo": "That payment's month has no open accounting period",
   "facturar.emitir": "Issue the invoice",
-  "facturar.aviso": "With its control number. The sequence comes from the database, not from a person: one kept by hand ends up with gaps or duplicates."
+  "facturar.aviso": "With its control number. The sequence comes from the database, not from a person: one kept by hand ends up with gaps or duplicates.",
+  "periodo.titulo": "Accounting months",
+  "periodo.explica": "An entry only goes into an open month. With no open month, no invoice and no payment can be recorded, so a new one has to be opened on the 1st.",
+  "periodo.abrir": "Open the month",
+  "periodo.cerrar": "Close",
+  "periodo.abierto": "Open",
+  "periodo.cerrado": "Closed",
+  "periodo.asientos": "entries",
+  "periodo.cerrar_aviso": "Closing a month blocks any further entry in it. It cannot be reopened from here: correcting a closed month is done with a reversing entry in the next one, which is how the trail should read.",
+  "periodo.error.orden": "A month cannot be closed while the previous one is still open",
+  "periodo.error.descuadre": "That month does not balance: an unbalanced month is not closed",
+  "periodo.error.ya": "That month was already there",
+  "periodo.siguiente": "Next month to open"
 }

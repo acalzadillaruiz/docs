@@ -155,6 +155,7 @@ ${ESTILOS_AVANCE}
   ${esCliente ? '' : `<a class="medidas" href="/medidas">${escapar(t('medida.titulo'))} →</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/contratos/nuevo">${escapar(t('alta.nuevo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/importar">${escapar(t('importar.titulo'))}</a>`}
+  ${esCliente ? '' : `<a class="medidas" href="/periodos">${escapar(t('periodo.titulo'))}</a>`}
   <a class="medidas" href="/perfil">${escapar(t('perfil.titulo'))}</a>
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
 </div></header>`,

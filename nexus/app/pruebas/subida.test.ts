@@ -593,3 +593,35 @@ test('traer la misma hoja dos veces se avisa, no se cuela', async () => {
   assert.equal(dos.codigo, 409)
   assert.match(dos.cuerpo!, /ya se importó/)
 })
+
+test('los meses contables se abren desde el navegador, y el cliente no llega', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const af = testigoAnti(cookie)
+
+  const pantalla = await pedir({ ruta: '/periodos', cookie })
+  assert.equal(pantalla.codigo, 200)
+  assert.match(pantalla.cuerpo!, /Meses contables/)
+
+  const r = await pedir({
+    metodo: 'POST', ruta: '/periodos', cookie,
+    campos: { af, accion: 'abrir', anio: '2027', mes: '7' },
+  })
+  assert.equal(r.codigo, 200)
+  const [n] = (await dentro((q) => q`
+    select count(*)::int as n from periodo
+     where organizacion_id = ${ORG}::uuid and anio = 2027 and mes = 7
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(n!.n, 1)
+
+  const cli = await entrar('sub-cli@prueba.test')
+  assert.equal((await pedir({ ruta: '/periodos', cookie: cli })).codigo, 404)
+})
+
+test('abrir un mes SIN el testigo antifalsificación no pasa', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const r = await pedir({
+    metodo: 'POST', ruta: '/periodos', cookie,
+    campos: { accion: 'abrir', anio: '2028', mes: '1' },
+  })
+  assert.equal(r.codigo, 403)
+})

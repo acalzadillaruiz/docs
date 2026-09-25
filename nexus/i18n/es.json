@@ -339,5 +339,17 @@
   "cobrar.error.tasa": "No hay tasa del BCV publicada para esa fecha",
   "cobrar.error.periodo": "El mes de ese cobro no tiene su periodo contable abierto",
   "facturar.emitir": "Emitir la factura",
-  "facturar.aviso": "Con su número de control. El correlativo lo pone la base de datos, no una persona: uno llevado a mano acaba con huecos o repetido."
+  "facturar.aviso": "Con su número de control. El correlativo lo pone la base de datos, no una persona: uno llevado a mano acaba con huecos o repetido.",
+  "periodo.titulo": "Meses contables",
+  "periodo.explica": "Un asiento solo entra en un mes abierto. Sin el mes abierto no entra ni una factura ni un cobro, así que el día 1 hay que abrir el nuevo.",
+  "periodo.abrir": "Abrir el mes",
+  "periodo.cerrar": "Cerrar",
+  "periodo.abierto": "Abierto",
+  "periodo.cerrado": "Cerrado",
+  "periodo.asientos": "asientos",
+  "periodo.cerrar_aviso": "Cerrar un mes impide meterle un asiento más. No se puede reabrir desde aquí: corregir un mes cerrado se hace con un asiento de reverso en el mes siguiente, que es como debe quedar el rastro.",
+  "periodo.error.orden": "No se puede cerrar un mes con el anterior todavía abierto",
+  "periodo.error.descuadre": "Ese mes no cuadra: no se cierra un mes descuadrado",
+  "periodo.error.ya": "Ese mes ya estaba",
+  "periodo.siguiente": "Siguiente mes por abrir"
 }

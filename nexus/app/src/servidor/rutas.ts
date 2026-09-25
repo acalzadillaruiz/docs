@@ -48,6 +48,8 @@ import {
 import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
 import { estadoDeCobro, registrarCobro, NoCobrable, type Medio } from '../dominio/cobrar.ts'
 import { pintarCobrar } from '../pantallas/cobrar.ts'
+import { meses, abrirMes, cerrarMes } from '../dominio/periodos.ts'
+import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
 import { pintarPerfil } from '../pantallas/perfil.ts'
@@ -393,6 +395,32 @@ export async function resolver(
     const propuestas = await comoQuien((q) => mapeoGuardado(q, lote[1]!))
     return html(error === '' ? 200 : 400, pintarMapeo(
       lote[1]!, datos.archivo, propuestas, p.idioma, testigoAnti(testigo), revision, error))
+  }
+
+  // Los meses contables. La pantalla más aburrida y una de las que más bloquean:
+  // el día 1, sin el mes nuevo abierto, no entra ni una factura ni un cobro.
+  if (p.ruta === '/periodos' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const anio = Number(p.campos['anio'] ?? 0)
+      const mes = Number(p.campos['mes'] ?? 0)
+      const r = p.campos['accion'] === 'cerrar'
+        ? await comoQuien((q) => cerrarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
+        : await comoQuien((q) => abrirMes(q, org!.organizacion_id, anio, mes, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    }
+
+    const m = await comoQuien((q) => meses(q, org!.organizacion_id, p.idioma))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarPeriodos(m, p.idioma, testigoAnti(testigo), errores))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
