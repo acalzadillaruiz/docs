@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 121 de 141 sesiones · **86%**
+**Avance:** 122 de 141 sesiones · **87%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -72,9 +72,22 @@ fueron añadiendo de uno en uno y la fila nunca se partía; tres de ellos los pu
 ese mismo día sin verlo. **Leyendo el HTML no hay anchura: la anchura la decide el
 navegador.**
 
+Y **el contraste, medido por primera vez**: tres colores que no se leían. El gris de
+todas las etiquetas pequeñas daba 2,78 sobre 4,5 exigido; el botón verde de abrir el
+mes llevaba texto blanco, que en tema oscuro da 1,69; y el enlace de bajar el libro
+usaba un azul marino que no cambia con el tema, invisible sobre fondo oscuro — ese lo
+escribí yo esa misma mañana. **Los tres son el mismo error: un color fijo que se lee
+en un tema y desaparece en el otro.**
+
 Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`,
-`16f9c03`, `c0aa778`, `dd3822b`, `a768a76` y `33196cc`. **822 comprobaciones** (250
-de SQL y diccionario + 572 de TypeScript), todas pasando.
+`16f9c03`, `c0aa778`, `dd3822b`, `a768a76`, `33196cc` y `587f3d0`.
+**825 comprobaciones** (250 de SQL y diccionario + 575 de TypeScript), todas pasando.
+
+**Trampa nueva:** dentro de una plantilla de TypeScript, **`\d` se queda en `d`**.
+Hay que escribir `\\d` para que al navegador le llegue `\d`. La medición del
+contraste se quedó con `[d.]+`, no casaba con nada, todos los colores salían negros y
+la prueba «encontró» cien fallos que no existían. **Una prueba que falla de mentira
+cuesta lo mismo que una que pasa en vano.**
 
 **Regla que sostiene los importes y se pierde en el primer refactor:** la
 comprobación de un importe es **`!(x > 0)`**, nunca `x <= 0`. Las dos dicen lo mismo
