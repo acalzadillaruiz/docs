@@ -32,11 +32,14 @@ export type DatosValuacion = {
    * una acción y esconde que no te corresponde.
    */
   readonly puedeDecidir: boolean
+  /** Quien está dentro de GPS puede contestar las objeciones abiertas. */
+  readonly puedeResponder: boolean
   readonly antifalsificacion: string
   readonly objeciones: readonly ObjecionVista[]
 }
 
 export type ObjecionVista = {
+  readonly id: string
   readonly motivo: string
   readonly cuando: string
   readonly respuesta: string | null
@@ -51,11 +54,17 @@ const ACCIONES = {
         ayuda: 'Al aprobarla queda constancia de quién y cuándo. Esto no se deshace.',
         objecionTitulo: 'Objeciones', sinRespuesta: 'Sin responder todavía',
         respondida: 'Respondida', volver: 'Volver al contrato',
+        responder: 'Responder', tuRespuesta: 'Tu respuesta',
+        avisoResponder: 'Mientras no se responda, esta valuación no se puede facturar.',
+        placeholderR: 'Por ejemplo: se retiran las 12 horas de grúa y se corrige la valuación a la baja.',
         placeholder: 'Por ejemplo: el renglón 3 incluye 12 horas de grúa que no se ejecutaron el 14 de septiembre.' },
   en: { aprobar: 'Approve this progress payment', objetar: 'Dispute', motivo: 'What does not add up',
         ayuda: 'Approving records who and when. This cannot be undone.',
         objecionTitulo: 'Disputes', sinRespuesta: 'Not answered yet',
         respondida: 'Answered', volver: 'Back to the contract',
+        responder: 'Answer', tuRespuesta: 'Your answer',
+        avisoResponder: 'Until this is answered, the progress payment cannot be invoiced.',
+        placeholderR: 'For example: the 12 crane hours are withdrawn and the sheet is corrected.',
         placeholder: 'For example: line 3 includes 12 crane hours that were not worked on 14 September.' },
 } as const
 
@@ -158,6 +167,14 @@ h2.sec{margin:30px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5p
 .obj-e{margin-top:8px;font-size:13px;color:#946307;font-weight:600}
 .obj-r{margin-top:10px;padding-top:10px;border-top:1px solid var(--ln);font-size:14px;
   color:var(--ik2);line-height:1.5}
+.resp{margin-top:12px;padding-top:12px;border-top:1px solid var(--ln)}
+.resp label{display:block;font-family:"JetBrains Mono",monospace;font-size:9.5px;
+  font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--md)}
+.resp textarea{width:100%;margin-top:6px;font:inherit;font-size:15px;padding:11px;
+  border:1px solid var(--ln2);border-radius:10px;background:transparent;color:var(--ik);
+  resize:vertical}
+.resp button{margin-top:9px;width:100%;font:inherit;font-size:15px;font-weight:700;
+  padding:12px;border:0;border-radius:10px;background:var(--nv);color:#fff;cursor:pointer}
 .acc{margin-top:26px;background:var(--cd);border:1px solid var(--ln);border-radius:15px;
   padding:20px 18px}
 .acc form{margin:0}
@@ -222,10 +239,20 @@ ${filas}
     <div class="obj${o.respuesta === null ? ' abierta' : ''}">
       <div class="obj-m">${escapar(o.motivo)}</div>
       <div class="obj-f">${escapar(o.cuando)}</div>
-      ${o.respuesta === null
-        ? `<div class="obj-e">${escapar(a.sinRespuesta)}</div>`
-        : `<div class="obj-r">${escapar(o.respuesta)}</div>
-           <div class="obj-f">${escapar(a.respondida)} · ${escapar(o.respondidaEn ?? '')}</div>`}
+      ${o.respuesta !== null
+        ? `<div class="obj-r">${escapar(o.respuesta)}</div>
+           <div class="obj-f">${escapar(a.respondida)} · ${escapar(o.respondidaEn ?? '')}</div>`
+        : d.puedeResponder
+          ? `<div class="obj-e">${escapar(a.avisoResponder)}</div>
+             <form method="post" action="/objeciones/${escapar(o.id)}/responder" class="resp">
+               <input type="hidden" name="af" value="${escapar(d.antifalsificacion)}">
+               <input type="hidden" name="volver" value="/valuaciones/${escapar(d.id)}">
+               <label for="r-${escapar(o.id)}">${escapar(a.tuRespuesta)}</label>
+               <textarea id="r-${escapar(o.id)}" name="respuesta" rows="3" required
+                         placeholder="${escapar(a.placeholderR)}"></textarea>
+               <button type="submit">${escapar(a.responder)}</button>
+             </form>`
+          : `<div class="obj-e">${escapar(a.sinRespuesta)}</div>`}
     </div>`).join('')}</div>`}
 
   ${!d.puedeDecidir ? '' : `

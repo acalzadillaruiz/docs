@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 42 de 141 sesiones · **30%**
+**Avance:** 43 de 141 sesiones · **30%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -33,6 +33,16 @@ es lo primero, antes que cualquier cosa nueva.
 
 ---
 
+## AVISAR AL CEO: 30%
+
+Tercer décimo. El circuito del cliente está **cerrado de punta a punta**: entra, ve
+sus contratos, abre el que le espera, revisa la valuación línea por línea, aprueba u
+objeta — y del otro lado GPS lo ve en su bandeja y responde ahí mismo.
+
+**309 comprobaciones**, todas pasando. Nada se ha añadido sin su prueba.
+
+---
+
 ## AVISAR AL CEO: 20%
 
 Segundo décimo. Al motor contable completo se le suma ahora **la entrada entera**:
@@ -59,7 +69,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento cuarenta reglas duras, el diccionario bilingüe y las ciento sesenta y tres pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento cuarenta reglas duras, el diccionario bilingüe y las ciento sesenta y ocho pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 

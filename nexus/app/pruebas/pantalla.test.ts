@@ -11,6 +11,7 @@ const DATOS: DatosValuacion = {
   contratoId: '22222222-2222-2222-2222-222222222222',
   estadoCrudo: 'aprobada',
   puedeDecidir: false,
+  puedeResponder: false,
   antifalsificacion: 'af-de-prueba',
   objeciones: [],
   contrato: 'GPS-2026-001',
@@ -99,8 +100,10 @@ test('objetar exige escribir qué no cuadra', () => {
 
 test('una objeción sin responder se marca distinto de una respondida', () => {
   const h = pintarValuacion({ ...DATOS, objeciones: [
-    { motivo: 'Faltan 12 horas de grúa', cuando: '14/09/2026', respuesta: null, respondidaEn: null },
-    { motivo: 'Falta el acta', cuando: '10/09/2026',
+    { id: 'aaaa1111-1111-1111-1111-111111111111',
+      motivo: 'Faltan 12 horas de grúa', cuando: '14/09/2026', respuesta: null, respondidaEn: null },
+    { id: 'bbbb2222-2222-2222-2222-222222222222',
+      motivo: 'Falta el acta', cuando: '10/09/2026',
       respuesta: 'Se adjunta firmada', respondidaEn: '12/09/2026' },
   ] }, 'es')
   assert.match(h, /class="obj abierta"/)
@@ -110,7 +113,8 @@ test('una objeción sin responder se marca distinto de una respondida', () => {
 
 test('el texto de una objeción se escapa: lo escribe el cliente', () => {
   const h = pintarValuacion({ ...DATOS, objeciones: [
-    { motivo: '<script>alert(1)</script>', cuando: '14/09/2026', respuesta: null, respondidaEn: null },
+    { id: 'cccc3333-3333-3333-3333-333333333333',
+      motivo: '<script>alert(1)</script>', cuando: '14/09/2026', respuesta: null, respondidaEn: null },
   ] }, 'es')
   assert.equal(h.includes('<script>alert(1)</script>'), false)
   assert.match(h, /&lt;script&gt;/)
@@ -119,4 +123,48 @@ test('el texto de una objeción se escapa: lo escribe el cliente', () => {
 test('desde la valuación se puede volver al contrato', () => {
   assert.match(pintarValuacion(DATOS, 'es'),
     /href="\/contratos\/22222222-2222-2222-2222-222222222222"/)
+})
+
+const ABIERTA = {
+  id: 'aaaa1111-1111-1111-1111-111111111111',
+  motivo: 'Faltan 12 horas de grúa', cuando: '14/09/2026',
+  respuesta: null, respondidaEn: null,
+} as const
+
+test('desde dentro se puede responder una objeción abierta, ahí mismo', () => {
+  // Sin esto habría que salir a otra pantalla a contestar, y lo que cuesta un
+  // desvío no se hace: la objeción se queda abierta.
+  const h = pintarValuacion({ ...DATOS, puedeResponder: true, objeciones: [ABIERTA] }, 'es')
+  assert.match(h, /action="\/objeciones\/aaaa1111-1111-1111-1111-111111111111\/responder"/)
+  assert.match(h, /name="respuesta"/)
+  assert.match(h, /<textarea[^>]*required/)
+})
+
+test('el formulario de responder lleva el testigo antifalsificación y un destino propio', () => {
+  const h = pintarValuacion({ ...DATOS, puedeResponder: true, objeciones: [ABIERTA] }, 'es')
+  assert.match(h, /name="af" value="af-de-prueba"/)
+  // El destino de vuelta es una ruta nuestra. La ruta además lo sanea, pero aquí
+  // ya se manda bien de origen.
+  assert.match(h, /name="volver" value="\/valuaciones\/11111111-1111-1111-1111-111111111111"/)
+})
+
+test('se recuerda por qué urge responder: sin respuesta no se factura', () => {
+  const h = pintarValuacion({ ...DATOS, puedeResponder: true, objeciones: [ABIERTA] }, 'es')
+  assert.match(h, /no se puede facturar/)
+  assert.match(pintarValuacion({ ...DATOS, puedeResponder: true, objeciones: [ABIERTA] }, 'en'),
+    /cannot be invoiced/)
+})
+
+test('el cliente NO ve el formulario de responder: no es suyo', () => {
+  const h = pintarValuacion({ ...DATOS, puedeResponder: false, objeciones: [ABIERTA] }, 'es')
+  assert.equal(h.includes('/responder'), false)
+  assert.match(h, /Sin responder todavía/)
+})
+
+test('una objeción ya respondida no vuelve a ofrecer el formulario', () => {
+  const h = pintarValuacion({ ...DATOS, puedeResponder: true, objeciones: [
+    { ...ABIERTA, respuesta: 'Se retiran las 12 horas.', respondidaEn: '16/09/2026' },
+  ] }, 'es')
+  assert.equal(h.includes('/responder'), false)
+  assert.match(h, /Se retiran las 12 horas/)
 })

@@ -56,8 +56,10 @@ try {
       lineas,
       puedeDecidir: process.env.NEXUS_COMO_CLIENTE === '1' &&
         (cab.estado === 'presentada' || cab.estado === 'objetada'),
+      puedeResponder: process.env.NEXUS_COMO_CLIENTE !== '1',
       antifalsificacion: 'ejemplo-para-mirar',
       objeciones: objs.map((o) => ({
+        id: o.id,
         motivo: o.motivo,
         cuando: formatearFecha(idioma, o.cuando),
         respuesta: o.respuesta,

@@ -150,6 +150,7 @@ export async function cabeceraDeValuacion(
 }
 
 export type ObjecionFila = {
+  readonly id: string
   readonly motivo: string
   readonly cuando: Date
   readonly respuesta: string | null
@@ -161,13 +162,15 @@ export async function objecionesDe(
   q: Consulta, valuacionId: string,
 ): Promise<readonly ObjecionFila[]> {
   const filas = (await q`
-    select motivo, objetada_en, respuesta, respondida_en
+    select id, motivo, objetada_en, respuesta, respondida_en
       from objecion where valuacion_id = ${valuacionId}::uuid
      order by objetada_en desc
   `) as unknown as Array<{
-    motivo: string; objetada_en: Date; respuesta: string | null; respondida_en: Date | null
+    id: string; motivo: string; objetada_en: Date
+    respuesta: string | null; respondida_en: Date | null
   }>
   return filas.map((f) => ({
+    id: f.id,
     motivo: f.motivo,
     cuando: f.objetada_en,
     respuesta: f.respuesta,

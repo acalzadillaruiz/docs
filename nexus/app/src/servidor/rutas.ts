@@ -218,8 +218,11 @@ export async function resolver(
         estadoCrudo: datos.cab.estado,
         lineas: datos.lineas,
         puedeDecidir,
+        // Responder es de dentro, y solo tiene sentido si hay algo sin responder.
+        puedeResponder: !esCliente,
         antifalsificacion: testigoAnti(testigo),
         objeciones: datos.objeciones.map((o) => ({
+          id: o.id,
           motivo: o.motivo,
           cuando: formatearFecha(p.idioma, o.cuando),
           respuesta: o.respuesta,
