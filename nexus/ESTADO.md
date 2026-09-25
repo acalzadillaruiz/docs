@@ -17,6 +17,18 @@
 > son las fases de logística y procura, calidad, el portal del cliente más allá de lo
 > básico, y la venta como servicio a otras empresas.
 
+## AVISO AL CEO: el plan de 141 sesiones se acabó
+
+**Página publicada:** https://claude.ai/artifact/F8t5vJETMkc7R8jkp1KARc
+**Recorrido navegable, al día:** https://claude.ai/artifact/613p36bPqXYLT31Tvdrck3
+
+No dice «100% hecho», porque no lo está, y decirlo sería justo la confusión que esta
+aplicación impide cometer con un contrato. Dice lo que hay —**38 vistas de 119**, con
+la contabilidad entera y probada—, lo que no hay, los cuatro fallos reales que
+salieron de mirarlo con cuidado (dos míos, en pruebas de seguridad), y las tres
+decisiones que faltan y no son mías: dónde se despliega, si se abre la política de
+seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
+
 ## RETOMAR AQUÍ
 
 **Lo último terminado:** **el techo de `/medidas`, investigado y NO tocado — con dos
