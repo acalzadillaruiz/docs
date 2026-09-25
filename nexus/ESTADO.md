@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 08:40 (España)
-**Avance:** 76 de 141 sesiones · **54%**
+**Última actualización:** 2026-09-25, 08:55 (España)
+**Avance:** 79 de 141 sesiones · **56%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -10,26 +10,21 @@
 navegador.** Se elige la hoja (CSV), la aplicación propone cómo entendió cada columna
 y lo enseña con la cabecera original y un ejemplo del dato, el humano corrige, se
 comprueba sin escribir nada, y solo entonces entra — creando facturas de proveedor de
-verdad dentro del libro. Commit `8fabe17`. **570 comprobaciones.**
+verdad **y asentándolas en el libro en el acto**. Commit `cc6e1b6`. **573 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Asentar lo importado.** Las facturas de proveedor entran en `documento_fiscal`
-   pero **todavía no generan su asiento**. `asentar_factura_proveedor()` existe y está
-   probada desde hace tiempo: falta llamarla al confirmar el lote, con la cuenta de
-   gasto que diga el mapeo. Sin eso, lo importado no llega al libro y el margen sigue
-   sin verse.
-2. **Facturar y cobrar desde la aplicación.** El botón que emite el documento fiscal
+1. **Facturar y cobrar desde la aplicación.** El botón que emite el documento fiscal
    desde una valuación aprobada, y el que registra el cobro. Los generadores de
    asiento existen y están probados.
-3. **Caja chica**, que depende de las ocho respuestas del CEO
+2. **Caja chica**, que depende de las ocho respuestas del CEO
    (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — sin contestar).
-4. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
+3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos.
-5. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
+4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
    falta la ruta que lo recibe y la pantalla que manda a la operadora.
 
 **Cómo continuar, literalmente:**
@@ -51,7 +46,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-570 comprobaciones hayan encontrado veinticuatro fallos reales, veintiuno de ellos míos.
+573 comprobaciones hayan encontrado veinticuatro fallos reales, veintiuno de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -430,6 +425,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 208 | Un proveedor sin dar de alta para el lote entero, **sin crear nada**, y se dice cuál. |
 | 209 | El importe en dólares sale de la tasa del día **de la factura**. |
 | 210 | El camino completo por HTTP: hoja → mapeo → comprobar → factura en la contabilidad. |
+| 211 | Lo importado **llega al libro**: las facturas quedan asentadas y el libro cuadra. |
+| 212 | **Sin plan de cuentas no se importa**, y se dice por qué antes de crear nada. |
+| 213 | Un mes con el periodo contable cerrado se dice **antes**, con cuántas filas caen en él. |
 
 ## Lo que sigue
 
