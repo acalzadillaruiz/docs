@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 120 de 141 sesiones · **85%**
+**Avance:** 121 de 141 sesiones · **86%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -65,9 +65,16 @@ hermano peor: **`Number('')` no es NaN, es CERO**. En `Accept-Language` un `q=0`
 significa «no quiero este idioma», así que un `q=` mal escrito se leía como un
 rechazo explícito y mandaba al visitante al idioma equivocado.
 
+Y **las pantallas dibujadas de verdad** en un Chromium a 360 × 740. Encontró a la
+primera que **la cartera medía 1077 px sobre una pantalla de 360** — lo primero que
+se ve al entrar, tres pantallas y media de ancho. Los diez enlaces de la cabecera se
+fueron añadiendo de uno en uno y la fila nunca se partía; tres de ellos los puse yo
+ese mismo día sin verlo. **Leyendo el HTML no hay anchura: la anchura la decide el
+navegador.**
+
 Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`,
-`16f9c03`, `c0aa778` y `dd3822b`. **808 comprobaciones** (250 de SQL y diccionario +
-558 de TypeScript), todas pasando.
+`16f9c03`, `c0aa778`, `dd3822b`, `a768a76` y `33196cc`. **822 comprobaciones** (250
+de SQL y diccionario + 572 de TypeScript), todas pasando.
 
 **Regla que sostiene los importes y se pierde en el primer refactor:** la
 comprobación de un importe es **`!(x > 0)`**, nunca `x <= 0`. Las dos dicen lo mismo
@@ -338,6 +345,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/libros.ts` · `pantallas/libros.ts` | Los libros de ventas y compras. **Lo único de esta aplicación que sale con destino al SENIAT.** No son una tabla: salen de las facturas que ya existen — un libro tecleado aparte acaba discrepando del sistema, y entonces hay dos verdades. Los totales van **arriba**, que es lo que se copia en la declaración. Una compra **sin número de control** sale señalada: sin control no hay crédito fiscal y la retención pasa al 100%. |
 | `app/pruebas/dia-uno.test.ts` | El día 1: empresa recién creada, base vacía, **sin cargar ni un dato a propósito**. Cada pantalla responde, no suelta «undefined», tiene salida, y el cliente recibe en la contabilidad **el mismo 404 que ante una dirección inventada** — un 403 confirmaría que existe. |
 | `app/pruebas/formulario.ts` · `formularios.test.ts` | Devolver un formulario **como lo devuelve el navegador**, y mandarlos todos en blanco. Modela las reglas que no son intuitivas y que ya escondieron dos fallos. Cada pantalla abre su propia sesión y se comprueba que sigue viva al final: sin eso, el barrido pasa sin comprobar nada. |
+| `app/pruebas/movil.test.ts` | Las pantallas **dibujadas** en un Chromium a 360 × 740, y también a 320. **Sin red**, cortando las fuentes: el portal se usa en el patio con mala cobertura, así que lo que hay que comprobar es cómo queda cuando las fuentes NO llegan. El código que corre en el navegador va **como texto**, no como función: escribirlo como función obligaría a meter `dom` en la configuración de tipos, y entonces el servidor podría usar `document` sin que nadie se lo impidiera. Si el navegador falta, **falla diciéndolo**; no se salta sola. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
