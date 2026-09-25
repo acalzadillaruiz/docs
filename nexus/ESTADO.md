@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 113 de 141 sesiones · **80%**
+**Avance:** 114 de 141 sesiones · **81%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -31,9 +31,13 @@ no era un detalle de instalación: la cola se llenaba y nadie la vaciaba. El buc
 aparte y probado con un reloj de mentira — uno que se prueba esperando de verdad es
 uno que nadie vuelve a probar. Commits `632b9b0` y `ac7cb5a`.
 Y **la reexpresión por inflación, en pantalla**: el resultado monetario del ejercicio
-arriba y grande, y el ajuste cuenta por cuenta. **De los tres módulos construidos y
-sin pantalla queda uno.** Commits `632b9b0`, `ac7cb5a` y `913314b`.
-**725 comprobaciones** (246 de SQL y diccionario + 479 de TypeScript), todas pasando.
+arriba y grande, y el ajuste cuenta por cuenta.
+
+Y **el histórico de ventas entra por Excel** — el segundo destino del importador. Con
+eso **no queda ningún módulo construido y probado sin pantalla**, que era el patrón
+que arrastraba esta lista desde hace semanas. Commits `632b9b0`, `ac7cb5a`, `913314b`
+y `d95d68c`. **732 comprobaciones** (246 de SQL y diccionario + 486 de TypeScript),
+todas pasando.
 
 **Trampa cara, apuntada aquí porque se va a volver a leer mal:** el signo del
 resultado monetario (REME) se lee **al revés** de lo que parece. **Positivo es
@@ -48,10 +52,13 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **La importación de destinos que no sean facturas de proveedor.** Es el último
-   módulo construido y probado que no usa ninguna pantalla. El patrón está hecho tres
-   veces ya: mirar `src/dominio/reexpresion.ts` y `src/pantallas/reexpresion.ts`, que
-   son el caso más reciente y el más parecido.
+2. **El repaso de lo que se usa a diario.** Ya no queda nada construido a medias, así
+   que lo siguiente no es añadir: es que todo lo anterior se aguante junto. En el
+   móvil, con mala red, y recorrido entero por una persona que no lo escribió. Empezar
+   por el camino del día 1 de mes: abrir el periodo, importar, valuar, facturar.
+3. **Los dos destinos que el importador todavía no materializa** (`valuaciones` y
+   `cobros`): `validar_lote` ya los conoce, pero `confirmar_lote` no crea nada con
+   ellos. Están a la vista en el reparto de `26-importar-ventas.sql`.
 
 **Trampa que se acaba de pagar dos veces, y que se va a volver a pagar:** dentro de una
 función `plpgsql`, un alias de tabla que se llame igual que una variable declarada
@@ -270,6 +277,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/activos.ts` · `pantallas/activos.ts` | Los equipos. Cada uno con lo que queda en libros y, si está alquilado, **lo que deja**: lo facturado del contrato menos el desgaste del periodo. Un equipo que deja menos de lo que se gasta no es una pérdida contable abstracta: es **una máquina que habría salido más barata parada**, y esa cifra no estaba en ningún sitio. Depreciar el mes se hace desde aquí, y las tres cosas que lo impedirían se comprueban **antes** de pulsar, no después. |
 | `app/src/servidor/bucle.ts` · `herramientas/avisar.ts` · `operar/` | Los avisos saliendo solos. La espera se cuenta **desde que termina** la vuelta, no desde que empieza: contándola desde el principio, un servidor de correo lento arranca la vuelta siguiente encima de la anterior. Un fallo no mata el bucle, pero fallo tras fallo espera más cada vez. Se para con SIGTERM **terminando la vuelta**: cortar a mitad de un envío deja avisos tomados y sin mandar. Probado con un reloj de mentira — un bucle que se prueba esperando de verdad es un bucle que nadie vuelve a probar. |
 | `app/src/dominio/reexpresion.ts` · `pantallas/reexpresion.ts` | Reexpresión por inflación (VEN-NIF / NIC 29). El **resultado monetario del ejercicio arriba y grande**: es lo que costó tener bolívares mientras perdían valor, y es lo que un CFO mira primero. **Positivo es pérdida** — el signo se lee al revés de lo que parece. El ajuste se ve **cuenta por cuenta**, porque un ajuste global que nadie puede abrir es un número que nadie se cree. Las monetarias, marcadas y con el ajuste **en blanco, no en cero**: cero se lee como «se calculó y dio cero». |
+| `db/schema/26-importar-ventas.sql` | El histórico de ventas por Excel. Aquí el número **no** lo pone la base de datos, al revés que en `siguiente_factura`: estas facturas ya existen, ya las tiene el cliente y ya se declararon. No se asienta lo que ya tiene asiento — cargar el histórico encima de lo vivo **duplicando el ingreso** es el error clásico de esta operación. El ingreso va a la cuenta del **tipo del contrato**, no a un cajón de «ingresos». |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
