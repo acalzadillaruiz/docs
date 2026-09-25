@@ -674,5 +674,7 @@
   "diario.error.motivo": "El reverso necesita un motivo escrito: uno sin motivo, leído dentro de dos años, no se distingue de un error",
   "diario.error.no_existe": "Ese asiento no existe",
   "diario.error.ya": "Ese asiento ya fue reversado",
-  "diario.error.cerrado": "El mes de ese asiento está cerrado. Ábrelo antes de reversar."
+  "diario.error.cerrado": "El mes de ese asiento está cerrado. Ábrelo antes de reversar.",
+  "pago.al": "Deuda al día",
+  "pago.ver": "Ver"
 }

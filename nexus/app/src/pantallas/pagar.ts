@@ -22,6 +22,8 @@ export type DatosPagar = {
   readonly deudas: readonly Deuda[]
   readonly medios: readonly { readonly codigo: string; readonly nombre: string }[]
   readonly hoy: string
+  /** A qué día se mira la deuda. Por defecto hoy, pero un cierre se mira a su día. */
+  readonly al: string
 }
 
 function pintarDeuda(d: Deuda, datos: DatosPagar, af: string, t: ReturnType<typeof traductor>): string {
@@ -85,6 +87,12 @@ export function pintarPagar(
     errores.map((e) => `<li>${escapar(e)}</li>`).join('')
   }</ul></div>`}
 
+  <form method="get" action="/pagar" class="sel">
+    <label>${escapar(t('pago.al'))}
+      <input type="date" name="al" value="${escapar(d.al)}"></label>
+    <button type="submit">${escapar(t('pago.ver'))}</button>
+  </form>
+
   <p class="expl">${escapar(t('pago.igtf_explica'))}</p>
 
   ${d.deudas.length === 0
@@ -95,6 +103,13 @@ export function pintarPagar(
 }
 
 export const ESTILOS_PAGAR = `
+.sel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:18px 0 6px}
+.sel label{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--md)}
+.sel input{display:block;margin-top:5px;font:inherit;font-size:14px;padding:8px 10px;
+  border:1px solid var(--ln2);border-radius:9px;background:var(--cd);color:var(--ik)}
+.sel button{font:inherit;font-size:14px;font-weight:700;padding:9px 20px;border:0;
+  border-radius:9px;background:var(--nv);color:#E9F0F6;cursor:pointer}
 .expl{margin:16px 0 4px;font-size:13.5px;color:var(--ik2);line-height:1.45;max-width:66ch}
 .dd{margin-top:14px;background:var(--cd);border:1px solid var(--ln);border-radius:15px;
   box-shadow:var(--sh);padding:16px 18px}

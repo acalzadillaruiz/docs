@@ -678,10 +678,16 @@ export async function resolver(
       }
     }
 
-    const deudas = await comoQuien((q) => porPagar(q, orgId, p.idioma))
+    // Aqui solo se MIRA la fecha, asi que una ilegible se resuelve con hoy en vez de
+    // parar. Al PAGAR no: ahi la fecha manda en el asiento y se comprueba de verdad.
+    const hoy = new Date().toISOString().slice(0, 10)
+    const pedida = (p.campos['al'] ?? '').trim()
+    const al = /^\d{4}-\d{2}-\d{2}$/.test(pedida) && !Number.isNaN(Date.parse(pedida))
+      ? pedida : hoy
+
+    const deudas = await comoQuien((q) => porPagar(q, orgId, p.idioma, al))
     return html(errores.length === 0 ? 200 : 400,
-      pintarPagar({ deudas, medios: mediosTraducidos(p.idioma),
-                    hoy: new Date().toISOString().slice(0, 10) },
+      pintarPagar({ deudas, medios: mediosTraducidos(p.idioma), hoy, al },
         p.idioma, testigoAnti(testigo), errores))
   }
 

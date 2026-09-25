@@ -16,6 +16,8 @@
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 
+const PROV = 'c8d9e0f1-0000-0000-0000-00000000000f'
+
 export const MUESTRA = {
   org: 'c8d9e0f1-0000-0000-0000-00000000000a',
   cliente: 'c8d9e0f1-0000-0000-0000-00000000000b',
@@ -179,6 +181,33 @@ export async function sembrar(): Promise<void> {
                             '5.1.04', null,'Cooperativa Guanipa','h-recibo-0033','${YO}');
       end
       $sembrar$;`)
+
+    // Dos facturas de proveedor con saldo, para que «lo que toca pagar» no salga
+    // vacío: una pantalla de deudas sin deudas no enseña nada de lo que hace.
+    await q.unsafe(`
+      do $prov$
+      declare
+        pr  uuid := '${PROV}';
+        tsa uuid;
+        alq uuid;
+      begin
+        if exists (select 1 from documento_fiscal
+                    where organizacion_id = '${G}' and sentido = 'recibido') then return; end if;
+        select id into tsa from tasa_bcv where vigente_el = '2027-03-01' and sustituida_por is null;
+        select id into alq from alicuota_iva where clase = 'general'
+         order by vigente_desde desc limit 1;
+        insert into organizacion (id, tipo, nombre, rif)
+          values (pr,'proveedor','Suministros Oriente · Muestra','J-31212121-2')
+          on conflict (id) do nothing;
+        insert into documento_fiscal (organizacion_id, sentido, tipo, numero, numero_control,
+                                      contraparte_id, fecha, base_ves, base_usd,
+                                      alicuota_iva_id, iva_ves, iva_usd, tasa_id, registrado_por)
+        values ('${G}','recibido','factura','00004412','01-00044120', pr,'2027-03-05',
+                2400000.00, 34285.71, alq, 384000.00, 5485.71, tsa,'${YO}'),
+               ('${G}','recibido','factura','00004419','01-00044190', pr,'2027-03-21',
+                860000.00, 12285.71, alq, 137600.00, 1965.71, tsa,'${YO}');
+      end
+      $prov$;`)
   })
 }
 

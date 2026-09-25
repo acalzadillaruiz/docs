@@ -674,5 +674,7 @@
   "diario.error.motivo": "The reversal needs a written reason: one without a reason, read two years from now, is indistinguishable from a mistake",
   "diario.error.no_existe": "That entry does not exist",
   "diario.error.ya": "That entry has already been reversed",
-  "diario.error.cerrado": "The month of that entry is closed. Reopen it before reversing."
+  "diario.error.cerrado": "The month of that entry is closed. Reopen it before reversing.",
+  "pago.al": "Debt as of",
+  "pago.ver": "Show"
 }
