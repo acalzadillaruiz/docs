@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 114 de 141 sesiones · **81%**
+**Avance:** 116 de 141 sesiones · **82%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -33,11 +33,20 @@ uno que nadie vuelve a probar. Commits `632b9b0` y `ac7cb5a`.
 Y **la reexpresión por inflación, en pantalla**: el resultado monetario del ejercicio
 arriba y grande, y el ajuste cuenta por cuenta.
 
-Y **el histórico de ventas entra por Excel** — el segundo destino del importador. Con
-eso **no queda ningún módulo construido y probado sin pantalla**, que era el patrón
-que arrastraba esta lista desde hace semanas. Commits `632b9b0`, `ac7cb5a`, `913314b`
-y `d95d68c`. **732 comprobaciones** (246 de SQL y diccionario + 486 de TypeScript),
-todas pasando.
+Y **el histórico de ventas entra por Excel** — el segundo destino del importador.
+
+Y **el día 1**, que no estaba probado: una empresa recién creada, con la base vacía.
+Las diez pantallas responden sin datos y ninguna enseña «undefined». Salió de ahí una
+deriva real: la valuación tenía el contenedor a 780 mientras el resto iba a 760.
+
+Y **los libros de ventas y compras**, que existían como vistas desde el principio y
+no los enseñaba nada — siendo **lo único que sale de la empresa con destino al
+SENIAT**. Con su hoja de cálculo para bajarlos, y con el escritor de CSV probado de
+ida y vuelta. *(Corrección: ayer dije que no quedaba nada sin pantalla. Quedaba
+esto.)*
+
+Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e` y `9420d12`.
+**772 comprobaciones** (246 de SQL y diccionario + 526 de TypeScript), todas pasando.
 
 **Trampa cara, apuntada aquí porque se va a volver a leer mal:** el signo del
 resultado monetario (REME) se lee **al revés** de lo que parece. **Positivo es
@@ -52,10 +61,10 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 1. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
-2. **El repaso de lo que se usa a diario.** Ya no queda nada construido a medias, así
-   que lo siguiente no es añadir: es que todo lo anterior se aguante junto. En el
-   móvil, con mala red, y recorrido entero por una persona que no lo escribió. Empezar
-   por el camino del día 1 de mes: abrir el periodo, importar, valuar, facturar.
+2. **El camino del día 1 de MES, recorrido entero por HTTP**: abrir el periodo →
+   importar la hoja → valuar → facturar → mirar el libro → cerrar el mes. Lo que hay
+   probado es cada tramo por su lado y el circuito del contrato; el mes completo no.
+   Mirar `pruebas/circuito.test.ts`, que es el patrón exacto.
 3. **Los dos destinos que el importador todavía no materializa** (`valuaciones` y
    `cobros`): `validar_lote` ya los conoce, pero `confirmar_lote` no crea nada con
    ellos. Están a la vista en el reparto de `26-importar-ventas.sql`.
@@ -278,6 +287,8 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/bucle.ts` · `herramientas/avisar.ts` · `operar/` | Los avisos saliendo solos. La espera se cuenta **desde que termina** la vuelta, no desde que empieza: contándola desde el principio, un servidor de correo lento arranca la vuelta siguiente encima de la anterior. Un fallo no mata el bucle, pero fallo tras fallo espera más cada vez. Se para con SIGTERM **terminando la vuelta**: cortar a mitad de un envío deja avisos tomados y sin mandar. Probado con un reloj de mentira — un bucle que se prueba esperando de verdad es un bucle que nadie vuelve a probar. |
 | `app/src/dominio/reexpresion.ts` · `pantallas/reexpresion.ts` | Reexpresión por inflación (VEN-NIF / NIC 29). El **resultado monetario del ejercicio arriba y grande**: es lo que costó tener bolívares mientras perdían valor, y es lo que un CFO mira primero. **Positivo es pérdida** — el signo se lee al revés de lo que parece. El ajuste se ve **cuenta por cuenta**, porque un ajuste global que nadie puede abrir es un número que nadie se cree. Las monetarias, marcadas y con el ajuste **en blanco, no en cero**: cero se lee como «se calculó y dio cero». |
 | `db/schema/26-importar-ventas.sql` | El histórico de ventas por Excel. Aquí el número **no** lo pone la base de datos, al revés que en `siguiente_factura`: estas facturas ya existen, ya las tiene el cliente y ya se declararon. No se asienta lo que ya tiene asiento — cargar el histórico encima de lo vivo **duplicando el ingreso** es el error clásico de esta operación. El ingreso va a la cuenta del **tipo del contrato**, no a un cajón de «ingresos». |
+| `app/src/dominio/libros.ts` · `pantallas/libros.ts` | Los libros de ventas y compras. **Lo único de esta aplicación que sale con destino al SENIAT.** No son una tabla: salen de las facturas que ya existen — un libro tecleado aparte acaba discrepando del sistema, y entonces hay dos verdades. Los totales van **arriba**, que es lo que se copia en la declaración. Una compra **sin número de control** sale señalada: sin control no hay crédito fiscal y la retención pasa al 100%. |
+| `app/pruebas/dia-uno.test.ts` | El día 1: empresa recién creada, base vacía, **sin cargar ni un dato a propósito**. Cada pantalla responde, no suelta «undefined», tiene salida, y el cliente recibe en la contabilidad **el mismo 404 que ante una dirección inventada** — un 403 confirmaría que existe. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
