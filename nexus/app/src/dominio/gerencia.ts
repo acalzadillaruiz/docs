@@ -45,6 +45,23 @@ export type Semana = {
   readonly netoCrudo: number
 }
 
+export type LineaPyG = {
+  readonly seccion: 'ingresos' | 'gastos'
+  readonly codigo: string
+  readonly cuenta: string
+  readonly monto: string
+}
+
+export type Contrato = {
+  readonly contrato: string
+  readonly cliente: string
+  readonly estado: string
+  readonly valuado: string
+  readonly costo: string
+  readonly margen: string
+  readonly margenPct: number
+}
+
 export type Mes = {
   readonly anio: number
   readonly mes: number
@@ -56,6 +73,10 @@ export type Mes = {
   readonly porCliente: readonly Fila[]
   readonly porServicio: readonly Fila[]
   readonly semanas: readonly Semana[]
+  /** El resultado abierto cuenta por cuenta: de dónde sale cada bolívar. */
+  readonly pyg: readonly LineaPyG[]
+  /** La cartera contrato por contrato, ordenada por lo que más duele. */
+  readonly contratos: readonly Contrato[]
   /** Si el libro no cuadra, todo lo de arriba vale menos. Se dice antes que nada. */
   readonly descuadre: string
   readonly cuadra: boolean
@@ -98,6 +119,21 @@ export async function mes(
       from flujo_caja(${orgId}::uuid, ${hasta}::date, 8)
   `) as unknown as Array<Record<string, string>>
 
+  // El resultado, abierto cuenta por cuenta. Un total sin poder abrirlo es un número
+  // que nadie se cree, igual que el ajuste de la reexpresión.
+  const pyg = (await q`
+    select seccion, codigo, cuenta_es, cuenta_en, monto_ves::text
+      from estado_resultados(${orgId}::uuid, ${desde}::date, ${hasta}::date)
+  `) as unknown as Array<Record<string, string>>
+
+  // Y la cartera contrato por contrato. `margen_cartera` ya viene ordenada por el
+  // margen ascendente: lo que más duele, primero. Eso es deliberado y se respeta.
+  const cartera = (await q`
+    select contrato, cliente, estado::text, valuado::text, costo::text,
+           margen::text, margen_pct::text
+      from margen_cartera(${orgId}::uuid, ${hasta}::date)
+  `) as unknown as Array<Record<string, string>>
+
   const aFila = (f: Record<string, string | number>, clave: string): Fila => ({
     nombre: String(f[clave] ?? ''),
     contratos: Number(f['contratos'] ?? 0),
@@ -126,6 +162,21 @@ export async function mes(
       sale: moneda(idioma, n(f['sale']), 'VES'),
       neto: moneda(idioma, n(f['neto']), 'VES'),
       netoCrudo: n(f['neto']),
+    })),
+    pyg: pyg.map((f): LineaPyG => ({
+      seccion: f['seccion'] === 'ingresos' ? 'ingresos' : 'gastos',
+      codigo: f['codigo']!,
+      cuenta: (idioma === 'es' ? f['cuenta_es'] : f['cuenta_en'])!,
+      monto: moneda(idioma, n(f['monto_ves']), 'VES'),
+    })),
+    contratos: cartera.map((f): Contrato => ({
+      contrato: f['contrato']!,
+      cliente: f['cliente']!,
+      estado: f['estado']!,
+      valuado: moneda(idioma, n(f['valuado']), 'VES'),
+      costo: moneda(idioma, n(f['costo']), 'VES'),
+      margen: moneda(idioma, n(f['margen']), 'VES'),
+      margenPct: n(f['margen_pct']),
     })),
     descuadre: moneda(idioma, n(d?.ves), 'VES'),
     cuadra: Math.abs(n(d?.ves)) < 0.005,

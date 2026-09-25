@@ -537,5 +537,11 @@
   "est.tramo": "Ageing",
   "est.nada_cobrar": "Nothing outstanding to collect as of that date.",
   "est.nada_pagar": "Nothing outstanding to pay as of that date.",
-  "est.vacio": "There are no entries as of that date."
+  "est.vacio": "There are no entries as of that date.",
+  "ger.pyg": "Where that result comes from",
+  "ger.pyg_explica": "The same result as above, opened up account by account. A total you cannot open is a number nobody believes.",
+  "ger.cartera": "Contract by contract · to date",
+  "ger.cartera_explica": "Ordered worst first. A contract in red is not a figure: it is a decision waiting to be taken.",
+  "ger.contrato": "Contract",
+  "ger.estado": "Status"
 }

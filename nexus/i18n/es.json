@@ -537,5 +537,11 @@
   "est.tramo": "Antigüedad",
   "est.nada_cobrar": "No hay nada pendiente de cobro a esa fecha.",
   "est.nada_pagar": "No hay nada pendiente de pago a esa fecha.",
-  "est.vacio": "No hay ningún asiento a esa fecha."
+  "est.vacio": "No hay ningún asiento a esa fecha.",
+  "ger.pyg": "De dónde sale ese resultado",
+  "ger.pyg_explica": "El mismo resultado de arriba, abierto cuenta por cuenta. Un total que no se puede abrir es un número que nadie se cree.",
+  "ger.cartera": "Contrato por contrato · acumulado",
+  "ger.cartera_explica": "Ordenados por lo que más duele primero. Un contrato en rojo no es una cifra: es una decisión que hay que tomar.",
+  "ger.contrato": "Contrato",
+  "ger.estado": "Estado"
 }

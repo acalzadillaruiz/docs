@@ -108,6 +108,42 @@ export function pintarGerencia(m: Mes, idioma: Idioma, antifalsificacion: string
     ? `<p class="nada">${escapar(t('ger.nada'))}</p>`
     : `<p class="expl">${escapar(t('ger.acumulado_explica'))}</p>`}
 
+  ${m.pyg.length === 0 ? '' : `
+  <h2>${escapar(t('ger.pyg'))}</h2>
+  <div class="caja"><div class="ancho"><table class="gt">
+    <tbody>${m.pyg.map((l) => `
+      <tr class="${l.seccion}">
+        <td><span class="cod">${escapar(l.codigo)}</span> ${escapar(l.cuenta)}</td>
+        <td class="n">${escapar(l.monto)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div></div>
+  <p class="expl">${escapar(t('ger.pyg_explica'))}</p>`}
+
+  ${m.contratos.length === 0 ? '' : `
+  <h2>${escapar(t('ger.cartera'))}</h2>
+  <div class="caja"><div class="ancho"><table class="gt">
+    <thead><tr>
+      <th>${escapar(t('ger.contrato'))}</th>
+      <th>${escapar(t('ger.cliente'))}</th>
+      <th class="n">${escapar(t('ger.valuado'))}</th>
+      <th class="n">${escapar(t('ger.costo'))}</th>
+      <th class="n">${escapar(t('ger.margen'))}</th>
+      <th class="n">${escapar(t('ger.margen_pct'))}</th>
+    </tr></thead>
+    <tbody>${m.contratos.map((c) => `
+      <tr>
+        <td class="m">${escapar(c.contrato)}</td>
+        <td>${escapar(c.cliente)}</td>
+        <td class="n">${escapar(c.valuado)}</td>
+        <td class="n">${escapar(c.costo)}</td>
+        <td class="n ${c.margenPct >= 0 ? 'bien' : 'mal'}">${escapar(c.margen)}</td>
+        <td class="n ${c.margenPct >= 0 ? 'bien' : 'mal'}">${c.margenPct}%</td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div></div>
+  <p class="expl">${escapar(t('ger.cartera_explica'))}</p>`}
+
   <h2>${escapar(t('ger.flujo'))}</h2>
   <div class="caja"><div class="ancho"><table class="gt">
     <thead><tr>
@@ -170,6 +206,9 @@ h2{margin:26px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;
 .gt th.n,.gt td.n{text-align:right;font-family:"JetBrains Mono",monospace;white-space:nowrap}
 .gt td{padding:9px 12px;border-top:1px solid var(--ln)}
 .gt td.m{font-family:"JetBrains Mono",monospace;font-size:12px}
+/* El ingreso y el gasto se distinguen sin leer el signo. */
+.gt tr.ingresos td:first-child{border-left:3px solid var(--grt)}
+.gt tr.gastos td:first-child{border-left:3px solid var(--ln2)}
 .gt td.n.bien{color:var(--grt)}
 .gt td.n.mal{color:var(--rj)}
 .expl{margin:11px 0 0;font-size:12.5px;color:var(--md);line-height:1.45;max-width:64ch}

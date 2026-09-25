@@ -150,3 +150,37 @@ test('la ganancia va en verde y la pérdida en rojo', async () => {
   const pierde = pintarGerencia({ ...m, resultado: { ...m.resultado, resultadoCrudo: -500 } }, 'es', 'af')
   assert.match(pierde, /class="cif-v mal"/)
 })
+
+test('el resultado se puede ABRIR cuenta por cuenta', async () => {
+  // Un total que no se puede abrir es un número que nadie se cree. Es la misma razón
+  // por la que el ajuste de la reexpresión se enseña partida por partida.
+  const m = await dentro((q) => mes(q, G, 2026, 10, 'es'))
+  const h = pintarGerencia(m, 'es', 'af')
+  if (m.pyg.length > 0) {
+    assert.match(h, /De dónde sale ese resultado/)
+    // Ingreso y gasto se distinguen sin tener que leer el signo.
+    assert.ok(h.includes('class="ingresos"') || h.includes('class="gastos"'))
+  }
+})
+
+test('la cartera sale contrato por contrato, con lo peor primero', async () => {
+  // `margen_cartera` viene ordenada por margen ascendente. Eso es deliberado —lo que
+  // más duele, primero— y esta capa no lo reordena.
+  const m = await dentro((q) => mes(q, G, 2026, 10, 'es'))
+  if (m.contratos.length > 1) {
+    for (let i = 1; i < m.contratos.length; i++) {
+      assert.ok(m.contratos[i - 1]!.margenPct <= m.contratos[i]!.margenPct + 0.001,
+        'la cartera dejó de venir ordenada por lo que más duele')
+    }
+  }
+  if (m.contratos.length > 0) {
+    assert.match(pintarGerencia(m, 'es', 'af'), /Contrato por contrato/)
+  }
+})
+
+test('con el mes vacío no se pintan las tablas nuevas', async () => {
+  const vacio = await dentro((q) => mes(q, ING, 2020, 1, 'es'))
+  const h = pintarGerencia(vacio, 'es', 'af')
+  assert.doesNotMatch(h, /De dónde sale ese resultado/)
+  assert.doesNotMatch(h, /Contrato por contrato/)
+})
