@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 126 de 141 sesiones · **89%**
+**Avance:** 127 de 141 sesiones · **90%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -110,6 +110,15 @@ cd nexus && for f in $(grep -rhoE "create or replace function [a-z_]+" db/schema
 
 Lo que salga ahí son disparadores, generadores y ayudantes que se llaman desde SQL:
 ahí es donde tienen que estar.
+
+Y **el libro diario** (`942c129`), que era el agujero de verdad: todas las pantallas
+enseñaban algo **derivado** y no había ninguna donde terminara de abrirse un número.
+Debajo de un asiento no hay nada más. Sale entero —cabecera y líneas juntas, sin
+pinchar—, con el debe y el haber en columnas separadas aunque por dentro sean un solo
+campo con signo, con **cuándo ocurrió y cuándo se supo**, y con el asiento anulado y
+su reverso **los dos** a la vista.
+
+**863 comprobaciones** (250 de SQL y diccionario + 610 de TypeScript), todas pasando.
 
 **Decisión pendiente del CEO:** las tablas de rentabilidad son **acumuladas**, no del
 mes — `margen_contrato` ignora su `p_desde`. Está marcado en la pantalla, pero si se
