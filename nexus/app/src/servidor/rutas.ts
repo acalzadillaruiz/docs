@@ -29,10 +29,17 @@ import {
 } from '../dominio/valuacion.ts'
 import { aprobar, objetar, responder } from '../dominio/aprobacion.ts'
 import {
-  avanceDelRenglon, cabeceraDelRenglon, porRevisar, HitoNoAlcanzable,
+  avanceDelRenglon, cabeceraDelRenglon, porRevisar, subir, verificar, rechazar,
+  HitoNoAlcanzable, DocumentoVacio, type Clase, CLASES,
 } from '../dominio/evidencia.ts'
 import { pintarPaginaAvance, pintarPorRevisar } from '../pantallas/evidencia.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
+import {
+  almacen, tipoAceptado, DocumentoAusente, HuellaInvalida,
+} from './almacen.ts'
+import {
+  partir, campos as camposDe, archivo as archivoDe, frontera, LIMITES,
+} from './multipart.ts'
 import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
 import { fecha as formatearFecha, t, type Idioma } from '../i18n/t.ts'
@@ -46,11 +53,19 @@ export type Peticion = {
   readonly cookie: string | null
   readonly idioma: Idioma
   readonly origen: string
+  /** El archivo, si la petición venía con uno. Solo las rutas que lo esperan lo miran. */
+  readonly archivo?: {
+    readonly archivo: string
+    readonly tipoMime: string
+    readonly contenido: Uint8Array
+  } | null
 }
 
 export type Respuesta = {
   readonly codigo: number
   readonly cuerpo?: string
+  /** Para servir un documento. Va aparte del texto: convertirlo a cadena lo rompería. */
+  readonly bytes?: Uint8Array
   readonly cabeceras?: Readonly<Record<string, string>>
 }
 
@@ -209,9 +224,113 @@ export async function resolver(
         cabecera: await cabeceraDelRenglon(q, renglon[1]!, p.idioma),
         avance: await avanceDelRenglon(q, renglon[1]!, p.idioma),
       }))
-      return html(200, pintarPaginaAvance(datos.avance, datos.cabecera, p.idioma))
+      // Subir y revisar es de dentro. Al cliente no se le esconden los botones:
+      // es que sin esto no hay nada que pintar, así que no pueden salir por descuido.
+      return html(200, pintarPaginaAvance(datos.avance, datos.cabecera, p.idioma,
+        esCliente ? null : { antifalsificacion: testigoAnti(testigo), volver: p.ruta }))
     } catch (e) {
       if (e instanceof HitoNoAlcanzable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
+  // ------------------------------------------------------------------ evidencia
+
+  // Subir el documento que respalda un hito. Solo de dentro: si el cliente pudiera
+  // subir su propia evidencia, el avance volvería a ser lo que alguien diga — solo
+  // que ahora lo diría el otro lado.
+  const subirEvi = /^\/hitos\/([0-9a-f-]{36})\/evidencia$/.exec(p.ruta)
+  if (subirEvi && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    const a = p.archivo
+    if (!a) return { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    // El tipo se comprueba contra una lista cerrada ANTES de tocar el disco. Escribir
+    // primero y comprobar después deja el archivo puesto aunque se rechace.
+    if (!tipoAceptado(a.tipoMime)) {
+      return { codigo: 415, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    const clase = p.campos['clase'] ?? ''
+    if (!(CLASES as readonly string[]).includes(clase)) {
+      return { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+
+    try {
+      // Los bytes al almacén primero, la fila después. Al revés quedaría una fila
+      // apuntando a un documento que no está, que es peor que no tener la fila:
+      // la pantalla diría que el papel existe.
+      await almacen().guardar(a.contenido)
+      await comoQuien((q) => subir(q, {
+        hitoId: subirEvi[1]!,
+        clase: clase as Clase,
+        nombre: a.archivo,
+        tipoMime: a.tipoMime,
+        contenido: a.contenido,
+        ocurridoEn: p.campos['ocurrido_en'] || null,
+      }, personaId, p.idioma))
+    } catch (e) {
+      if (e instanceof HitoNoAlcanzable) return noEncontrado(p.idioma)
+      if (e instanceof DocumentoVacio) return { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' }
+      throw e
+    }
+    return aOtroSitio(destinoSeguro(p.campos['volver']))
+  }
+
+  // Revisar es de GPS, siempre. Rechazar exige motivo, y el motivo se comprueba aquí
+  // y no solo en la base de datos: que la pantalla deje pulsar y luego reviente es
+  // la forma más rápida de que alguien deje de usar el botón.
+  const revisar = /^\/evidencia\/([0-9a-f-]{36})\/(verificar|rechazar)$/.exec(p.ruta)
+  if (revisar && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    const r = revisar[2] === 'verificar'
+      ? await comoQuien((q) => verificar(q, revisar[1]!, personaId))
+      : await comoQuien((q) => rechazar(q, revisar[1]!, personaId, p.campos['motivo'] ?? ''))
+
+    if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    return aOtroSitio(destinoSeguro(p.campos['volver']))
+  }
+
+  // Descargar el documento. La fila se pide COMO la persona, así que las políticas
+  // de fila deciden si le toca — y la factura del proveedor no le toca a un cliente.
+  // Los bytes solo se leen si la fila vino.
+  const bajarEvi = /^\/evidencia\/([0-9a-f-]{36})\/archivo$/.exec(p.ruta)
+  if (bajarEvi && p.metodo === 'GET') {
+    const [fila] = (await comoQuien((q) => q`
+      select huella, nombre, tipo_mime from evidencia where id = ${bajarEvi[1]!}::uuid
+    `)) as unknown as Array<{ huella: string; nombre: string; tipo_mime: string }>
+    if (!fila) return noEncontrado(p.idioma)
+
+    try {
+      const bytes = await almacen().leer(fila.huella)
+      return {
+        codigo: 200,
+        bytes,
+        cabeceras: {
+          ...CABECERAS_BASE,
+          // El tipo se vuelve a filtrar por la lista cerrada al SALIR, no solo al
+          // entrar: si algún día se cuela una fila con otro tipo, aquí no sale.
+          'Content-Type': tipoAceptado(fila.tipo_mime)
+            ? fila.tipo_mime : 'application/octet-stream',
+          // Descarga, nunca dentro de la página. Un documento subido por otro que se
+          // abriera en el dominio del portal es código de otro corriendo aquí.
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fila.nombre)}`,
+          'Content-Length': String(bytes.length),
+        },
+      }
+    } catch (e) {
+      // Falta en el disco o la huella está torcida: las dos cosas se responden igual,
+      // porque distinguirlas solo le sirve a quien esté probando.
+      if (e instanceof DocumentoAusente || e instanceof HuellaInvalida) {
+        return noEncontrado(p.idioma)
+      }
       throw e
     }
   }
@@ -359,14 +478,43 @@ export class CuerpoDemasiadoGrande extends Error {
   }
 }
 
+/** Lee el cuerpo entero, con tope. El tope se comprueba MIENTRAS llega, no al final. */
+async function leerBytes(req: IncomingMessage, tope: number): Promise<Buffer> {
+  const trozos: Buffer[] = []
+  let total = 0
+  for await (const t of req) {
+    total += (t as Buffer).length
+    if (total > tope) throw new CuerpoDemasiadoGrande(total)
+    trozos.push(t as Buffer)
+  }
+  return Buffer.concat(trozos)
+}
+
 /** Adapta una petición de red al tipo que entiende `resolver`. */
 export async function desdeHttp(req: IncomingMessage): Promise<Peticion> {
   const url = new URL(req.url ?? '/', 'http://interno')
-  const campos = req.method === 'POST' ? await leerCampos(req) : {}
+
+  // Un formulario con archivo pesa otra cosa que uno de texto, así que el tope es
+  // otro. El de texto se queda como estaba: un formulario de entrada no pesa más.
+  const limite = frontera(req.headers['content-type'])
+  let campos: Record<string, string> = {}
+  let archivo: Peticion['archivo'] = null
+  if (req.method === 'POST') {
+    if (limite) {
+      const partes = partir(await leerBytes(req, LIMITES.maxBytes), limite)
+      campos = camposDe(partes)
+      const a = archivoDe(partes, 'documento')
+      archivo = a ? { archivo: a.archivo, tipoMime: a.tipoMime, contenido: a.contenido } : null
+    } else {
+      campos = await leerCampos(req)
+    }
+  }
+
   return {
     metodo: req.method ?? 'GET',
     ruta: url.pathname,
     campos,
+    archivo,
     cookie: leerCookie(req.headers.cookie),
     idioma: idiomaPedido(req.headers['accept-language']),
     // Detrás de un proxy, la dirección real llega en una cabecera. Se toma solo el
@@ -378,5 +526,7 @@ export async function desdeHttp(req: IncomingMessage): Promise<Peticion> {
 
 export function escribir(res: ServerResponse, r: Respuesta): void {
   res.writeHead(r.codigo, r.cabeceras)
-  res.end(r.cuerpo ?? '')
+  // Los bytes van tal cual. Pasarlos por una cadena los rompería: un PDF no es texto
+  // en UTF-8, y convertirlo y desconvertirlo cambia la huella.
+  res.end(r.bytes ? Buffer.from(r.bytes) : (r.cuerpo ?? ''))
 }

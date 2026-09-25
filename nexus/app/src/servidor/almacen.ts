@@ -115,3 +115,54 @@ export class Almacen {
     }
   }
 }
+
+/**
+ * El almacén del proceso.
+ *
+ * Mismo patrón que la conexión a la base de datos, y por el mismo motivo: no se
+ * exporta el objeto, se exporta la función que lo pide. Así no hay forma de acabar
+ * con dos almacenes apuntando a sitios distintos según qué archivo importó cuál.
+ */
+let elAlmacen: Almacen | null = null
+
+export function configurarAlmacen(raiz: string): void {
+  elAlmacen = new Almacen(raiz)
+}
+
+export class SinAlmacen extends Error {
+  constructor() {
+    super('no se ha configurado dónde viven los documentos')
+    this.name = 'SinAlmacen'
+  }
+}
+
+export function almacen(): Almacen {
+  if (!elAlmacen) throw new SinAlmacen()
+  return elAlmacen
+}
+
+/**
+ * Qué se acepta como evidencia.
+ *
+ * Una lista cerrada, no una lista de lo prohibido: lo prohibido siempre se queda
+ * corto. Son los formatos en que llega de verdad un papel del patio — el PDF del
+ * certificado, la foto del móvil, el escaneo del acta.
+ *
+ * No se acepta ningún formato que un navegador pueda ejecutar. Aunque el documento
+ * se sirva siempre como descarga y nunca dentro de la página, basta con que un día
+ * alguien cambie esa cabecera para que un .svg o un .html guardado aquí se convierta
+ * en código corriendo en el dominio del portal.
+ */
+export const TIPOS_ACEPTADOS: Readonly<Record<string, string>> = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/tiff': 'tif',
+}
+
+export function tipoAceptado(tipo: string): boolean {
+  return Object.hasOwn(TIPOS_ACEPTADOS, tipo.toLowerCase().split(';')[0]!.trim())
+}

@@ -6,6 +6,8 @@
 import { createServer } from 'node:http'
 import { conectar, type Destino } from '../db/conexion.ts'
 import { resolver, desdeHttp, escribir, CuerpoDemasiadoGrande, CABECERAS_BASE } from './rutas.ts'
+import { configurarAlmacen } from './almacen.ts'
+import { MultipartMalFormado, DemasiadoGrande } from './multipart.ts'
 
 const PUERTO = Number(process.env.NEXUS_PUERTO ?? 8080)
 const SERVICIO = process.env.NEXUS_PERSONA_SERVICIO
@@ -25,23 +27,38 @@ const BD: Destino | undefined = process.env.NEXUS_BD_SOCKET
       username: process.env.NEXUS_BD_USUARIO ?? 'nexus',
     }
   : process.env.NEXUS_BD
+/**
+ * Donde viven los documentos. Se exige expresamente y no se inventa un valor por
+ * defecto: un almacen en una carpeta temporal funcionaria en las pruebas y perderia
+ * las actas de recepcion el dia que se reinicie la maquina.
+ */
+const ALMACEN = process.env.NEXUS_ALMACEN
+
 // Solo se sirve sin TLS cuando alguien lo pide expresamente, para desarrollo.
 const SEGURO = process.env.NEXUS_INSEGURO !== '1'
 
-if (!SERVICIO || !BD) {
-  console.error('faltan NEXUS_PERSONA_SERVICIO y (NEXUS_BD o NEXUS_BD_SOCKET)')
+if (!SERVICIO || !BD || !ALMACEN) {
+  console.error('faltan NEXUS_PERSONA_SERVICIO, NEXUS_ALMACEN y (NEXUS_BD o NEXUS_BD_SOCKET)')
   process.exit(1)
 }
 
 conectar(BD)
+configurarAlmacen(ALMACEN)
 
 const servidor = createServer(async (req, res) => {
   try {
     const p = await desdeHttp(req)
     escribir(res, await resolver(p, SERVICIO, SEGURO))
   } catch (e) {
-    if (e instanceof CuerpoDemasiadoGrande) {
+    if (e instanceof CuerpoDemasiadoGrande || e instanceof DemasiadoGrande) {
       escribir(res, { codigo: 413, cabeceras: CABECERAS_BASE, cuerpo: '' })
+      return
+    }
+    // Un formulario que no se entiende es culpa de quien lo manda, no del servidor.
+    // Devolver 500 lo haria parecer una averia nuestra y llenaria el registro de
+    // errores que no lo son.
+    if (e instanceof MultipartMalFormado) {
+      escribir(res, { codigo: 400, cabeceras: CABECERAS_BASE, cuerpo: '' })
       return
     }
     // Nunca se devuelve el detalle del error al navegador: un mensaje de la base de

@@ -23,7 +23,7 @@
  */
 
 import type { Avance, Hito, Documento, PorRevisar } from '../dominio/evidencia.ts'
-import { nombreClase, nombreEstado, porcentaje } from '../dominio/evidencia.ts'
+import { nombreClase, nombreEstado, porcentaje, CLASES } from '../dominio/evidencia.ts'
 import { type Idioma } from '../i18n/t.ts'
 import { escapar, pagina } from './base.ts'
 
@@ -36,6 +36,10 @@ const TEXTOS = {
     cola: 'Documentos por revisar', colaVacia: 'No hay nada esperando revisión.',
     dias: (d: number) => `${d} ${d === 1 ? 'día' : 'días'}`, hoy: 'hoy',
     revisar: 'Revisar', ocurrio: 'Ocurrió', subido: 'Subido',
+    subir: 'Subir el documento', elegir: 'Elegir archivo', clase: 'Qué documento es',
+    cuando: 'Cuándo ocurrió', verificar: 'Verificar', rechazar: 'Rechazar',
+    porQue: 'Por qué se rechaza', bajar: 'Descargar',
+    avisoRechazo: 'Hay que decir por qué: quien subió el papel equivocado tiene que saber cuál traer.',
     nota: 'El avance sale de los hitos verificados. No hay ninguna casilla donde escribirlo.',
     brecha: 'sin demostrar',
   },
@@ -47,6 +51,10 @@ const TEXTOS = {
     cola: 'Documents awaiting review', colaVacia: 'Nothing awaiting review.',
     dias: (d: number) => `${d} ${d === 1 ? 'day' : 'days'}`, hoy: 'today',
     revisar: 'Review', ocurrio: 'Occurred', subido: 'Uploaded',
+    subir: 'Upload the document', elegir: 'Choose file', clase: 'What document is it',
+    cuando: 'When it happened', verificar: 'Verify', rechazar: 'Reject',
+    porQue: 'Why it is rejected', bajar: 'Download',
+    avisoRechazo: 'A reason is required: whoever uploaded the wrong paper needs to know which one to bring.',
     nota: 'Progress comes from verified milestones. There is no field to type it into.',
     brecha: 'unproven',
   },
@@ -57,14 +65,33 @@ export function huellaCorta(huella: string): string {
   return `${huella.slice(0, 8)}…${huella.slice(-4)}`
 }
 
-function pintarDocumento(d: Documento, idioma: Idioma): string {
+function pintarDocumento(d: Documento, idioma: Idioma, r: Revision | null): string {
   const x = TEXTOS[idioma]
   const marca = d.estado === 'verificada' ? 'ok' : d.estado === 'rechazada' ? 'no' : 'esp'
+
+  // Los botones solo salen cuando de verdad se pueden pulsar: de dentro, y sobre un
+  // documento que todavía no se ha revisado. Enseñar uno que va a rebotar enseña que
+  // la acción existe y esconde que no te corresponde.
+  const botones = r && d.estado === 'sin_revisar' ? `
+  <form class="doc-f" method="post" action="/evidencia/${escapar(d.id)}/verificar">
+    <input type="hidden" name="af" value="${escapar(r.antifalsificacion)}">
+    <input type="hidden" name="volver" value="${escapar(r.volver)}">
+    <button type="submit" class="b-ok">${escapar(x.verificar)}</button>
+  </form>
+  <form class="doc-f" method="post" action="/evidencia/${escapar(d.id)}/rechazar">
+    <input type="hidden" name="af" value="${escapar(r.antifalsificacion)}">
+    <input type="hidden" name="volver" value="${escapar(r.volver)}">
+    <input type="text" name="motivo" required maxlength="500"
+           placeholder="${escapar(x.porQue)}">
+    <button type="submit" class="b-no">${escapar(x.rechazar)}</button>
+  </form>` : ''
+
   return `<div class="doc ${marca}">
   <div class="doc-c">
-    <div class="doc-n">${escapar(d.nombre)}</div>
+    <a class="doc-n" href="/evidencia/${escapar(d.id)}/archivo">${escapar(d.nombre)}</a>
     <div class="doc-m">${escapar(nombreClase(idioma, d.clase))} · <span class="hu">${escapar(huellaCorta(d.huella))}</span></div>
     ${d.motivoRechazo ? `<div class="doc-r">${escapar(d.motivoRechazo)}</div>` : ''}
+    ${botones}
   </div>
   <div class="doc-e">${escapar(
     d.estado === 'verificada' ? x.verificado
@@ -74,7 +101,19 @@ function pintarDocumento(d: Documento, idioma: Idioma): string {
 </div>`
 }
 
-function pintarHito(h: Hito, idioma: Idioma): string {
+/**
+ * Lo que hace falta para poder escribir desde esta pantalla.
+ *
+ * Nulo cuando quien mira es un cliente. No es que se le escondan los botones: es que
+ * sin esto no hay nada que pintar, así que no hay forma de que salgan por descuido.
+ */
+export type Revision = {
+  readonly antifalsificacion: string
+  /** Adónde volver después de escribir. El servidor lo sanea igualmente. */
+  readonly volver: string
+}
+
+function pintarHito(h: Hito, idioma: Idioma, r: Revision | null): string {
   const x = TEXTOS[idioma]
   // Lo que falta va primero y marcado. Es la razón por la que el avance no sube.
   const falta = h.falta.length === 0 ? '' : `<div class="falta">${escapar(x.falta)}: ${
@@ -82,9 +121,27 @@ function pintarHito(h: Hito, idioma: Idioma): string {
   }</div>`
 
   const docs = h.documentos.length === 0 ? '' :
-    `<div class="docs">${h.documentos.map((d) => pintarDocumento(d, idioma)).join('')}</div>`
+    `<div class="docs">${h.documentos.map((d) => pintarDocumento(d, idioma, r)).join('')}</div>`
 
-  return `<div class="hito ${h.estado}">
+  // El formulario de subir va DENTRO del hito al que pertenece, no en un botón
+  // suelto arriba que luego pregunta a cuál. Quien sube un papel viene ya del hito.
+  const subir = !r ? '' : `
+  <form class="sub" method="post" enctype="multipart/form-data"
+        action="/hitos/${escapar(h.id)}/evidencia">
+    <input type="hidden" name="af" value="${escapar(r.antifalsificacion)}">
+    <input type="hidden" name="volver" value="${escapar(r.volver)}">
+    <select name="clase" required aria-label="${escapar(x.clase)}">
+      ${(h.falta.length > 0 ? h.falta : h.exige.length > 0 ? h.exige : CLASES)
+        .map((c) => `<option value="${escapar(c)}">${escapar(nombreClase(idioma, c))}</option>`)
+        .join('')}
+    </select>
+    <input type="date" name="ocurrido_en" aria-label="${escapar(x.cuando)}">
+    <input type="file" name="documento" required accept="${ACEPTA}"
+           aria-label="${escapar(x.elegir)}">
+    <button type="submit">${escapar(x.subir)}</button>
+  </form>`
+
+  return `<div class="hito ${h.estado}" id="hito-${escapar(h.id)}">
   <div class="hi-p">${escapar(porcentaje(idioma, h.peso))}</div>
   <div class="hi-c">
     <div class="hi-n">${escapar(h.nombre)}</div>
@@ -93,16 +150,20 @@ function pintarHito(h: Hito, idioma: Idioma): string {
     }</div>
     ${falta}
     ${docs}
+    ${subir}
   </div>
 </div>`
 }
+
+/** Lo que el selector de archivo ofrece de entrada. El servidor lo comprueba igual. */
+const ACEPTA = '.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.tif,.tiff'
 
 /**
  * El bloque del avance de un renglón. Devuelve solo el bloque: se incrusta en la
  * ficha del contrato, porque el avance no es una pantalla aparte — es lo que se va
  * a mirar de la ficha.
  */
-export function pintarAvance(a: Avance, idioma: Idioma): string {
+export function pintarAvance(a: Avance, idioma: Idioma, r: Revision | null = null): string {
   const x = TEXTOS[idioma]
   // Los dos tramos de la barra. El rayado empieza donde acaba el sólido.
   const v = Math.max(0, Math.min(100, a.verificado))
@@ -120,7 +181,7 @@ export function pintarAvance(a: Avance, idioma: Idioma): string {
   </div>
   <p class="av-nota">${escapar(x.nota)}</p>
   <h3 class="av-t">${escapar(x.deDonde)}</h3>
-  <div class="hitos">${a.hitos.map((h) => pintarHito(h, idioma)).join('')}</div>
+  <div class="hitos">${a.hitos.map((h) => pintarHito(h, idioma, r)).join('')}</div>
 </section>`
 }
 
@@ -194,7 +255,22 @@ export const ESTILOS_AVANCE = `
 .doc.ok{border-left:3px solid var(--grt)}
 .doc.esp{border-left:3px solid var(--am)}
 .doc.no{border-left:3px solid var(--md);opacity:.7}
-.doc-n{font-size:13px;font-weight:600;word-break:break-all}
+.doc-n{font-size:13px;font-weight:600;word-break:break-all;color:inherit;
+  text-decoration:underline;text-decoration-color:var(--ln2);text-underline-offset:2px}
+.doc-n:hover{text-decoration-color:var(--ik2)}
+.doc-f{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.doc-f input[type=text]{flex:1;min-width:150px;font:inherit;font-size:12.5px;padding:5px 9px;
+  border:1px solid var(--ln2);border-radius:7px;background:var(--cd);color:var(--ik)}
+.doc-f button,.sub button{font:inherit;font-size:12.5px;font-weight:650;padding:5px 12px;
+  border:1px solid var(--ln2);border-radius:7px;background:var(--cd);color:var(--ik);cursor:pointer}
+.doc-f .b-ok{border-color:var(--grt);color:var(--grt)}
+.doc-f .b-no{border-color:var(--md)}
+.sub{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center;
+  padding-top:10px;border-top:1px dashed var(--ln)}
+.sub select,.sub input[type=date],.sub input[type=file]{font:inherit;font-size:12.5px;
+  padding:5px 8px;border:1px solid var(--ln2);border-radius:7px;background:var(--cd);
+  color:var(--ik);max-width:100%}
+.sub button{border-color:var(--grt);color:var(--grt)}
 .doc-m{margin-top:2px;font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--md)}
 .hu{letter-spacing:.04em}
 .doc-r{margin-top:4px;font-size:12px;color:var(--ik2);line-height:1.4}
@@ -231,7 +307,7 @@ export const ESTILOS_AVANCE = `
  * dónde sale, que es la única razón por la que alguien querría verla.
  */
 export function pintarPaginaAvance(
-  a: Avance, cabecera: DatosCabecera, idioma: Idioma,
+  a: Avance, cabecera: DatosCabecera, idioma: Idioma, r: Revision | null = null,
 ): string {
   const x = TEXTOS[idioma]
   return pagina({
@@ -246,7 +322,7 @@ export function pintarPaginaAvance(
   <h1>${escapar(cabecera.renglon)}</h1>
   <div class="sub">${escapar(cabecera.cantidad)}</div>
 </div></header>`,
-    cuerpo: `<main class="wrap">${pintarAvance(a, idioma)}</main>`,
+    cuerpo: `<main class="wrap">${pintarAvance(a, idioma, r)}</main>`,
   })
 }
 
