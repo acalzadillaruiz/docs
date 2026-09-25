@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 10:00 (España)
-**Avance:** 107 de 141 sesiones · **76%**
+**Avance:** 110 de 141 sesiones · **78%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -19,7 +19,7 @@ identidad**, que es la mitad de SSO que faltaba. Y **el camino entero de entrar 
 de la empresa**, probado con testigos firmados de verdad. Con **sus dos rutas HTTP** y el cambio de
 código por testigo: el circuito de entrada con la empresa se recorre entero.
 Y **las retenciones a proveedores**, con su
-pantalla. Commit `3eb5aa4`. **682 comprobaciones.**
+pantalla. Y **la conciliación bancaria**. Commit `ea2cd0d`. **702 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
@@ -31,14 +31,13 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
    usa la primera semana y se abandona la tercera.
-3. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
-   no lo usa ninguna pantalla.
-4. **Activos fijos y depreciación en pantalla.** Igual: `15-activos.sql` construido y
+3. **Activos fijos y depreciación en pantalla.** Igual: `15-activos.sql` construido y
    probado, sin pantalla. Importa más de lo que parece — alquiler de equipos es uno de
    los cinco tipos de contrato.
 
-**Patrón que se repite y conviene ver entero:** quedan cuatro módulos de base de datos
-construidos y probados que **no usa ninguna pantalla**. El trabajo que queda es, en su
+**Patrón que se repite y conviene ver entero:** quedan tres módulos de base de datos
+construidos y probados que **no usa ninguna pantalla**: activos fijos, reexpresión por
+inflación, y la importación de destinos que no sean facturas de proveedor. El trabajo que queda es, en su
 mayor parte, ponerles la pantalla encima — no inventar nada nuevo.
 
 **Cómo continuar, literalmente:**
@@ -60,7 +59,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-682 comprobaciones hayan encontrado veintiocho fallos reales, veinticinco de ellos míos.
+702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -70,8 +69,9 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
   propia fecha de tasa del BCV.** Las de TypeScript corren todas seguidas contra una
   sola base; dos archivos que compartan identificadores se pisan en silencio, porque
   el `on conflict do nothing` hace que el segundo se quede con las filas del primero.
-  `db/colisiones.py` lo busca ahora antes de correr nada. Fechas ya usadas: 09-01 a
-  09-07.
+  `db/colisiones.py` lo busca ahora antes de correr nada: prefijos de UUID, fechas de
+  tasa del BCV (escritas o `current_date`), **correos y RIF**. Fechas ya usadas: 09-01
+  a 09-16 y 04-01 a 04-06.
 - **`avance_renglon()` es `stable`**: llamada en la MISMA instrucción que
   `recalcular_hito()` lee la foto de antes del cambio y devuelve el avance viejo. Van
   en instrucciones separadas.
@@ -232,6 +232,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/25-sso.sql` · `app/src/dominio/sso.ts` | Entrar con la cuenta de la empresa. **El motivo entero: cuando la operadora da de baja al ingeniero, pierde el acceso el mismo día**, sin que nadie de GPS se acuerde. El estado y el nonce viven en la base de datos y **se queman al usarse** — en una cookie, quien pueda escribirla elige el nonce, y elegir el nonce es reutilizar un testigo viejo. La empresa se busca **por la persona**, no por el dominio del correo. Y no se crea la persona sola: tener cuenta en Microsoft no es tener acceso a este contrato. |
 | `app/src/servidor/proveedores.ts` | Microsoft y Google configurados. **El `client_secret` sale del entorno:** escribirlo en el código es escribirlo en el historial del repositorio para siempre, y un secreto que estuvo en un repositorio está quemado aunque se borre. **Medio configurado es peor que nada**, así que un cliente sin secreto no cuenta como configurado — se ofrecería el botón y fallaría al volver. |
 | `app/src/dominio/proveedores.ts` · `pantallas/proveedores.ts` | Retener el IVA y el ISLR a los proveedores. **No retener cuando toca lo paga GPS de su bolsillo, con multa.** La pantalla avisa antes de pulsar de lo que más se discute: **sin número de control la retención es del 100%, no del 75%**. Y si la empresa no consta como agente de retención en esa fecha, el botón no se ofrece y se dice por qué — un botón que aparece y revienta hace pensar que el sistema está roto. |
+| `app/src/dominio/banco.ts` · `pantallas/banco.ts` | Conciliación bancaria. **La máquina propone; casar lo hace una persona** — dos movimientos del mismo importe el mismo día son más frecuentes de lo que parece, y una conciliación automática que se equivoca una vez al mes es peor que ninguna. **Lo que no casa no se esconde**, a los dos lados, y queda señalado hasta que alguien lo explique por escrito. La nota solo se ofrece en los movimientos del banco: un cobro que el banco no tiene no se arregla con una nota. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -494,6 +495,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 255 | El comprobante lleva correlativo (AAAAMM + secuencia) y **no se repite**. |
 | 256 | El ISLR guarda **la regla**, no solo el resultado: porcentaje, concepto y sustraendo en UT. |
 | 257 | Si la empresa no consta como agente, **no se ofrece el botón** y se dice por qué. |
+| 258 | La máquina propone por importe y cercanía, **y no casa nada sola**. |
+| 259 | Un movimiento no se casa dos veces, ni un cobro con dos movimientos. |
+| 260 | Aceptar sin casar **exige decir por qué**, por escrito, y queda guardado. |
+| 261 | Lo que no casa se ve **a los dos lados** y se distinguen entre sí. |
 
 ## Lo que sigue
 
