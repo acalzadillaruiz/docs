@@ -1,21 +1,30 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 43 de 141 sesiones · **30%**
+**Última actualización:** 2026-09-25, 06:10 (España)
+**Avance:** 45 de 141 sesiones · **32%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** `app/src/dominio/sesion.ts`, el flujo de entrada completo,
-con nueve pruebas contra la base de datos real. Commit más reciente en la rama.
+**Lo último terminado:** `db/schema/19-evidencia.sql` y `db/pruebas/16-evidencia.sql`
+— **la tesis del proyecto**, entera y probada en la base de datos: hitos con su peso,
+evidencia identificada por su huella SHA-256, y el avance calculado **solo** desde lo
+verificado. Con las tres medidas que nadie más da: brecha de evidencia, tiempo hasta
+la verdad y cobertura. 14 comprobaciones, todas pasando.
 
 **Lo siguiente, en este orden exacto:**
 
-1. `app/src/pantallas/entrada.ts` — las cuatro pantallas: ingreso, segundo factor,
-   recuperación e invitación aceptada.
-4. `app/src/dominio/sso.ts` — entrar con la cuenta de la empresa. Lo importante no es
-   el botón: es que cuando la operadora da de baja al empleado, pierda el acceso.
-   `organizacion.metodos` e `idp_tenant` ya están en el esquema.
+1. **La evidencia por arriba: dominio y pantallas.** La base de datos ya se niega a
+   dar por verificado un hito sin su documento; falta el camino humano:
+   `app/src/dominio/evidencia.ts` (subir un archivo, calcular su huella, rechazar el
+   duplicado porque la huella ya es la identidad, y la cola de verificación) y
+   `app/src/pantallas/evidencia.ts` (el hito con lo que le falta dicho en una línea,
+   y el avance con el enlace al documento que lo sostiene).
+2. **Avisar por correo** cuando algo entra en la bandeja o una valuación queda
+   presentada. Hoy hay que abrir la aplicación para enterarse, y eso deja el circuito
+   dependiendo de que alguien se acuerde de mirar.
+3. **Lo que falta de contabilidad y depende de las ocho respuestas del CEO**
+   (caja chica, y el importador atado a valuaciones de verdad).
 
 **Cómo continuar, literalmente:**
 
@@ -29,7 +38,7 @@ base de datos, el diccionario bilingüe y las de la aplicación. Si algo falla a
 es lo primero, antes que cualquier cosa nueva.
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-137 comprobaciones hayan encontrado seis fallos reales, cuatro de ellos míos.
+311 comprobaciones hayan encontrado seis fallos reales, cuatro de ellos míos.
 
 ---
 
@@ -147,6 +156,8 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/bandeja.ts` · `pantallas/bandeja.ts` | **Lo que espera a GPS**, dentro de la cartera y no en una pantalla aparte: una bandeja que hay que buscar no se mira, y una que no se mira deja al cliente escribiendo al vacío igual que antes. Ordenada por **lo que lleva más tiempo parado**, no por importe: el daño de dejar a un cliente sin respuesta no es proporcional al dinero. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
+| `db/schema/19-evidencia.sql` | **La tesis del proyecto.** El avance no se declara: se calcula desde los hitos que tienen su documento **y alguien lo revisó**. Un hito exige unas clases de evidencia concretas y un disparador se niega a darlo por bueno sin ellas, diciendo cuál falta. La evidencia se identifica por su **huella SHA-256**, no por su nombre de archivo: dos nombres distintos del mismo papel son el mismo papel. Rechazar exige decir por qué. Y de aquí salen las tres medidas que nadie más da: **brecha de evidencia** (lo declarado menos lo verificado, en dinero), **tiempo hasta la verdad** (mediana de lo que tarda un hecho en llegar al sistema) y **cobertura** (lo vendido arriba sin costo abajo). |
+| `db/pruebas/16-evidencia.sql` | Catorce intentos de hacer trampa al avance: declarar 30% sin nada hecho, verificar sin el documento, subir una de las dos evidencias que se exigen, colar una huella que no es un SHA-256, contar una evidencia rechazada. Ninguno pasa. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -261,7 +272,21 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 107 | Es **una sola pantalla** para escritorio y móvil, no dos plantillas. |
 | 108 | Funciona en modo oscuro sin que el usuario elija nada. |
 | 109 | El título de la pestaña dice de qué valuación se trata, en los dos idiomas. |
-| 30 | Un mes cerrado no admite un asiento nuevo — y la prueba comprueba que lo rechaza **por estar cerrado**, no por otro motivo. |
+| 110 | Sin nada hecho, el avance es **cero**. |
+| 111 | Declarado 30%, el avance real sigue en 0%. **Declarar no es avanzar.** |
+| 112 | No se puede dar por verificado un hito sin su documento, y el error dice **cuál** falta. |
+| 113 | Con el documento subido, el hito pasa a *evidenciado* — pero no a verificado. |
+| 114 | *Evidenciado* no es *verificado*: el avance sigue en 0%. |
+| 115 | El hito no se verifica mientras su evidencia esté **sin revisar**. |
+| 116 | Revisada la evidencia, el avance sube al 30% que pesa ese hito. |
+| 117 | El avance a una fecha pasada **no cuenta lo ocurrido después**: la historia no se reescribe. |
+| 118 | Un hito que exige acta **y** foto no se verifica con una sola. |
+| 119 | Una evidencia rechazada no cuenta para nada. |
+| 120 | Rechazar exige decir por qué: sin motivo, la base de datos no deja. |
+| 121 | La huella tiene que ser un SHA-256 de verdad, 64 dígitos hexadecimales. |
+| 122 | Brecha de evidencia: de 100.000 declarados, **40.000 sin respaldo**. |
+| 123 | Tiempo hasta la verdad: mediana de 7,5 días, el peor caso 12. |
+| 124 | Cobertura: 200.000 vendidos arriba **sin nada comprado debajo**. |
 
 ## Lo que sigue
 
