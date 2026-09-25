@@ -1,33 +1,35 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 08:20 (España)
-**Avance:** 71 de 141 sesiones · **50%**
+**Última actualización:** 2026-09-25, 08:40 (España)
+**Avance:** 76 de 141 sesiones · **54%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el circuito entero se recorre sin tocar la base de datos
-ni una vez.** Alta del contrato con sus hitos → ponerlo en vigor → subir la evidencia
-→ verificarla → ver subir el avance → proponer la valuación **desde lo verificado** →
-presentarla → que el cliente la objete → responder → que apruebe. Hay una sola prueba
-que hace ese camino entero por HTTP: `app/pruebas/circuito.test.ts`. Commit `f90b11a`.
-**519 comprobaciones.**
+**Lo último terminado:** **el camino de Excel a la contabilidad, entero y por el
+navegador.** Se elige la hoja (CSV), la aplicación propone cómo entendió cada columna
+y lo enseña con la cabecera original y un ejemplo del dato, el humano corrige, se
+comprueba sin escribir nada, y solo entonces entra — creando facturas de proveedor de
+verdad dentro del libro. Commit `8fabe17`. **570 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Lo que falta de contabilidad**, que es la prioridad que puso el CEO. Caja chica
-   y el importador de Excel atado a la aplicación. `13-importacion.sql` está
-   construido y probado y **no lo usa ninguna pantalla**: es lo que saca la
-   contabilidad de Excel.
-2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
-   lanza `herramientas/avisar.ts` a mano cada pocos minutos.
-3. **Facturar y cobrar desde la aplicación.** Los generadores de asiento existen y
-   están probados; lo que falta es el botón que emite el documento fiscal desde una
-   valuación aprobada, y el que registra el cobro.
-4. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
+1. **Asentar lo importado.** Las facturas de proveedor entran en `documento_fiscal`
+   pero **todavía no generan su asiento**. `asentar_factura_proveedor()` existe y está
+   probada desde hace tiempo: falta llamarla al confirmar el lote, con la cuenta de
+   gasto que diga el mapeo. Sin eso, lo importado no llega al libro y el margen sigue
+   sin verse.
+2. **Facturar y cobrar desde la aplicación.** El botón que emite el documento fiscal
+   desde una valuación aprobada, y el que registra el cobro. Los generadores de
+   asiento existen y están probados.
+3. **Caja chica**, que depende de las ocho respuestas del CEO
+   (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — sin contestar).
+4. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
+   lanza `herramientas/avisar.ts` cada pocos minutos.
+5. **SSO de punta a punta.** `dominio/empresa.ts` valida el testigo y está probado;
    falta la ruta que lo recibe y la pantalla que manda a la operadora.
 
 **Cómo continuar, literalmente:**
@@ -49,7 +51,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-519 comprobaciones hayan encontrado veinte fallos reales, dieciocho de ellos míos.
+570 comprobaciones hayan encontrado veinticuatro fallos reales, veintiuno de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -210,6 +212,9 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/dominio/alta.ts` · `pantallas/alta.ts` | Dar de alta un contrato. **El monto se calcula, no se teclea.** Nace en borrador. Los hitos se crean ahí mismo, en la misma transacción. Los errores salen todos juntos y lo escrito vuelve escrito. **Sin una línea de JavaScript**, porque la política de seguridad es `default-src 'none'` y relajarla para clonar una fila sería pagar con la mejor defensa que hay. |
 | `app/src/dominio/valuar.ts` · `pantallas/valuar.ts` | La propuesta de valuación. **La pantalla no tiene ninguna casilla donde teclear la obra**, y esa ausencia es la decisión de diseño más importante del proyecto: ponerla «por si acaso» convertiría todo lo anterior en decoración. |
 | `app/pruebas/circuito.test.ts` | **La prueba que contesta la única pregunta que importa.** Recorre el circuito entero por HTTP sin tocar la base de datos. Si pasa, el sistema sirve; si falla, da igual lo que digan las demás. |
+| `app/src/servidor/csv.ts` | Leer la hoja. **No se lee .xlsx, se lee CSV, y es una decisión:** un .xlsx es un ZIP con XML dentro. «Guardar como CSV» son dos clics y deja un archivo legible dentro de diez años. Tres cosas hay que acertar y son donde falla todo lo que lee CSV a mano: **el separador** (Excel en español usa punto y coma, porque la coma es el decimal), **las comillas** (`Cabezal 11" 5M`) y **el BOM** de Excel. |
+| `app/src/dominio/importar.ts` · `pantallas/importar.ts` | El camino de cuatro pasos. La aplicación **propone y enseña**; el humano corrige. El formato se propone mirando el **dato**, que es lo único que lo dice. Y la pantalla enseña la **cabecera original** y un **ejemplo de la hoja** al lado de cada columna: sin el ejemplo no hay forma de saber si «Base» es la base o el total con IVA, y esa confusión mete un 16% de error. |
+| `db/schema/23-importar-facturas.sql` | Lo que hacía falta para que el importador **cree algo**: antes `confirmar_lote` ponía un sello y nada más. **Un proveedor que no existe no se crea solo** — se niega el lote entero y se dice cuál falta. El importe en dólares se calcula con la tasa del día **de la factura**, no con la de hoy. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -412,6 +417,19 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 195 | Un contrato sin hitos **no se puede poner en vigor**. |
 | 196 | Presentar dos veces no pasa: mandaría dos correos. |
 | 197 | **El circuito entero, por HTTP y sin tocar la base de datos**, de punta a punta. |
+| 198 | Excel en español separa con punto y coma; un punto y coma **dentro de comillas** no decide el formato. |
+| 199 | `Cabezal 11" 5M` sobrevive al viaje, y un salto de línea dentro de comillas no parte la fila. |
+| 200 | Los tres bytes invisibles de Excel no se pegan a la primera cabecera. |
+| 201 | Lo que no es un número devuelve **nada, nunca cero**: un cero silencioso es un importe que entra mal. |
+| 202 | El 31 de febrero **no existe** aunque se escriba — `to_date` lo daba por el 3 de marzo. |
+| 203 | La base de datos y la aplicación **llaman igual a los formatos**. |
+| 204 | La hoja entra **tal cual**: `1.200.000,00` se guarda como texto, sin convertir. |
+| 205 | La misma hoja dos veces se detecta por su huella y se avisa. |
+| 206 | «Nro Control» lleva dentro «Nro»: lo específico gana a lo genérico al proponer. |
+| 207 | Validar **no escribe nada**, y con una fila mala **no entra ninguna**. |
+| 208 | Un proveedor sin dar de alta para el lote entero, **sin crear nada**, y se dice cuál. |
+| 209 | El importe en dólares sale de la tasa del día **de la factura**. |
+| 210 | El camino completo por HTTP: hoja → mapeo → comprobar → factura en la contabilidad. |
 
 ## Lo que sigue
 
