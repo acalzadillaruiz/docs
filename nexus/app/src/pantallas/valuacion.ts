@@ -37,6 +37,8 @@ export type DatosValuacion = {
   readonly puedeResponder: boolean
   /** Solo de dentro, y solo mientras sea un borrador: sacarla hacia el cliente. */
   readonly puedePresentar?: boolean
+  /** Solo de dentro, y solo una vez aprobada: registrar lo que entra. */
+  readonly puedeCobrar?: boolean
   readonly antifalsificacion: string
   readonly objeciones: readonly ObjecionVista[]
 }
@@ -231,6 +233,10 @@ ${filas}
       <p class="ayuda">${escapar(t('accion.presentar_aviso'))}</p>
     </form>
   </section>`}
+
+  ${!d.puedeCobrar ? '' : `
+  <p class="volver"><a href="/valuaciones/${escapar(d.id)}/cobrar">${
+    escapar(t('cobrar.titulo'))} →</a></p>`}
 
   ${!d.puedeDecidir ? '' : `
   <section class="acc">

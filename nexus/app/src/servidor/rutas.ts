@@ -46,6 +46,8 @@ import {
   CAMPOS, HojaRepetida, type Campo,
 } from '../dominio/importar.ts'
 import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
+import { estadoDeCobro, registrarCobro, NoCobrable, type Medio } from '../dominio/cobrar.ts'
+import { pintarCobrar } from '../pantallas/cobrar.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
 import { pintarPerfil } from '../pantallas/perfil.ts'
@@ -635,6 +637,9 @@ export async function resolver(
         puedeResponder: !esCliente,
         // Presentar también, y solo mientras siga siendo un borrador.
         puedePresentar: !esCliente && datos.cab.estado === 'borrador',
+        // Y cobrar, solo cuando ya hay algo que cobrar.
+        puedeCobrar: !esCliente &&
+          ['aprobada', 'facturada', 'cobrada'].includes(datos.cab.estado),
         antifalsificacion: testigoAnti(testigo),
         objeciones: datos.objeciones.map((o) => ({
           id: o.id,
@@ -646,6 +651,38 @@ export async function resolver(
       }, p.idioma))
     } catch (e) {
       if (e instanceof ValuacionNoAlcanzable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
+  // Registrar un cobro. Cierra el ciclo: valuación → asiento → cobro → asiento.
+  const cobrarVal = /^\/valuaciones\/([0-9a-f-]{36})\/cobrar$/.exec(p.ruta)
+  if (cobrarVal && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    const hoy = new Date().toISOString().slice(0, 10)
+    try {
+      let errores: readonly string[] = []
+      if (p.metodo === 'POST') {
+        const [org] = (await dentro((q) => q`
+          select organizacion_id from persona where id = ${personaId}::uuid
+        `)) as unknown as Array<{ organizacion_id: string }>
+        const r = await comoQuien((q) => registrarCobro(q, {
+          valuacionId: cobrarVal[1]!,
+          fecha: p.campos['fecha'] || hoy,
+          medio: (p.campos['medio'] ?? 'transferencia') as Medio,
+          monto: Number((p.campos['monto'] ?? '0').replace(',', '.')),
+          referencia: p.campos['referencia'] ?? '',
+        }, personaId, org!.organizacion_id, p.idioma))
+        if (r.hecho) return aOtroSitio(`/valuaciones/${cobrarVal[1]!}`)
+        errores = r.errores
+      }
+      const e = await comoQuien((q) => estadoDeCobro(q, cobrarVal[1]!, p.idioma))
+      return html(errores.length === 0 ? 200 : 400,
+        pintarCobrar(e, p.idioma, testigoAnti(testigo), hoy, errores))
+    } catch (e) {
+      if (e instanceof NoCobrable) return noEncontrado(p.idioma)
       throw e
     }
   }

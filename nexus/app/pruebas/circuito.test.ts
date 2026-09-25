@@ -247,3 +247,95 @@ test('de dar de alta un contrato a que el cliente lo apruebe, sin tocar la base 
   assert.equal(final!['origen_obra'], 'hitos_evidenciados')
   assert.equal(final!['obra'], '60000.00')
 })
+
+test('y del cobro al cierre: la cuenta por cobrar baja sola, por el navegador', async () => {
+  const gps = await entrar('circ@prueba.test')
+  const afG = testigoAnti(gps)
+  const cli = await entrar('circ-cli@prueba.test')
+  const afC = testigoAnti(cli)
+
+  // El libro necesita su plan de cuentas y su mes abierto. Sin eso no hay dónde
+  // asentar, y un cobro sin asentar parece que cuenta y no cuenta.
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`select instalar_plan_cuentas(${G}::uuid)`
+    await q`insert into periodo (organizacion_id, anio, mes)
+            values (${G}::uuid, extract(year from current_date)::int,
+                    extract(month from current_date)::int)
+            on conflict do nothing`
+  })
+
+  // Un contrato nuevo, su hito verificado, su valuación aprobada.
+  const codigo = `CIRC-COB-${Date.now() % 1000000}`
+  const alta = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie: gps,
+    campos: { af: afG, accion: 'crear', cliente: C, codigo, tipo: 'servicio',
+              titulo_es: 'Cuadrilla', titulo_en: 'Crew', moneda: 'VES',
+              anticipo_pct: '0', amortiza_pct: '0', garantia_pct: '0', filas: '3' },
+    repetidos: {
+      r_desc_es: ['Cuadrilla', '', ''], r_desc_en: ['Crew', '', ''],
+      r_cantidad: ['1', '', ''], r_unidad: ['mes', '', ''],
+      r_norma: ['', '', ''], r_espec: ['', '', ''],
+      r_precio: ['100000', '', ''], r_costo: ['60000', '', ''],
+    },
+  })
+  const rutaContrato = alta.cabeceras!['Location']!
+  const contratoId = rutaContrato.split('/').pop()!
+  await pedir({ metodo: 'POST', ruta: `${rutaContrato}/activar`, cookie: gps, campos: { af: afG } })
+
+  // Se verifica el hito de movilización (10% de 100.000 = 10.000).
+  const [hito] = (await dentro((q) => q`
+    select h.id from hito h join renglon rg on rg.id = h.renglon_id
+     where rg.contrato_id = ${contratoId}::uuid and h.clave = 'movilizacion'
+  `)) as unknown as Array<{ id: string }>
+  await pedir({
+    metodo: 'POST', ruta: `/hitos/${hito!.id}/evidencia`, cookie: gps,
+    campos: { af: afG, clase: 'acta', ocurrido_en: '2026-09-10' },
+    archivo: { archivo: 'acta.pdf', tipoMime: 'application/pdf',
+               contenido: new TextEncoder().encode('%PDF acta de movilizacion') },
+  })
+  const [evi] = (await dentro((q) => q`
+    select id from evidencia where hito_id = ${hito!.id}::uuid
+  `)) as unknown as Array<{ id: string }>
+  await pedir({
+    metodo: 'POST', ruta: `/evidencia/${evi!.id}/verificar`, cookie: gps, campos: { af: afG },
+  })
+
+  const hoy = new Date().toISOString().slice(0, 10)
+  const emitida = await pedir({
+    metodo: 'POST', ruta: `${rutaContrato}/valuar`, cookie: gps,
+    campos: { af: afG, desde: '2026-09-01', hasta: hoy },
+  })
+  const rutaVal = emitida.cabeceras!['Location']!
+  await pedir({ metodo: 'POST', ruta: `${rutaVal}/presentar`, cookie: gps, campos: { af: afG } })
+  await pedir({ metodo: 'POST', ruta: `${rutaVal}/aprobar`, cookie: cli, campos: { af: afC } })
+
+  // La pantalla de cobro enseña lo que queda, y el cliente no llega a ella.
+  const cobro = await pedir({ ruta: `${rutaVal}/cobrar`, cookie: gps })
+  assert.equal(cobro.codigo, 200)
+  assert.match(cobro.cuerpo!, /class="saldo/)
+  assert.equal((await pedir({ ruta: `${rutaVal}/cobrar`, cookie: cli })).codigo, 404)
+
+  const valId = rutaVal.split('/').pop()!
+  const [antes] = (await dentro((q) => q`
+    select saldo_valuacion(${valId}::uuid)::text as s
+  `)) as unknown as Array<{ s: string }>
+  assert.ok(Number(antes!.s) > 0)
+
+  const registrado = await pedir({
+    metodo: 'POST', ruta: `${rutaVal}/cobrar`, cookie: gps,
+    campos: { af: afG, monto: antes!.s, fecha: hoy, medio: 'transferencia',
+              referencia: 'TRF-CIRC' },
+  })
+  assert.equal(registrado.codigo, 303)
+
+  // La cuenta por cobrar queda en cero SOLA, y la valuación en cobrada.
+  const [despues] = (await dentro((q) => q`
+    select saldo_valuacion(${valId}::uuid)::text as s,
+           (select estado::text from valuacion where id = ${valId}::uuid) as estado,
+           (select asiento_id from cobro where valuacion_id = ${valId}::uuid limit 1) as asiento
+  `)) as unknown as Array<{ s: string; estado: string; asiento: string | null }>
+  assert.equal(Number(despues!.s), 0)
+  assert.equal(despues!.estado, 'cobrada')
+  assert.notEqual(despues!.asiento, null, 'el cobro quedó asentado, no solo registrado')
+})
