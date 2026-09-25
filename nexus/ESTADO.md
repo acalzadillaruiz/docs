@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 123 de 141 sesiones · **87%**
+**Avance:** 124 de 141 sesiones · **88%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -86,9 +86,23 @@ tabular**. Un campo de fecha se recorre **por dentro** (día, mes, año), y mien
 foco está en una de sus partes el campo en sí no cuenta como enfocado: su anillo no
 llega a pintarse. El que se ve es el de la **etiqueta** que lo envuelve.
 
+Y **«Cómo va el mes»**, el cuadro de mando del CFO. **Corrección, y es la segunda
+vez: dos módulos ENTEROS no los usaba ninguna pantalla** — `12-gerencia.sql` y
+`08-estados.sql`: margen, rentabilidad por cliente y por servicio, ejecutado sin
+cobrar, flujo de caja, estado de resultados, balance general. Dije dos veces que no
+quedaba nada sin pantalla y las dos veces era falso. **Antes de volver a decirlo:
+`grep -rn "create or replace function" db/schema/ | wc -l` contra lo que usa
+`app/src/`.**
+
 Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`,
-`16f9c03`, `c0aa778`, `dd3822b`, `a768a76`, `33196cc`, `587f3d0` y `20b40bc`.
-**834 comprobaciones** (250 de SQL y diccionario + 584 de TypeScript), todas pasando.
+`16f9c03`, `c0aa778`, `dd3822b`, `a768a76`, `33196cc`, `587f3d0`, `20b40bc` y
+`4db6418`. **843 comprobaciones** (250 de SQL y diccionario + 593 de TypeScript),
+todas pasando.
+
+**Decisión pendiente del CEO:** las tablas de rentabilidad son **acumuladas**, no del
+mes — `margen_contrato` ignora su `p_desde`. Está marcado en la pantalla, pero si se
+quiere el margen DEL MES hay que cambiar esa función, y tiene pruebas que dependen de
+su significado actual.
 
 **Trampa nueva:** dentro de una plantilla de TypeScript, **`\d` se queda en `d`**.
 Hay que escribir `\\d` para que al navegador le llegue `\d`. La medición del
