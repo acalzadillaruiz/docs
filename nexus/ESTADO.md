@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 10:00 (España)
-**Avance:** 104 de 141 sesiones · **74%**
+**Avance:** 107 de 141 sesiones · **76%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -18,7 +18,8 @@ el libro. Y **la comprobación de firma del testigo de
 identidad**, que es la mitad de SSO que faltaba. Y **el camino entero de entrar con la cuenta
 de la empresa**, probado con testigos firmados de verdad. Con **sus dos rutas HTTP** y el cambio de
 código por testigo: el circuito de entrada con la empresa se recorre entero.
-Commit `4b982ad`. **659 comprobaciones.**
+Y **las retenciones a proveedores**, con su
+pantalla. Commit `3eb5aa4`. **682 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
@@ -30,15 +31,13 @@ La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 2. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
    lanza `herramientas/avisar.ts` cada pocos minutos. Sin esto, todo lo construido se
    usa la primera semana y se abandona la tercera.
-3. **Retenciones de IVA e ISLR a proveedores, en pantalla.** `11-egresos.sql` las
-   calcula y emite el comprobante con su correlativo; no hay botón.
-4. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
+3. **Conciliación bancaria en pantalla.** `14-pagos.sql` está construido y probado y
    no lo usa ninguna pantalla.
-5. **Activos fijos y depreciación en pantalla.** Igual: `15-activos.sql` construido y
+4. **Activos fijos y depreciación en pantalla.** Igual: `15-activos.sql` construido y
    probado, sin pantalla. Importa más de lo que parece — alquiler de equipos es uno de
    los cinco tipos de contrato.
 
-**Patrón que se repite y conviene ver entero:** hay cinco módulos de base de datos
+**Patrón que se repite y conviene ver entero:** quedan cuatro módulos de base de datos
 construidos y probados que **no usa ninguna pantalla**. El trabajo que queda es, en su
 mayor parte, ponerles la pantalla encima — no inventar nada nuevo.
 
@@ -61,7 +60,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-659 comprobaciones hayan encontrado veintiocho fallos reales, veinticinco de ellos míos.
+682 comprobaciones hayan encontrado veintiocho fallos reales, veinticinco de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -232,6 +231,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/servidor/jwks.ts` | La firma del testigo de identidad: **lo único que separa «entrar con la cuenta de la empresa» de «entrar diciendo que eres quien quieras»**. Solo RS256, decidido por quien verifica y no por quien firma — aceptar el algoritmo que venga dentro es el ataque clásico contra JWT. La clave se busca por su `kid`, y el juego de claves se guarda un rato pero **se vuelve a pedir ante un `kid` desconocido**: los proveedores rotan sin avisar. |
 | `db/schema/25-sso.sql` · `app/src/dominio/sso.ts` | Entrar con la cuenta de la empresa. **El motivo entero: cuando la operadora da de baja al ingeniero, pierde el acceso el mismo día**, sin que nadie de GPS se acuerde. El estado y el nonce viven en la base de datos y **se queman al usarse** — en una cookie, quien pueda escribirla elige el nonce, y elegir el nonce es reutilizar un testigo viejo. La empresa se busca **por la persona**, no por el dominio del correo. Y no se crea la persona sola: tener cuenta en Microsoft no es tener acceso a este contrato. |
 | `app/src/servidor/proveedores.ts` | Microsoft y Google configurados. **El `client_secret` sale del entorno:** escribirlo en el código es escribirlo en el historial del repositorio para siempre, y un secreto que estuvo en un repositorio está quemado aunque se borre. **Medio configurado es peor que nada**, así que un cliente sin secreto no cuenta como configurado — se ofrecería el botón y fallaría al volver. |
+| `app/src/dominio/proveedores.ts` · `pantallas/proveedores.ts` | Retener el IVA y el ISLR a los proveedores. **No retener cuando toca lo paga GPS de su bolsillo, con multa.** La pantalla avisa antes de pulsar de lo que más se discute: **sin número de control la retención es del 100%, no del 75%**. Y si la empresa no consta como agente de retención en esa fecha, el botón no se ofrece y se dice por qué — un botón que aparece y revienta hace pensar que el sistema está roto. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -490,6 +490,10 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 251 | Un cliente sin secreto **no cuenta como configurado**. |
 | 252 | Microsoft pone el inquilino en el emisor y Google no: confundirlos deja entrar cuentas personales. |
 | 253 | La vuelta sin estado, sin código o con un estado inventado **no llega a mirar nada**. |
+| 254 | La retención de IVA es del **75%** con número de control y del **100%** sin él. |
+| 255 | El comprobante lleva correlativo (AAAAMM + secuencia) y **no se repite**. |
+| 256 | El ISLR guarda **la regla**, no solo el resultado: porcentaje, concepto y sustraendo en UT. |
+| 257 | Si la empresa no consta como agente, **no se ofrece el botón** y se dice por qué. |
 
 ## Lo que sigue
 
