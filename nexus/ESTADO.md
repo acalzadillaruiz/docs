@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 119 de 141 sesiones · **84%**
+**Avance:** 120 de 141 sesiones · **85%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -60,9 +60,19 @@ de los que acaban en página de error: **`Number('hola')` no falla, devuelve `Na
 Escribir mal un año en la pantalla de meses daba un error de servidor. Ahora hay un
 `entero()` que exige la forma entera y un `anioMes()` que comprueba el rango.
 
+Y **el repaso de los NaN que quedaban** (cabecera, correo, arranque), que destapó al
+hermano peor: **`Number('')` no es NaN, es CERO**. En `Accept-Language` un `q=0`
+significa «no quiero este idioma», así que un `q=` mal escrito se leía como un
+rechazo explícito y mandaba al visitante al idioma equivocado.
+
 Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`,
-`16f9c03` y `c0aa778`. **800 comprobaciones** (250 de SQL y diccionario + 550 de
-TypeScript), todas pasando.
+`16f9c03`, `c0aa778` y `dd3822b`. **808 comprobaciones** (250 de SQL y diccionario +
+558 de TypeScript), todas pasando.
+
+**Regla que sostiene los importes y se pierde en el primer refactor:** la
+comprobación de un importe es **`!(x > 0)`**, nunca `x <= 0`. Las dos dicen lo mismo
+en castellano y hacen lo contrario con un NaN: la segunda lo deja pasar. Está escrita
+en `pruebas/nan.test.ts` para que se note si alguien la «simplifica».
 
 **Los dos fallos, porque la lección vale más que el arreglo:**
 
