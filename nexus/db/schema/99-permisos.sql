@@ -67,5 +67,10 @@ grant select (id, organizacion_id, correo, nombre, idioma, activa, ultimo_acceso
 grant select, insert, update, delete on preferencia_aviso to nexus_cliente;
 grant select on aviso to nexus_cliente;
 
+-- Las peticiones de entrada con la cuenta de la empresa no se conceden a nadie mas
+-- que al servicio: llevan un nonce dentro, y quien lea un nonce puede reutilizar el
+-- testigo que lo lleva.
+revoke all on peticion_sso from nexus_cliente;
+
 -- La contabilidad no se concede en absoluto.
 revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;
