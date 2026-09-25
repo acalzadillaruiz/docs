@@ -185,9 +185,9 @@ export async function cargar(
 
   const [lote] = (await q`
     insert into lote_importacion (organizacion_id, archivo, destino, estado, filas,
-                                  huella, cargado_por)
+                                  huella, cabeceras, cargado_por)
     values (${orgId}::uuid, ${archivo}, ${destino}, 'cargado', ${datos.length},
-            ${huella}, ${personaId}::uuid)
+            ${huella}, ${cabeceras ?? []}, ${personaId}::uuid)
     returning id
   `) as unknown as Array<{ id: string }>
 
@@ -321,4 +321,43 @@ export async function lotes(q: Consulta, orgId: string): Promise<readonly Lote[]
 
 export function nombreCampo(idioma: Idioma, campo: Campo): string {
   return t(idioma, `campo.${campo}` as Clave)
+}
+
+/**
+ * El mapeo tal como está guardado, con las cabeceras de la hoja original.
+ *
+ * La cabecera es lo que el humano reconoce. Enseñarle «columna 5» en vez de «Base»
+ * le obliga a abrir el Excel al lado para contar columnas, y ahí se abandona.
+ */
+export async function mapeoGuardado(q: Consulta, loteId: string): Promise<Propuesta[]> {
+  const [l] = (await q`
+    select cabeceras from lote_importacion where id = ${loteId}::uuid
+  `) as unknown as Array<{ cabeceras: string[] | null }>
+  const cabeceras = l?.cabeceras ?? []
+
+  const [primera] = (await q`
+    select celdas from fila_cruda where lote_id = ${loteId}::uuid order by fila limit 1
+  `) as unknown as Array<{ celdas: string[] }>
+  const muestra = primera?.celdas ?? []
+
+  const mapeo = (await q`
+    select columna, campo, tipo, formato from mapeo_columna
+     where lote_id = ${loteId}::uuid order by columna
+  `) as unknown as Array<{ columna: number; campo: string; tipo: string; formato: string | null }>
+  const por = new Map(mapeo.map((m) => [Number(m.columna), m]))
+
+  // Se recorre por el ancho de la hoja y no por lo mapeado: una columna sin campo
+  // tiene que seguir saliendo, o no habría forma de asignársela.
+  const ancho = Math.max(cabeceras.length, muestra.length, 0)
+  return Array.from({ length: ancho }, (_, i): Propuesta => {
+    const m = por.get(i + 1)
+    return {
+      columna: i + 1,
+      cabecera: cabeceras[i] ?? `${i + 1}`,
+      muestra: muestra[i] ?? '',
+      campo: (m?.campo ?? null) as Propuesta['campo'],
+      tipo: (m?.tipo ?? 'texto') as Propuesta['tipo'],
+      formato: m?.formato ?? null,
+    }
+  })
 }

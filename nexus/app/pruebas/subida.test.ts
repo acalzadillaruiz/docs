@@ -495,3 +495,98 @@ test('dar de alta SIN el testigo antifalsificación no pasa', async () => {
   })
   assert.equal(r.codigo, 403)
 })
+
+test('el importador, desde el navegador: hoja → mapeo → comprobar → importar', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const af = testigoAnti(cookie)
+
+  // Un proveedor dado de alta, porque desde una hoja no se crean solos.
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`insert into organizacion (id, tipo, nombre, rif)
+            values ('3c4d5e6f-0000-0000-0000-0000000000cc','proveedor','Suministros Sub',
+                    'J-30777777-7') on conflict (id) do nothing`
+    await q`insert into tasa_bcv (id, vigente_el, ves_por_usd, fuente)
+            values ('3c4d5e6f-1111-0000-0000-0000000000cc','2026-04-03', 40.00,'carga_manual')
+            on conflict (id) do nothing`
+  })
+
+  const hoja = '﻿' + [
+    'Fecha;RIF;Proveedor;Nro Factura;Nro Control;Base;IVA',
+    `03/04/2026;J-30777777-7;Suministros Sub;SUB-${Date.now() % 100000};01-00077777;"500.000,00";"80.000,00"`,
+  ].join('\r\n')
+
+  const subida = await pedir({
+    metodo: 'POST', ruta: '/importar', cookie,
+    campos: { af, destino: 'facturas_recibidas' },
+    archivo: { archivo: 'abril.csv', tipoMime: 'text/csv',
+               contenido: new TextEncoder().encode(hoja) },
+  })
+  assert.equal(subida.codigo, 303)
+  const rutaLote = subida.cabeceras!['Location']!
+
+  // La pantalla de mapeo enseña la cabecera de la hoja Y un ejemplo del dato: sin
+  // el ejemplo no hay forma de saber si «Base» es la base o el total con IVA.
+  const mapeo = await pedir({ ruta: rutaLote, cookie })
+  assert.equal(mapeo.codigo, 200)
+  assert.match(mapeo.cuerpo!, /Nro Control/)
+  assert.match(mapeo.cuerpo!, /500\.000,00/)
+  // Y el formato propuesto sale elegido, no en blanco.
+  assert.match(mapeo.cuerpo!, /value="ven" selected/)
+  assert.match(mapeo.cuerpo!, /value="dmy" selected/)
+
+  // Comprobar, con el mapeo tal cual vino propuesto.
+  const columnas = ['1', '2', '3', '4', '5', '6', '7']
+  const campos = ['fecha', 'proveedor', 'proveedor_nombre', 'numero', 'control', 'base', 'iva']
+  const formatos = ['dmy', '', '', '', '', 'ven', 'ven']
+
+  const comprobado = await pedir({
+    metodo: 'POST', ruta: rutaLote, cookie,
+    campos: { af, accion: 'validar' },
+    repetidos: { columna: columnas, campo: campos, formato: formatos },
+  })
+  assert.equal(comprobado.codigo, 200)
+  assert.match(comprobado.cuerpo!, /filas correctas/)
+  assert.match(comprobado.cuerpo!, /accion" value="confirmar"/)
+
+  // Importar de verdad.
+  const importado = await pedir({
+    metodo: 'POST', ruta: rutaLote, cookie,
+    campos: { af, accion: 'confirmar' },
+    repetidos: { columna: columnas, campo: campos, formato: formatos },
+  })
+  assert.equal(importado.codigo, 303)
+
+  const [n] = (await dentro((q) => q`
+    select count(*)::int as n from documento_fiscal
+     where organizacion_id = ${ORG}::uuid and sentido = 'recibido'
+  `)) as unknown as Array<{ n: number }>
+  assert.ok(n!.n >= 1, 'la factura tiene que estar en la contabilidad')
+})
+
+test('el cliente no llega al importador', async () => {
+  const cli = await entrar('sub-cli@prueba.test')
+  assert.equal((await pedir({ ruta: '/importar', cookie: cli })).codigo, 404)
+  assert.equal((await pedir({
+    metodo: 'POST', ruta: '/importar', cookie: cli, campos: { af: testigoAnti(cli) },
+  })).codigo, 404)
+})
+
+test('traer la misma hoja dos veces se avisa, no se cuela', async () => {
+  const cookie = await entrar('sub@prueba.test')
+  const af = testigoAnti(cookie)
+  const hoja = 'Fecha;RIF;Nro Factura;Base\n03/04/2026;J-30777777-7;REPE-001;"1.000,00"\n'
+  const uno = await pedir({
+    metodo: 'POST', ruta: '/importar', cookie, campos: { af },
+    archivo: { archivo: 'r.csv', tipoMime: 'text/csv',
+               contenido: new TextEncoder().encode(hoja) },
+  })
+  assert.equal(uno.codigo, 303)
+  const dos = await pedir({
+    metodo: 'POST', ruta: '/importar', cookie, campos: { af },
+    archivo: { archivo: 'r-copia.csv', tipoMime: 'text/csv',
+               contenido: new TextEncoder().encode(hoja) },
+  })
+  assert.equal(dos.codigo, 409)
+  assert.match(dos.cuerpo!, /ya se importó/)
+})

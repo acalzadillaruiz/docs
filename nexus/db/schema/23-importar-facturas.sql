@@ -160,3 +160,8 @@ begin
 
   return greatest(n, (select count(*)::int from fila_cruda where lote_id = p_lote));
 end $$;
+
+-- La fila de cabecera de la hoja. No es un dato —no se valida ni se importa— pero
+-- sin ella la pantalla de mapeo no puede ensenar como se llamaba cada columna en el
+-- Excel original, que es justo lo que el humano necesita para reconocerla.
+alter table lote_importacion add column if not exists cabeceras text[];

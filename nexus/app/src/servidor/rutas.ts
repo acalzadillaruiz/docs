@@ -41,6 +41,12 @@ import {
 } from '../dominio/alta.ts'
 import { pintarAlta, type Traido } from '../pantallas/alta.ts'
 import { proponer, emitir, presentar, ContratoNoValuable } from '../dominio/valuar.ts'
+import {
+  cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, mapeoGuardado,
+  CAMPOS, HojaRepetida, type Campo,
+} from '../dominio/importar.ts'
+import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
+import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
 import { pintarPerfil } from '../pantallas/perfil.ts'
 import { pintarMedidas } from '../pantallas/medidas.ts'
@@ -293,6 +299,98 @@ export async function resolver(
       return html(400, pintarAlta(lista, p.idioma, testigoAnti(testigo), r.errores, traido, filas))
     }
     return aOtroSitio(`/contratos/${r.contratoId}`)
+  }
+
+  // ------------------------------------------------------------------ importar
+  // Es la pantalla que decide si esto se usa o se abandona: hoy la contabilidad
+  // vive en hojas de cálculo, y si sacarla de ahí cuesta más que quedarse, se queda.
+  if (p.ruta === '/importar' && p.metodo === 'GET') {
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const lista = await comoQuien((q) => lotes(q, org!.organizacion_id))
+    return html(200, pintarSubirHoja(p.idioma, testigoAnti(testigo), lista))
+  }
+
+  if (p.ruta === '/importar' && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const a = p.archivo
+    const listaDe = () => comoQuien((q) => lotes(q, org!.organizacion_id))
+    if (!a) {
+      return html(400, pintarSubirHoja(p.idioma, testigoAnti(testigo), await listaDe(),
+        t(p.idioma, 'alta.error.campo')))
+    }
+    try {
+      const r = await comoQuien((q) => cargar(q, org!.organizacion_id, personaId,
+        a.archivo, a.contenido, 'facturas_recibidas'))
+      // El mapeo propuesto se guarda de una vez: así la pantalla siguiente enseña
+      // lo mismo que se va a usar, y no una sugerencia que todavía no existe.
+      const propuestas = proponerMapeo(r.cabeceras, r.muestras, 'facturas_recibidas')
+      await comoQuien((q) => guardarMapeo(q, r.loteId, propuestas))
+      return aOtroSitio(`/importar/${r.loteId}`)
+    } catch (e) {
+      if (e instanceof HojaRepetida) {
+        return html(409, pintarSubirHoja(p.idioma, testigoAnti(testigo), await listaDe(),
+          t(p.idioma, 'importar.error.ya')))
+      }
+      if (e instanceof HojaVacia || e instanceof HojaDemasiadoGrande) {
+        return html(400, pintarSubirHoja(p.idioma, testigoAnti(testigo), await listaDe(),
+          (e as Error).message))
+      }
+      throw e
+    }
+  }
+
+  const lote = /^\/importar\/([0-9a-f-]{36})$/.exec(p.ruta)
+  if (lote && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    const datos = await comoQuien(async (q) => {
+      const [l] = (await q`
+        select archivo, estado::text from lote_importacion where id = ${lote[1]!}::uuid
+      `) as unknown as Array<{ archivo: string; estado: string }>
+      return l
+    })
+    if (!datos) return noEncontrado(p.idioma)
+
+    // Lo que el humano acaba de corregir se guarda antes de comprobar nada: si no,
+    // se validaría el mapeo viejo y los errores no cuadrarían con lo que se ve.
+    if (p.metodo === 'POST') {
+      const columnas = mapeoDelFormulario(p)
+      await comoQuien((q) => guardarMapeo(q, lote[1]!, columnas))
+    }
+
+    let revision = null
+    let error = ''
+    if (p.metodo === 'POST') {
+      try {
+        revision = await comoQuien((q) => validar(q, lote[1]!))
+      } catch (e) {
+        // Faltar una columna obligatoria por mapear no es un fallo de una fila: es
+        // del lote entero, y la base de datos lo dice con los nombres dentro.
+        error = String((e as Error).message ?? e)
+      }
+      if (revision && p.campos['accion'] === 'confirmar') {
+        const c = await comoQuien((q) => confirmar(q, lote[1]!, personaId, p.idioma))
+        if (c.hecho) return aOtroSitio('/importar')
+        error = c.motivo
+      }
+    }
+
+    const propuestas = await comoQuien((q) => mapeoGuardado(q, lote[1]!))
+    return html(error === '' ? 200 : 400, pintarMapeo(
+      lote[1]!, datos.archivo, propuestas, p.idioma, testigoAnti(testigo), revision, error))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
@@ -607,6 +705,28 @@ function destinoSeguro(pedido: string | undefined): string {
   if (pedido.includes(':')) return '/'
   if (pedido.includes('\\')) return '/'
   return pedido
+}
+
+/** Lo que el humano dejó en los desplegables del mapeo, columna por columna. */
+function mapeoDelFormulario(p: Peticion): Array<{
+  columna: number; campo: Campo | null; tipo: string; formato: string | null
+}> {
+  const col = (n: string) => p.repetidos?.[n] ?? (p.campos[n] ? [p.campos[n]!] : [])
+  const columnas = col('columna')
+  const campos = col('campo')
+  const formatos = col('formato')
+  const tipoDe = (campo: string) =>
+    CAMPOS['facturas_recibidas'].find((c) => c.campo === campo)?.tipo ?? 'texto'
+
+  return columnas.map((c, i) => {
+    const campo = (campos[i] ?? '') as Campo | ''
+    return {
+      columna: Number(c),
+      campo: campo === '' ? null : campo,
+      tipo: campo === '' ? 'texto' : tipoDe(campo),
+      formato: (formatos[i] ?? '') || null,
+    }
+  })
 }
 
 /** El primero del mes de una fecha. El periodo por omisión es el mes en curso. */
