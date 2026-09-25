@@ -477,5 +477,6 @@
   "libro.bajar": "Download the ledger as a spreadsheet",
   "libro.vacio": "There are no invoices for that month in this ledger.",
   "libro.sin_control": "No control number",
-  "libro.sin_control_aviso": "A purchase invoice without a control number gives no right to input VAT credit, and VAT withholding becomes 100%."
+  "libro.sin_control_aviso": "A purchase invoice without a control number gives no right to input VAT credit, and VAT withholding becomes 100%.",
+  "periodo.error.fecha": "Year and month have to be numbers: a 4-digit year and a month from 1 to 12"
 }

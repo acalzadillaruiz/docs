@@ -26,7 +26,7 @@ import { resolver, type Peticion } from '../src/servidor/rutas.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
-import { formularios } from './formulario.ts'
+import { formularios, conBasura, BASURA } from './formulario.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = 'a0b1c2d3-0000-0000-0000-00000000000a'
@@ -178,4 +178,93 @@ test('el navegador manda la PRIMERA opción de un select sin marcar, no una vac�
   assert.equal(f!.campos['tipo'], 'procura')
   // Y el de cliente sí empieza vacío, porque su primera opción lo está.
   assert.equal(f!.campos['cliente'], '')
+})
+
+// ===========================================================================
+// El mismo barrido, pero con los formularios RELLENOS DE BASURA.
+//
+// Enviar en blanco ya está cubierto. Esto es el otro lado: lo que pasa cuando la
+// casilla lleva algo, pero algo que no vale. Son los cuatro errores que de verdad se
+// cometen delante de una pantalla, y el que más daño hace no es el más raro: es el
+// texto donde va un número, porque `Number('hola')` no falla, devuelve NaN, y un NaN
+// metido en una cuenta la envenena sin que salte nada.
+
+for (const cual of ['numero', 'fecha', 'negativo', 'largo'] as const) {
+  test(`con «${cual}» en cada casilla, ninguna pantalla revienta ni escribe a medias`, async () => {
+    const sesion = await entrar('formularios@prueba.test')
+    let mandados = 0
+
+    for (const ruta of PANTALLAS) {
+      const pagina = await pedir({ ruta, cookie: sesion })
+      const formas = formularios(pagina.cuerpo ?? '')
+        .filter((f) => f.metodo === 'POST')
+        .filter((f) => f.accion !== '/salir')
+
+      for (const f of formas) {
+        const destino = f.accion || ruta
+        const r = await pedir({
+          metodo: 'POST', ruta: destino, cookie: sesion,
+          campos: conBasura(f, cual), repetidos: f.repetidos,
+        })
+        mandados++
+        assert.ok(r.codigo < 500,
+          `${destino} respondió ${r.codigo} con «${cual}» dentro`)
+        assert.notEqual(r.codigo, 303, `${destino} echó la sesión`)
+
+        // Si lo rechaza, que se lea por qué. Un 400 mudo no lo arregla nadie.
+        if (r.codigo === 400 && r.cuerpo) {
+          assert.match(r.cuerpo, /class="mal/, `${destino} rechazó sin decir por qué`)
+        }
+        // Y nunca devuelve la basura convertida en «NaN» o en una fecha imposible.
+        if (r.cuerpo) {
+          assert.doesNotMatch(r.cuerpo, /\bNaN\b/, `${destino} enseña NaN`)
+          assert.doesNotMatch(r.cuerpo, /0001-01-01/, `${destino} enseña una fecha imposible`)
+        }
+      }
+    }
+
+    // La afirmación que impide que este barrido pase en vano. Ya pasó una vez.
+    assert.ok(mandados >= 5, `solo se mandaron ${mandados} formularios: el barrido no barrió`)
+    assert.equal((await pedir({ ruta: '/periodos', cookie: sesion })).codigo, 200,
+      'la sesión se perdió durante el barrido')
+  })
+}
+
+test('después de toda la basura, el libro sigue cuadrado', async () => {
+  // Es la comprobación que de verdad importa: que nada de lo anterior dejó medio
+  // asiento escrito. Un descuadre aquí valdría por todas las demás juntas.
+  const [d] = (await dentro((q) => q`
+    select ves::text from descuadre(${G}::uuid, current_date)
+  `)) as unknown as Array<{ ves: string }>
+  assert.equal(Number(d?.ves ?? 0), 0)
+})
+
+test('nada de lo escrito con basura llegó a la base de datos', async () => {
+  // Ni un contrato con el título de 5.000 letras, ni un periodo del año -999999.
+  const [n] = (await dentro((q) => q`
+    select (select count(*) from contrato where organizacion_id = ${G}::uuid)
+         + (select count(*) from documento_fiscal where organizacion_id = ${G}::uuid)
+         + (select count(*) from periodo
+             where organizacion_id = ${G}::uuid and (anio < 2000 or anio > 2100))
+      as n
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(Number(n!.n), 0, 'la basura entró en la base de datos')
+})
+
+test('un texto larguísimo se corta o se rechaza, pero NO se guarda entero', async () => {
+  // Alguien pega media hoja de cálculo en una casilla. Guardarlo entero es cómo se
+  // llena una tabla de basura que luego nadie sabe de dónde salió.
+  const sesion = await entrar('formularios@prueba.test')
+  const h = (await pedir({ ruta: '/contratos/nuevo', cookie: sesion })).cuerpo ?? ''
+  const [f] = formularios(h)
+  const r = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie: sesion,
+    campos: { ...f!.campos, titulo_es: BASURA.largo, accion: 'crear' },
+  })
+  assert.ok(r.codigo < 500)
+  const [largo] = (await dentro((q) => q`
+    select coalesce(max(length(titulo_es)), 0)::int as n from contrato
+     where organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ n: number }>
+  assert.ok(Number(largo!.n) < 5000, `se guardó un título de ${largo!.n} letras`)
 })

@@ -126,3 +126,42 @@ export function formularios(html: string): Enviado[] {
   }
   return salida
 }
+
+/**
+ * El mismo formulario, relleno de basura.
+ *
+ * No es fuzzing: son los cuatro errores que de verdad comete la gente delante de una
+ * pantalla, y cada uno tiene su forma de hacer daño.
+ *
+ *   - **Texto donde va un número.** El navegador valida `type="number"`, pero la
+ *     petición no llega siempre de un navegador. Si el servidor hace `Number(x)` sin
+ *     mirar, sale `NaN`, y un `NaN` metido en una cuenta la envenena en silencio.
+ *   - **Una fecha imposible.** El 31 de febrero existe en todos los teclados.
+ *   - **Un importe negativo.** Cambia el signo de un asiento sin avisar.
+ *   - **Un texto larguísimo.** Es lo que pasa cuando alguien pega media hoja de
+ *     cálculo en una casilla sin querer.
+ *
+ * Lo que se espera del servidor no es que lo acepte: es que **se niegue diciendo por
+ * qué**, y que no escriba nada a medias.
+ */
+export const BASURA = {
+  numero: 'no es un número',
+  fecha: '31/02/2026',
+  negativo: '-999999',
+  largo: 'x'.repeat(5000),
+} as const
+
+/** Rellena lo que se pueda con basura, respetando lo que el navegador mandaría. */
+export function conBasura(
+  enviado: Enviado, cual: keyof typeof BASURA,
+): Record<string, string> {
+  const salida: Record<string, string> = { ...enviado.campos }
+  for (const nombre of Object.keys(salida)) {
+    // El testigo antifalsificación se deja en paz: sin él la respuesta es 403 y no se
+    // llega a comprobar nada de lo que interesa. Y la acción tampoco, que es la que
+    // decide QUÉ formulario se está mandando.
+    if (nombre === 'af' || nombre === 'accion' || nombre === 'volver') continue
+    salida[nombre] = BASURA[cual]
+  }
+  return salida
+}

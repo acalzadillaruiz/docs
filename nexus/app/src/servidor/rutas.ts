@@ -519,12 +519,16 @@ export async function resolver(
 
     let errores: readonly string[] = []
     if (p.metodo === 'POST') {
-      const anio = Number(p.campos['anio'] ?? 0)
-      const mes = Number(p.campos['mes'] ?? 0)
-      const r = p.campos['accion'] === 'cerrar'
-        ? await comoQuien((q) => cerrarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
-        : await comoQuien((q) => abrirMes(q, org!.organizacion_id, anio, mes, p.idioma))
-      if (!r.hecho) errores = [r.motivo]
+      const cuando = anioMes(p)
+      if (cuando === null) {
+        errores = [t(p.idioma, 'periodo.error.fecha')]
+      } else {
+        const { anio, mes } = cuando
+        const r = p.campos['accion'] === 'cerrar'
+          ? await comoQuien((q) => cerrarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
+          : await comoQuien((q) => abrirMes(q, org!.organizacion_id, anio, mes, p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      }
     }
 
     const m = await comoQuien((q) => meses(q, org!.organizacion_id, p.idioma))
@@ -608,15 +612,23 @@ export async function resolver(
       select organizacion_id from persona where id = ${personaId}::uuid
     `)) as unknown as Array<{ organizacion_id: string }>
 
+    // Mirando, un año que no se entiende se resuelve con el mes en curso. Pero al
+    // DEPRECIAR no: ahí hay que decirlo, porque depreciar el mes equivocado deja un
+    // asiento que hay que reversar a mano.
     const hoy = new Date()
-    const anio = Number(p.campos['anio'] ?? 0) || hoy.getUTCFullYear()
-    const mes = Number(p.campos['mes'] ?? 0) || hoy.getUTCMonth() + 1
+    const cuando = anioMes(p)
+    const anio = cuando?.anio ?? hoy.getUTCFullYear()
+    const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
 
     let errores: readonly string[] = []
     if (p.metodo === 'POST') {
-      const r = await comoQuien((q) =>
-        depreciarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
-      if (!r.hecho) errores = [r.motivo]
+      if (cuando === null) {
+        errores = [t(p.idioma, 'periodo.error.fecha')]
+      } else {
+        const r = await comoQuien((q) =>
+          depreciarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      }
     }
 
     const lista = await comoQuien((q) => equipos(q, org!.organizacion_id, p.idioma))
@@ -635,14 +647,19 @@ export async function resolver(
     `)) as unknown as Array<{ organizacion_id: string }>
 
     const hoy = new Date()
-    const anio = Number(p.campos['anio'] ?? 0) || hoy.getUTCFullYear()
-    const mes = Number(p.campos['mes'] ?? 0) || hoy.getUTCMonth() + 1
+    const cuando = anioMes(p)
+    const anio = cuando?.anio ?? hoy.getUTCFullYear()
+    const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
 
     let errores: readonly string[] = []
     if (p.metodo === 'POST') {
-      const r = await comoQuien((q) =>
-        asentarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
-      if (!r.hecho) errores = [r.motivo]
+      if (cuando === null) {
+        errores = [t(p.idioma, 'periodo.error.fecha')]
+      } else {
+        const r = await comoQuien((q) =>
+          asentarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      }
     }
 
     // El cuadro se mira al ultimo dia del mes elegido, no a hoy: comparar contra hoy
@@ -663,9 +680,9 @@ export async function resolver(
 
     const hoy = new Date()
     const cual: 'ventas' | 'compras' = p.campos['cual'] === 'compras' ? 'compras' : 'ventas'
-    const anio = Number(p.campos['anio'] ?? 0) || hoy.getUTCFullYear()
-    const mes = Number(p.campos['mes'] ?? 0) || hoy.getUTCMonth() + 1
-    if (mes < 1 || mes > 12 || anio < 2000 || anio > 2100) return noEncontrado(p.idioma)
+    const cuando = anioMes(p)
+    const anio = cuando?.anio ?? hoy.getUTCFullYear()
+    const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
 
     if (p.ruta === '/libros') {
       const l = await comoQuien((q) => libro(q, org!.organizacion_id, cual, anio, mes, p.idioma))
@@ -1103,6 +1120,32 @@ function destinoSeguro(pedido: string | undefined): string {
  * guardaría como texto y la validación comprobaría otra cosa —sin avisar de nada,
  * que es lo peor que puede hacer una validación.
  */
+/**
+ * Un entero venido de un formulario, o nada.
+ *
+ * `Number('hola')` no falla: devuelve `NaN`. Y `NaN` no es un número pero SÍ llega
+ * hasta la base de datos, que contesta `invalid input syntax for type integer:
+ * "NaN"` — un error de servidor, no un «eso no vale». La comprobación va aquí y no
+ * allí porque el sitio donde se explica un dato mal escrito es la pantalla.
+ *
+ * Se exige la forma entera: ni «12.5», ni «12abc», ni «1e9». Un año se escribe con
+ * cuatro cifras y ya está.
+ */
+function entero(v: string | undefined): number | null {
+  if (v === undefined) return null
+  const t = v.trim()
+  return /^-?\d{1,9}$/.test(t) ? Number(t) : null
+}
+
+/** Año y mes de un formulario; `null` si alguno no se entiende o no existe. */
+function anioMes(p: Peticion): { anio: number; mes: number } | null {
+  const anio = entero(p.campos['anio'])
+  const mes = entero(p.campos['mes'])
+  if (anio === null || mes === null) return null
+  if (anio < 2000 || anio > 2100 || mes < 1 || mes > 12) return null
+  return { anio, mes }
+}
+
 function mapeoDelFormulario(p: Peticion, destino: Destino): Array<{
   columna: number; campo: Campo | null; tipo: string; formato: string | null
 }> {

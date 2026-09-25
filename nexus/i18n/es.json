@@ -477,5 +477,6 @@
   "libro.bajar": "Bajar el libro en hoja de cálculo",
   "libro.vacio": "No hay ninguna factura de ese mes en este libro.",
   "libro.sin_control": "Sin número de control",
-  "libro.sin_control_aviso": "Una factura de compra sin número de control no da derecho a crédito fiscal, y la retención de IVA pasa a ser del 100%."
+  "libro.sin_control_aviso": "Una factura de compra sin número de control no da derecho a crédito fiscal, y la retención de IVA pasa a ser del 100%.",
+  "periodo.error.fecha": "El año y el mes tienen que ser números: un año de 4 cifras y un mes del 1 al 12"
 }
