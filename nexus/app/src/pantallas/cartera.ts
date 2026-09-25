@@ -157,6 +157,7 @@ ${ESTILOS_AVANCE}
   ${esCliente ? '' : `<a class="medidas" href="/importar">${escapar(t('importar.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/proveedores">${escapar(t('proveedor.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/activos">${escapar(t('activo.titulo'))}</a>`}
+  ${esCliente ? '' : `<a class="medidas" href="/reexpresion">${escapar(t('reex.nombre'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/banco">${escapar(t('banco.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/periodos">${escapar(t('periodo.titulo'))}</a>`}
   <a class="medidas" href="/perfil">${escapar(t('perfil.titulo'))}</a>

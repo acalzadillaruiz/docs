@@ -62,6 +62,8 @@ import { conciliacion, casar, aceptarConNota } from '../dominio/banco.ts'
 import { pintarBanco } from '../pantallas/banco.ts'
 import { equipos, depreciarMes } from '../dominio/activos.ts'
 import { pintarActivos } from '../pantallas/activos.ts'
+import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
+import { pintarReexpresion } from '../pantallas/reexpresion.ts'
 import { pintarPeriodos } from '../pantallas/periodos.ts'
 import { HojaVacia, HojaDemasiadoGrande } from './csv.ts'
 import { pintarValuar } from '../pantallas/valuar.ts'
@@ -605,6 +607,35 @@ export async function resolver(
     const lista = await comoQuien((q) => equipos(q, org!.organizacion_id, p.idioma))
     return html(errores.length === 0 ? 200 : 400,
       pintarActivos(lista, p.idioma, testigoAnti(testigo), anio, mes, errores))
+  }
+
+  // La reexpresion por inflacion. Nunca la ve el cliente: es contabilidad.
+  if (p.ruta === '/reexpresion' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+
+    const hoy = new Date()
+    const anio = Number(p.campos['anio'] ?? 0) || hoy.getUTCFullYear()
+    const mes = Number(p.campos['mes'] ?? 0) || hoy.getUTCMonth() + 1
+
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const r = await comoQuien((q) =>
+        asentarMes(q, org!.organizacion_id, anio, mes, personaId, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    }
+
+    // El cuadro se mira al ultimo dia del mes elegido, no a hoy: comparar contra hoy
+    // mientras se cierra un mes anterior da una cifra que no cuadra con nada.
+    const al = new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10)
+    const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
