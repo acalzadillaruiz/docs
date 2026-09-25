@@ -106,7 +106,7 @@ export async function abrirMes(
   q: Consulta, orgId: string, anio: number, mes: number, idioma: Idioma,
 ): Promise<Cambio> {
   if (!(mes >= 1 && mes <= 12) || !(anio >= 2000 && anio <= 2100)) {
-    return { hecho: false, motivo: t(idioma, 'alta.error.campo') }
+    return { hecho: false, motivo: t(idioma, 'periodo.error.fecha') }
   }
   const filas = await q`
     insert into periodo (organizacion_id, anio, mes) values (${orgId}::uuid, ${anio}, ${mes})

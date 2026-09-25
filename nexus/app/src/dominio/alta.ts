@@ -79,15 +79,15 @@ function revisar(c: ContratoNuevo, idioma: Idioma): string[] {
 
   if (falta(c.clienteId)) malo.push(t(idioma, 'alta.error.cliente'))
   if (falta(c.codigo) || falta(c.tituloEs) || falta(c.tituloEn)) {
-    malo.push(t(idioma, 'alta.error.campo'))
+    malo.push(t(idioma, 'alta.error.cabecera'))
   }
-  if (!TIPOS.includes(c.tipo)) malo.push(t(idioma, 'alta.error.campo'))
+  if (!TIPOS.includes(c.tipo)) malo.push(t(idioma, 'alta.error.tipo'))
   if (c.renglones.length === 0) malo.push(t(idioma, 'alta.error.renglones'))
 
   for (const r of c.renglones) {
     if (falta(r.descripcionEs) || falta(r.descripcionEn) || falta(r.unidad) ||
         !(r.cantidad > 0) || !(r.precioUnitario >= 0)) {
-      malo.push(t(idioma, 'alta.error.campo'))
+      malo.push(t(idioma, 'alta.error.renglon'))
       break
     }
   }
@@ -99,7 +99,7 @@ function revisar(c: ContratoNuevo, idioma: Idioma): string[] {
   // ninguna valuación: se queda cobrado dos veces hasta que alguien lo note.
   if (c.anticipoPct > 0 && c.amortizaPct <= 0) malo.push(t(idioma, 'alta.error.amortiza'))
   for (const p of [c.anticipoPct, c.amortizaPct, c.garantiaPct]) {
-    if (!(p >= 0 && p <= 100)) { malo.push(t(idioma, 'alta.error.campo')); break }
+    if (!(p >= 0 && p <= 100)) { malo.push(t(idioma, 'alta.error.porcentaje')); break }
   }
   return [...new Set(malo)]
 }

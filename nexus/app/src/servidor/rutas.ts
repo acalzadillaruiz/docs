@@ -440,7 +440,7 @@ export async function resolver(
     const listaDe = () => comoQuien((q) => lotes(q, org!.organizacion_id))
     if (!a) {
       return html(400, pintarSubirHoja(p.idioma, testigoAnti(testigo), await listaDe(),
-        t(p.idioma, 'alta.error.campo')))
+        t(p.idioma, 'importar.error.sin_hoja')))
     }
     // El destino llega del formulario, así que se comprueba contra la lista en vez de
     // pasarlo tal cual: un valor inventado acabaría en la columna `destino` del lote y
@@ -723,7 +723,7 @@ export async function resolver(
           if (!r.hecho) errores = [r.motivo]
         }
       } else if (!esId) {
-        errores = [t(p.idioma, 'caja.error.generico')]
+        errores = [t(p.idioma, 'caja.error.no_existe')]
       } else if (que === 'vale') {
         const monto = decimal(p.campos['monto'])
         const contrato = (p.campos['contrato'] ?? '').trim()
@@ -925,7 +925,12 @@ export async function resolver(
   if (contrato && p.metodo === 'GET') {
     try {
       const f = await comoQuien((q) => ficha(q, contrato[1]!, p.idioma, !esCliente))
-      return html(200, pintarContrato(f, p.idioma, esCliente, testigoAnti(testigo)))
+      // El motivo por el que no se pudo poner en vigor, si viene de vuelta. Se
+      // comprueba contra la lista: lo que llega por la direccion no se pinta tal cual.
+      const fallo = p.campos['fallo']
+      const dicho = fallo === 'sin_hitos' ? [t(p.idioma, 'accion.error.sin_hitos')]
+        : fallo === 'estado_equivocado' ? [t(p.idioma, 'accion.error.ya_vigente')] : []
+      return html(200, pintarContrato(f, p.idioma, esCliente, testigoAnti(testigo), dicho))
     } catch (e) {
       if (e instanceof ContratoNoAlcanzable) return noEncontrado(p.idioma)
       throw e
@@ -1115,7 +1120,10 @@ export async function resolver(
     `)) as unknown as Array<{ organizacion_id: string }>
     const r = await comoQuien((q) => activar(q, activarCtr[1]!, org!.organizacion_id))
     if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
-    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    // Un 409 con el cuerpo vacio era una pagina en blanco: el motivo existia, estaba
+    // escrito en el diccionario, y no llegaba a ninguna parte. Vuelve a la ficha con
+    // el motivo puesto, que es donde esta el boton que se acaba de pulsar.
+    if (!r.hecho) return aOtroSitio(`/contratos/${activarCtr[1]!}?fallo=${r.motivo}`)
     return aOtroSitio(`/contratos/${activarCtr[1]!}`)
   }
 

@@ -31,6 +31,7 @@ const TEXTOS = {
 
 export function pintarContrato(
   f: FichaContrato, idioma: Idioma, esCliente: boolean, antifalsificacion = '',
+  errores: readonly string[] = [],
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -158,6 +159,9 @@ export function pintarContrato(
 </div></header>
 `,
     cuerpo: `<main class="wrap">
+  ${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
+    errores.map((e) => `<li>${escapar(e)}</li>`).join('')
+  }</ul></div>`}
   <h2>${escapar(x.renglones)}</h2>
   <section class="caja">${renglones || `<p class="nada">—</p>`}</section>
   <h2>${escapar(x.valuaciones)}</h2>

@@ -1,12 +1,36 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 21:20 (España)
-**Avance:** 135 de 141 sesiones · **96%**
+**Última actualización:** 2026-09-25, 22:05 (España)
+**Avance:** 136 de 141 sesiones · **96%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el techo de `brecha_evidencia`, derribado midiendo.**
+**Lo último terminado:** **los ochenta textos de error, repasados en conjunto.** Se
+escriben de uno en uno, el día que hacen falta, y nunca se vuelven a mirar juntos.
+Mirándolos juntos salieron cuatro cosas, y de una salió un fallo de verdad:
+
+- **Poner un contrato en vigor sin hitos contestaba `409` con el cuerpo vacío**: una
+  **página en blanco**. El motivo estaba escrito en el diccionario desde el primer
+  día —«hay renglones sin hitos, y su avance se quedaría en cero para siempre»— y no
+  llegaba a ninguna parte. Es la tercera vez esta semana que aparece la misma forma
+  de fallo: **existe la regla, existe el texto, y no existe el camino.**
+- **`alta.error.campo` decía «Falta algo obligatorio»** para cuatro causas distintas:
+  la cabecera, el tipo, un renglón y un porcentaje. Son cuatro mensajes ahora, y el
+  que no decía nada ya no existe.
+- **`accion.error.estado` no lo usaba nadie** y `caja.error.generico` era un «no se
+  pudo, inténtalo de nuevo». Fuera los dos.
+- **`banco.error.tomado` estaba mal traducido**: en castellano decía «ese cobro o
+  pago» y en inglés solo «that payment».
+
+Y queda un barrido, `pruebas/errores.test.ts`, con las cinco reglas que salieron del
+repaso: **todo texto de error se usa en alguna parte** (la que encontró la página en
+blanco), los huecos `{n}` están en los dos idiomas, nada de jerga —`uuid`, `NaN`,
+«base de datos»—, nada tan corto que no diga nada, y ninguno con «inválido», que es
+la forma de no ayudar que se cuela al traducir. Comprobado que sabe fallar metiendo
+un error malo a propósito: caen tres de las cinco.
+
+**Antes:** **el techo de `brecha_evidencia`, derribado midiendo.**
 Llamaba a `avance_declarado` y `avance_renglon` **una vez por renglón**: con 500
 contratos eran 4.000 llamadas a función, cada una con su propia consulta. Ahora hace
 la misma cuenta —el mismo redondeo por renglón antes de dividir entre cien— en una
@@ -246,7 +270,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**911 comprobaciones** (250 de SQL y diccionario + 661 de TypeScript), todas pasando.
+**917 comprobaciones** (250 de SQL y diccionario + 667 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno

@@ -525,3 +525,63 @@ test('corregir una factura con una nota: la factura no se toca y las dos quedan'
   assert.equal(Number(f!.base), 10000)
   assert.equal(f!.notas, 1)
 })
+
+test('no poder poner un contrato en vigor se DICE, no se contesta con una página en blanco', async () => {
+  // El motivo estaba escrito en el diccionario desde el primer día —«hay renglones
+  // sin hitos, y su avance se quedaría en cero para siempre»— y la ruta contestaba
+  // 409 con el cuerpo vacío. Quien pulsaba el botón veía una página en blanco y no
+  // tenía forma de saber qué había pasado.
+  const gps = await entrar('circ@prueba.test')
+  const afG = testigoAnti(gps)
+  const codigo = `CIRC-SH-${Date.now() % 1000000}`
+
+  const alta = await pedir({
+    metodo: 'POST', ruta: '/contratos/nuevo', cookie: gps,
+    campos: {
+      af: afG, accion: 'crear', cliente: C, codigo, tipo: 'servicio',
+      titulo_es: 'Sin hitos', titulo_en: 'No milestones', moneda: 'VES',
+      inicio: '2026-01-01', fin_previsto: '2026-06-30',
+      anticipo_pct: '0', amortiza_pct: '0', garantia_pct: '0', filas: '1',
+    },
+    repetidos: {
+      r_desc_es: ['Servicio suelto'], r_desc_en: ['Loose service'],
+      r_cantidad: ['1'], r_unidad: ['servicio'],
+      r_norma: [''], r_espec: [''], r_precio: ['5000'], r_costo: ['3000'],
+    },
+  })
+  assert.equal(alta.codigo, 303)
+  const rutaContrato = alta.cabeceras!['Location']!
+  const id = rutaContrato.split('/').pop()!
+
+  // Se le quitan los hitos que el alta le puso, que es la situación real: un renglón
+  // que no casa con ninguna plantilla se queda sin ellos.
+  await dentro((q) => q`
+    delete from hito where renglon_id in (
+      select id from renglon where contrato_id = ${id}::uuid)`)
+
+  const intento = await pedir({
+    metodo: 'POST', ruta: `${rutaContrato}/activar`, cookie: gps, campos: { af: afG },
+  })
+  assert.equal(intento.codigo, 303, 'vuelve a la ficha, no a una página en blanco')
+  const vuelta = intento.cabeceras!['Location']!
+  assert.match(vuelta, /\?fallo=sin_hitos$/)
+
+  const ficha = await pedir({ ruta: rutaContrato, cookie: gps, campos: { fallo: 'sin_hitos' } })
+  assert.equal(ficha.codigo, 200)
+  assert.match(ficha.cuerpo!, /sin hitos/)
+  assert.equal(ficha.cuerpo!.includes('‹falta:'), false)
+
+  // Y lo que llegue por la dirección no se pinta tal cual: se comprueba contra la
+  // lista de motivos. Si no, cualquiera escribe el texto que quiera en la pantalla.
+  const inventado = await pedir({
+    ruta: rutaContrato, cookie: gps, campos: { fallo: '<b>lo que yo quiera</b>' },
+  })
+  assert.equal(inventado.codigo, 200)
+  assert.equal(inventado.cuerpo!.includes('lo que yo quiera'), false)
+
+  // Y sigue en borrador: el cliente no lo ve.
+  const [c] = (await dentro((q) => q`
+    select estado::text from contrato where id = ${id}::uuid
+  `)) as unknown as Array<{ estado: string }>
+  assert.equal(c!.estado, 'borrador')
+})
