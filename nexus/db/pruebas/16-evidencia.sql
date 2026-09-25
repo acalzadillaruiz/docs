@@ -186,3 +186,72 @@ select case when sin_respaldo = 200000.00
             then 'OK · cobertura: 200.000,00 vendidos sin nada comprado debajo'
             else 'FALLO · sin respaldo ' || sin_respaldo::text end as resultado
   from cobertura(:org);
+
+-- ============================================================ el estado se DERIVA
+-- Hasta aqui el estado del hito se ha puesto a mano y el disparador ha dicho que no
+-- cuando faltaba algo. Eso deja un hueco al reves: si se rechaza la evidencia DESPUES
+-- de verificar el hito, el hito se queda verificado para siempre. recalcular_hito()
+-- lo vuelve a calcular entero, y puede bajar.
+select set_config('app.persona_id', :yo, false);
+
+-- 'fabricado' esta verificado con su certificado. Recalcular no debe moverlo.
+select case when recalcular_hito('6f7a8b9c-2222-0000-0000-000000000002') = 'verificado'
+            then 'OK · recalcular no mueve un hito que sigue estando bien'
+            else 'FALLO · bajó un hito correcto' end as resultado;
+
+-- Ahora se rechaza ese certificado. El hito tiene que CAER.
+update evidencia set verificada_en = null, verificada_por = null,
+       rechazada_en = now(), motivo_rechazo = 'la colada no coincide con el cabezal'
+ where hito_id = '6f7a8b9c-2222-0000-0000-000000000002';
+
+-- Recalcular va en su PROPIA instruccion, y no por estilo: avance_renglon() es
+-- 'stable', asi que dentro de la misma instruccion lee la foto de antes del cambio
+-- y devolveria el avance viejo. Se comprueba despues, no a la vez.
+select recalcular_hito('6f7a8b9c-2222-0000-0000-000000000002') as _;
+
+select case when estado = 'declarado' and avance_renglon(:rg) = 0
+            then 'OK · rechazada la evidencia, el hito cae y el avance vuelve a 0%'
+            else 'FALLO · quedó en ' || estado::text
+                 || ' con avance ' || avance_renglon(:rg)::text end as resultado
+  from hito where id = '6f7a8b9c-2222-0000-0000-000000000002';
+
+-- ============================================================ qué le falta, dicho
+select case when falta_al_hito('6f7a8b9c-2222-0000-0000-000000000005') = '{foto}'::clase_evidencia[]
+            then 'OK · el hito dice qué le falta: foto'
+            else 'FALLO · dice ' ||
+                 coalesce(array_to_string(falta_al_hito('6f7a8b9c-2222-0000-0000-000000000005'), ','), 'nada')
+            end as resultado;
+
+-- ============================================================ el cliente NO ve la factura del proveedor
+-- Una factura de proveedor es evidencia legítima de que el material se compró, y
+-- lleva dentro el precio de compra. Sale de GPS y no del portal del cliente.
+insert into evidencia (hito_id, clase, huella, nombre, bytes, tipo_mime, subida_por,
+                       verificada_en, verificada_por)
+values ('6f7a8b9c-2222-0000-0000-000000000001','factura', repeat('f', 64),
+        'factura-proveedor.pdf', 40211,'application/pdf', :yo, now(), :yo);
+
+insert into persona (id, organizacion_id, correo, nombre, metodo, clave_hash, totp_secreto)
+values ('6f7a8b9c-0000-0000-0000-00000000000e', :cli,'cli@ejemplo.test','Cliente',
+        'clave_2fa','(h)','(s)');
+
+grant select on hito to nexus_cliente;
+grant select (id, hito_id, clase, huella, nombre, bytes, tipo_mime,
+              ocurrido_en, subida_en, verificada_en, rechazada_en)
+  on evidencia to nexus_cliente;
+
+do $$
+declare ve int; mios int;
+begin
+  set local role nexus_cliente;
+  perform set_config('app.persona_id','6f7a8b9c-0000-0000-0000-00000000000e', true);
+  select count(*) into ve   from evidencia where clase = 'factura';
+  select count(*) into mios from hito;
+  reset role;
+  if ve <> 0 then
+    raise exception 'FALLO · el cliente vio % factura(s) de proveedor', ve;
+  end if;
+  if mios = 0 then
+    raise exception 'FALLO · el cliente no ve ningún hito: no podría auditar su avance';
+  end if;
+  raise notice 'OK · el cliente ve sus % hitos y ninguna factura de proveedor', mios;
+end $$;

@@ -41,5 +41,15 @@ grant select on tasa_bcv, alicuota_iva, alicuota_igtf, concepto_islr, unidad_tri
 grant update (estado, aprobada_el, aprobada_por) on valuacion to nexus_cliente;
 grant insert, select on objecion to nexus_cliente;
 
+-- Los hitos y su evidencia si se le conceden al cliente, y es deliberado: un avance
+-- que el cliente no puede auditar vuelve a ser un numero que alguien escribio. Puede
+-- ver el hito, su estado, y el documento que lo respalda. Lo que no ve es la factura
+-- del proveedor: esa la aparta la politica de fila de 'evidencia', porque lleva
+-- dentro el precio de compra.
+grant select on hito to nexus_cliente;
+grant select (id, hito_id, clase, huella, nombre, bytes, tipo_mime,
+              ocurrido_en, subida_en, verificada_en, rechazada_en)
+  on evidencia to nexus_cliente;
+
 -- La contabilidad no se concede en absoluto.
 revoke all on asiento, partida, cuenta, mapa_cuenta, periodo, retencion from nexus_cliente;

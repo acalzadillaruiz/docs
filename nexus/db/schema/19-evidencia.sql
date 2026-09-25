@@ -291,3 +291,97 @@ language sql stable as $$
   having coalesce(sum(valor) filter (where not respaldado), 0) > 0
    order by 5 desc
 $$;
+
+-- -----------------------------------------------------------------------------
+-- El estado del hito se DERIVA de su evidencia. No se teclea.
+--
+-- Dejar que alguien escriba 'verificado' a mano y que el disparador de arriba solo
+-- diga que no cuando falta algo, deja un hueco al reves: una evidencia rechazada
+-- despues de verificar el hito lo dejaria verificado para siempre. Aqui el estado
+-- se vuelve a calcular entero desde lo que hay, y puede BAJAR.
+create or replace function recalcular_hito(p_hito uuid) returns estado_hito
+language plpgsql security definer as $$
+declare
+  h        hito%rowtype;
+  completas int;
+  algunas   int;
+  nuevo    estado_hito;
+begin
+  if not es_interna() then
+    raise exception 'recalcular el estado de un hito es cosa de dentro';
+  end if;
+
+  select * into h from hito where id = p_hito;
+  if not found then raise exception 'el hito % no existe', p_hito; end if;
+
+  -- Un hito sin evidencia exigida es administrativo: lo marca una persona y no hay
+  -- nada que derivar.
+  if cardinality(h.exige) = 0 then return h.estado; end if;
+
+  select count(*) filter (where verificada), count(*) filter (where presente)
+    into completas, algunas
+    from (
+      select exists (select 1 from evidencia e
+                      where e.hito_id = h.id and e.clase = c
+                        and e.rechazada_en is null and e.verificada_en is not null) verificada,
+             exists (select 1 from evidencia e
+                      where e.hito_id = h.id and e.clase = c
+                        and e.rechazada_en is null) presente
+        from unnest(h.exige) c
+    ) t;
+
+  nuevo := case
+    when completas = cardinality(h.exige) then 'verificado'
+    when algunas   = cardinality(h.exige) then 'evidenciado'
+    when h.ocurrido_en is not null        then 'declarado'
+    else 'pendiente'
+  end;
+
+  if nuevo is distinct from h.estado then
+    update hito set estado = nuevo where id = h.id;
+  end if;
+  return nuevo;
+end $$;
+
+-- Lo que le falta a un hito para poder darse por bueno, dicho en una linea.
+-- La pantalla no tiene que averiguarlo: lo pregunta.
+create or replace function falta_al_hito(p_hito uuid) returns clase_evidencia[]
+language sql stable as $$
+  select array_agg(c order by c)
+    from hito h, unnest(h.exige) c
+   where h.id = p_hito
+     and not exists (select 1 from evidencia e
+                      where e.hito_id = h.id and e.clase = c
+                        and e.rechazada_en is null and e.verificada_en is not null)
+$$;
+
+-- -----------------------------------------------------------------------------
+-- Aislamiento. Los hitos y su evidencia siguen al contrato del que cuelgan.
+--
+-- El cliente SI ve los hitos y los documentos que los respaldan: ese es el sentido
+-- entero de esto. Un avance que el cliente no puede auditar vuelve a ser un numero
+-- que alguien escribio.
+--
+-- Con una excepcion que no se negocia: la FACTURA DEL PROVEEDOR. Es evidencia
+-- legitima de que el material se compro, y lleva dentro el precio de compra. El
+-- cliente no tiene por que ver el margen, asi que esa clase no sale de GPS.
+
+alter table hito      enable row level security;
+alter table evidencia enable row level security;
+
+create policy hito_vista on hito for select using (
+  exists (select 1 from renglon r where r.id = hito.renglon_id)
+);
+
+create policy hito_escritura on hito for all
+  using  (es_interna() and exists (select 1 from renglon r where r.id = hito.renglon_id))
+  with check (es_interna() and exists (select 1 from renglon r where r.id = hito.renglon_id));
+
+create policy evidencia_vista on evidencia for select using (
+  exists (select 1 from hito h where h.id = evidencia.hito_id)
+  and (es_interna() or clase <> 'factura')
+);
+
+create policy evidencia_escritura on evidencia for all
+  using  (es_interna() and exists (select 1 from hito h where h.id = evidencia.hito_id))
+  with check (es_interna() and exists (select 1 from hito h where h.id = evidencia.hito_id));
