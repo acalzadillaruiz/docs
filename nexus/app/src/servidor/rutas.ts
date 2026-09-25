@@ -22,11 +22,12 @@ import { pintarEntrada } from '../pantallas/entrada.ts'
 import { pintarCartera } from '../pantallas/cartera.ts'
 import { pintarContrato } from '../pantallas/contrato.ts'
 import { cartera } from '../dominio/cartera.ts'
+import { bandeja } from '../dominio/bandeja.ts'
 import { ficha, ContratoNoAlcanzable } from '../dominio/contrato.ts'
 import {
   hojaDeValuacion, cabeceraDeValuacion, objecionesDe, ValuacionNoAlcanzable,
 } from '../dominio/valuacion.ts'
-import { aprobar, objetar } from '../dominio/aprobacion.ts'
+import { aprobar, objetar, responder } from '../dominio/aprobacion.ts'
 import { testigoAnti, testigoAntiValido } from './csrf.ts'
 import { pintarValuacion } from '../pantallas/valuacion.ts'
 import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.ts'
@@ -171,7 +172,12 @@ export async function resolver(
     comoPersona<T>({ id: personaId }, esCliente ? 'nexus_cliente' : 'nexus_interno', f)
 
   if (p.ruta === '/') {
-    return html(200, pintarCartera(await comoQuien((q) => cartera(q, p.idioma)), p.idioma, esCliente))
+    const datos = await comoQuien(async (q) => ({
+      lista: await cartera(q, p.idioma),
+      // La bandeja solo tiene sentido desde dentro: es lo que espera a GPS.
+      pendientes: esCliente ? [] : await bandeja(q, p.idioma),
+    }))
+    return html(200, pintarCartera(datos.lista, p.idioma, esCliente, datos.pendientes))
   }
 
   const contrato = /^\/contratos\/([0-9a-f-]{36})$/.exec(p.ruta)
@@ -226,6 +232,18 @@ export async function resolver(
     }
   }
 
+  const responderObj = /^\/objeciones\/([0-9a-f-]{36})\/responder$/.exec(p.ruta)
+  if (responderObj && p.metodo === 'POST') {
+    if (!testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    const r = await comoQuien((q) =>
+      responder(q, responderObj[1]!, personaId, !esCliente, p.campos['respuesta'] ?? ''))
+    if (!r.hecho && r.motivo === 'no_alcanzable') return noEncontrado(p.idioma)
+    if (!r.hecho) return { codigo: 409, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    return aOtroSitio(destinoSeguro(p.campos['volver']))
+  }
+
   const decidir = /^\/valuaciones\/([0-9a-f-]{36})\/(aprobar|objetar)$/.exec(p.ruta)
   if (decidir && p.metodo === 'POST') {
     // Toda ruta que escribe exige el testigo antifalsificación. Va antes que nada:
@@ -248,6 +266,27 @@ export async function resolver(
   }
 
   return noEncontrado(p.idioma)
+}
+
+/**
+ * Adonde volver despues de escribir, saneado.
+ *
+ * Aceptar el destino tal cual seria una puerta abierta: bastaria con un formulario
+ * en otra web que mandara `volver=https://sitio-falso`, y el portal de GPS estaria
+ * mandando a sus propios clientes a una pagina de otro. Es la clase de fallo que
+ * convierte un dominio de confianza en el trampolin de quien lo ataca.
+ *
+ * Solo se aceptan rutas propias: una barra, y no dos —'//otro.sitio' el navegador
+ * lo entiende como una direccion completa— y sin dos puntos, que abririan esquemas
+ * como 'javascript:'.
+ */
+function destinoSeguro(pedido: string | undefined): string {
+  if (!pedido) return '/'
+  if (!pedido.startsWith('/')) return '/'
+  if (pedido.startsWith('//')) return '/'
+  if (pedido.includes(':')) return '/'
+  if (pedido.includes('\\')) return '/'
+  return pedido
 }
 
 /**

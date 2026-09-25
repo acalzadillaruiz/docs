@@ -160,3 +160,58 @@ test('el cliente tampoco alcanza a B contando: la cifra tiene que cuadrar con lo
     assert.equal(c.filter((x) => x.cliente === 'Operadora B').length, 0)
   })
 })
+
+// ---------------------------------------------------------------- la bandeja
+import { pintarCartera } from '../src/pantallas/cartera.ts'
+import type { Pendiente } from '../src/dominio/bandeja.ts'
+
+const PENDIENTE: Pendiente = {
+  clase: 'objecion',
+  valuacionId: '33333333-3333-3333-3333-333333333333',
+  contratoId: '44444444-4444-4444-4444-444444444444',
+  contrato: 'GPS-2026-001',
+  cliente: 'Operadora <A> & Cía',
+  titulo: 'Objeción sin responder',
+  detalle: 'El renglón 3 incluye 12 horas de grúa que no se ejecutaron.',
+  dias: 20,
+  importe: 'Bs 50.000,00',
+}
+
+test('la bandeja va dentro de la cartera, no en una pantalla aparte', () => {
+  // Una bandeja que hay que buscar no se mira, y una que no se mira no sirve:
+  // el cliente sigue escribiendo al vacío igual que antes.
+  const h = pintarCartera([], 'es', false, [PENDIENTE])
+  assert.match(h, /Te esperan a ti/)
+  assert.match(h, /12 horas de grúa/)
+  assert.match(h, /href="\/valuaciones\/33333333-3333-3333-3333-333333333333"/)
+})
+
+test('sin nada pendiente no queda un encabezado huérfano', () => {
+  // «No hay nada esperando» ocupa sitio y no informa.
+  const h = pintarCartera([], 'es', false, [])
+  assert.equal(h.includes('Te esperan a ti'), false)
+})
+
+test('el cliente nunca ve la bandeja: es lo que espera a GPS', () => {
+  const h = pintarCartera([], 'es', true, [PENDIENTE])
+  assert.equal(h.includes('Te esperan a ti'), false)
+})
+
+test('a partir de una semana se marca como urgente', () => {
+  const nuevo = pintarCartera([], 'es', false, [{ ...PENDIENTE, dias: 3 }])
+  assert.equal(nuevo.includes('class="pd urge"'), false)
+  const viejo = pintarCartera([], 'es', false, [{ ...PENDIENTE, dias: 7 }])
+  assert.match(viejo, /class="pd urge"/)
+})
+
+test('cero días se dice «hoy», no «0 días»', () => {
+  assert.match(pintarCartera([], 'es', false, [{ ...PENDIENTE, dias: 0 }]), />hoy</)
+  assert.match(pintarCartera([], 'en', false, [{ ...PENDIENTE, dias: 0 }]), />today</)
+  assert.match(pintarCartera([], 'es', false, [{ ...PENDIENTE, dias: 1 }]), />1 día</)
+})
+
+test('el nombre del cliente se escapa también en la bandeja', () => {
+  const h = pintarCartera([], 'es', false, [PENDIENTE])
+  assert.match(h, /Operadora &lt;A&gt; &amp; Cía/)
+  assert.equal(h.includes('<A>'), false)
+})

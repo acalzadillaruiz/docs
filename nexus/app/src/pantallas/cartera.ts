@@ -11,6 +11,8 @@
  */
 
 import type { ResumenContrato } from '../dominio/cartera.ts'
+import type { Pendiente } from '../dominio/bandeja.ts'
+import { pintarBandeja, ESTILOS_BANDEJA } from './bandeja.ts'
 import { traductor, type Idioma } from '../i18n/t.ts'
 
 const escapar = (s: string): string =>
@@ -50,7 +52,10 @@ const TEXTOS = {
 } as const
 
 export function pintarCartera(
-  contratos: readonly ResumenContrato[], idioma: Idioma, esCliente: boolean,
+  contratos: readonly ResumenContrato[],
+  idioma: Idioma,
+  esCliente: boolean,
+  pendientes: readonly Pendiente[] = [],
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -153,6 +158,7 @@ main{margin-top:-26px;padding-bottom:70px}
 .tarde{font-size:11.5px;color:var(--rj);font-weight:600}
 .plazo{font-size:11.5px;color:var(--md)}
 .nada{margin-top:30px;text-align:center;color:var(--ik2)}
+${ESTILOS_BANDEJA}
 @media(max-width:520px){
   .ct{padding:15px 15px}
   .pie{flex-direction:column;align-items:stretch;gap:10px}
@@ -164,6 +170,12 @@ main{margin-top:-26px;padding-bottom:70px}
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
 </div></header>
 <main class="wrap">
+${/*
+   * La segunda cerradura: la ruta ya no le pasa pendientes a un cliente, pero si
+   * algún día otro sitio llamara a esta función pasándoselos, la bandeja saldría.
+   * Aquí no sale, pase lo que pase. Una prueba lo comprueba llamándola a propósito
+   * con pendientes y esCliente a la vez.
+   */''}${pintarBandeja(esCliente ? [] : pendientes, idioma)}
 ${tarjetas}
 </main>
 </html>`

@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-24, 22:00 (España)
-**Avance:** 39 de 141 sesiones · **28%**
+**Avance:** 42 de 141 sesiones · **30%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -59,7 +59,7 @@ que al revés.
 ---
 
 **Las pruebas pasan.** `nexus/db/probar.sh` levanta un PostgreSQL desechable, carga el
-esquema entero, comprueba las ciento cuarenta reglas duras, el diccionario bilingüe y las ciento cuarenta y siete pruebas de la aplicación y revisa el diccionario
+esquema entero, comprueba las ciento cuarenta reglas duras, el diccionario bilingüe y las ciento sesenta y tres pruebas de la aplicación y revisa el diccionario
 bilingüe en la misma pasada. Ejecútalo antes de cada commit
 que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se rompió.
 
@@ -92,6 +92,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/pruebas/14-sesiones.sql` | Un atacante falla veinte veces contra un correo y **el dueño entra igual**. |
 | `db/pruebas/15-aprobacion.sql` · `app/pruebas/aprobacion.test.ts` | Quién puede objetar, qué no se factura, y dos aprobaciones simultáneas. |
 | `app/pruebas/contrato.test.ts` | Que el cliente no llegue al margen ni pidiéndolo, y que «no existe» y «no es tuyo» den el mismo error palabra por palabra. |
+| `app/pruebas/bandeja.test.ts` | Que aparezca la objeción con su motivo, que lo recién presentado **no** aparezca (eso espera al cliente), y que responder la vacíe. |
 | `app/pruebas/cartera.test.ts` | Que el avance salga del libro, que el orden ponga delante lo que espera, y que el cliente de A no alcance a B ni contando. |
 | `app/pruebas/rutas.test.ts` | El camino completo de la petición a la respuesta: que sin cookie todo redirija, que el testigo **solo** viaje en la cookie, y que salir cierre la sesión de verdad y no solo borre la cookie. |
 | `app/pruebas/cookies.test.ts` | Que una cookie con nombre parecido no se confunda con la nuestra, y que el idioma respete el orden de preferencia del navegador. |
@@ -133,6 +134,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/18-aprobacion.sql` | Objeciones con tabla propia. Un disparador impide que GPS objete su propia valuación, y otro impide **facturar con una objeción sin responder** — facturar algo que el cliente discutió por escrito es como se pierde una discusión antes de empezarla. El cliente recibe permiso de escritura por primera vez, y **solo sobre tres columnas**: con `update` a secas podría marcarse la valuación como cobrada. |
 | `app/src/dominio/aprobacion.ts` | Aprueba **el cliente, no GPS**: un acta que se firma uno mismo no vale nada. La condición del estado va **dentro** del `update`, no en un `if` de arriba: entre la consulta y la escritura cabe otra petición, y hay una prueba que lanza dos aprobaciones a la vez y comprueba que solo una gana. |
 | `app/src/servidor/csrf.ts` | Segunda cerradura contra peticiones cruzadas. `SameSite=Lax` ya basta en navegadores actuales, pero depende de que el navegador se porte bien. El testigo se deriva del de sesión con HMAC: quien no puede leer la cookie no puede calcularlo, así que no hay que guardarlo en ningún sitio. |
+| `app/src/dominio/bandeja.ts` · `pantallas/bandeja.ts` | **Lo que espera a GPS**, dentro de la cartera y no en una pantalla aparte: una bandeja que hay que buscar no se mira, y una que no se mira deja al cliente escribiendo al vacío igual que antes. Ordenada por **lo que lleva más tiempo parado**, no por importe: el daño de dejar a un cliente sin respuesta no es proporcional al dinero. |
 | `i18n/es.json` · `i18n/en.json` | 152 términos en los dos idiomas, incluido el vocabulario donde la palabra equivocada cambia el sentido: *valuación* → progress payment, *retención de garantía* → retention, *reacondicionamiento* → well workover, *colada* → heat number, *sustraendo* → deductible amount. |
 | `i18n/comprobar.py` | Falla si una clave existe en un idioma y no en el otro, si un texto está vacío, o si los dos idiomas dicen lo mismo (casi siempre un olvido). |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |

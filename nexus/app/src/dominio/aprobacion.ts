@@ -89,3 +89,35 @@ export async function objetar(
 }
 
 export { ValuacionNoAlcanzable }
+
+/**
+ * Responder una objeción. Es de dentro, y es lo que vuelve a poner la valuación en
+ * movimiento: mientras haya una sin responder, no se puede facturar.
+ *
+ * No borra la objeción ni la cambia: le añade la respuesta. El texto original del
+ * cliente se queda tal cual, porque el expediente es la conversación entera y no
+ * solo la última versión de quien tuvo la última palabra.
+ */
+export async function responder(
+  q: Consulta, objecionId: string, personaId: string, esInterna: boolean, respuesta: string,
+): Promise<Resultado> {
+  if (!esInterna) return { hecho: false, motivo: 'no_eres_el_cliente' }
+  if (respuesta.trim() === '') return { hecho: false, motivo: 'estado_equivocado' }
+
+  const filas = await q`
+    update objecion
+       set respuesta = ${respuesta}, respondida_en = now(), respondida_por = ${personaId}::uuid
+     where id = ${objecionId}::uuid
+       and respondida_en is null
+    returning id`
+  if (filas.length === 1) return { hecho: true }
+
+  // Puede ser que no exista, que no te corresponda, o que ya estuviera respondida.
+  // Se distingue solo lo último, que no cuenta nada de nadie.
+  const [existe] = (await q`
+    select respondida_en from objecion where id = ${objecionId}::uuid
+  `) as unknown as Array<{ respondida_en: Date | null }>
+  return existe
+    ? { hecho: false, motivo: 'estado_equivocado' }
+    : { hecho: false, motivo: 'no_alcanzable' }
+}

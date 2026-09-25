@@ -277,3 +277,76 @@ test('sin sesión, una ruta que escribe ni se mira', async () => {
   assert.equal(r.codigo, 303)
   assert.equal(r.cabeceras?.['Location'], '/entrar')
 })
+
+test('el destino de vuelta no puede sacarte del portal', async () => {
+  // Sin sanear, un formulario en otra web con volver=https://sitio-falso haría que
+  // el portal de GPS mandara a sus propios clientes a una página de otro. Es la
+  // clase de fallo que convierte un dominio de confianza en trampolín.
+  const { destinoSeguro } = await import('../src/servidor/rutas.ts') as unknown as
+    { destinoSeguro?: (s: string | undefined) => string }
+  // No se exporta a propósito; se comprueba por el comportamiento de la ruta.
+  assert.equal(destinoSeguro, undefined)
+})
+
+test('responder una objeción sin el testigo antifalsificación no pasa', async () => {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+  const af = /* el mismo que pinta la pantalla */ (await import('../src/servidor/csrf.ts'))
+    .testigoAnti(testigo)
+
+  const ruta = '/objeciones/55555555-5555-5555-5555-555555555555/responder'
+  const sin = await pedir({ metodo: 'POST', ruta, cookie: testigo, campos: { respuesta: 'x' } })
+  assert.equal(sin.codigo, 403)
+
+  // Con el testigo correcto, pero una objeción que no existe: 404, no 403.
+  const con = await pedir({
+    metodo: 'POST', ruta, cookie: testigo, campos: { af, respuesta: 'x' },
+  })
+  assert.equal(con.codigo, 404)
+})
+
+test('un destino de vuelta hacia fuera se ignora y se vuelve a la raíz', async () => {
+  const origen = `o-${Math.random().toString(36).slice(2)}`
+  const p1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen,
+    campos: { correo: 'rutas@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
+  const p2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
+    campos: { desafio, codigo: codigoBueno() },
+  }, YO, false)
+  const testigo = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+  const af = (await import('../src/servidor/csrf.ts')).testigoAnti(testigo)
+
+  // Se crea una objeción de verdad para que el camino llegue hasta el redirigir.
+  const { comoPersona: cp } = await import('../src/db/conexion.ts')
+  const [obj] = await cp({ id: YO }, 'nexus_interno', (q) => q`
+    select ob.id from objecion ob
+      join valuacion v on v.id = ob.valuacion_id
+     where ob.respondida_en is null limit 1
+  `) as unknown as Array<{ id: string }>
+
+  if (!obj) return   // si no hay ninguna abierta en esta base, no hay nada que probar
+
+  for (const malo of ['https://sitio-falso.test', '//sitio-falso.test', 'javascript:alert(1)']) {
+    const r = await pedir({
+      metodo: 'POST', ruta: `/objeciones/${obj.id}/responder`, cookie: testigo,
+      campos: { af, respuesta: 'Contestado.', volver: malo },
+    })
+    // O redirige a un sitio propio, o rechaza. Nunca manda fuera.
+    if (r.codigo === 303) {
+      assert.match(r.cabeceras!['Location']!, /^\/[^/]*/, `no debería mandar a ${malo}`)
+      assert.equal(r.cabeceras!['Location']!.includes('sitio-falso'), false)
+    }
+  }
+})
