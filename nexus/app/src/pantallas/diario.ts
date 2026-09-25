@@ -19,7 +19,9 @@ const TEXTOS = {
   en: { volver: 'Back to the portfolio', anio: 'Year', mes: 'Month', ver: 'View' },
 } as const
 
-export function pintarDiario(d: Diario, idioma: Idioma, antifalsificacion: string): string {
+export function pintarDiario(
+  d: Diario, idioma: Idioma, antifalsificacion: string, errores: readonly string[] = [],
+): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
   const mm = String(d.mes).padStart(2, '0')
@@ -51,6 +53,16 @@ export function pintarDiario(d: Diario, idioma: Idioma, antifalsificacion: strin
       </tr>`).join('')}
     </tbody>
   </table></div>
+  ${a.reversado || a.esReverso ? '' : `
+  <form method="post" action="/diario" class="rev">
+    <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
+    <input type="hidden" name="asiento" value="${escapar(a.id)}">
+    <input type="hidden" name="anio" value="${d.anio}">
+    <input type="hidden" name="mes" value="${d.mes}">
+    <label>${escapar(t('diario.motivo'))}
+      <input type="text" name="motivo" maxlength="160"></label>
+    <button type="submit">${escapar(t('diario.reversar'))}</button>
+  </form>`}
 </div>`
 
   return pagina({
@@ -63,6 +75,10 @@ export function pintarDiario(d: Diario, idioma: Idioma, antifalsificacion: strin
   <div class="sub">${escapar(t('diario.explica'))}</div>
 </div></header>`,
     cuerpo: `<main class="wrap">
+  ${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
+    errores.map((e) => `<li>${escapar(e)}</li>`).join('')
+  }</ul></div>`}
+
   ${d.cuadra ? '' : `<div class="aviso">
     <b>${escapar(t('diario.descuadre'))} ${escapar(d.descuadre)}</b>
     <p>${escapar(t('diario.descuadre_explica'))}</p>
@@ -83,12 +99,26 @@ export function pintarDiario(d: Diario, idioma: Idioma, antifalsificacion: strin
          <b>${escapar(d.total)}</b></div>
        ${d.apuntes.map(apunte).join('')}
        <p class="expl">${escapar(t('diario.tardanza_explica'))}</p>
-       <p class="expl">${escapar(t('diario.reversado_explica'))}</p>`}
+       <p class="expl">${escapar(t('diario.reversado_explica'))}</p>
+       <p class="expl">${escapar(t('diario.reversar_explica'))}</p>`}
 </main>`,
   })
 }
 
 export const ESTILOS_DIARIO = `
+/* El reverso se pide con su motivo en la misma linea y sin ceremonia, pero discreto:
+   no es una accion de todos los dias, y un boton grande invita a usarlo como si lo
+   fuera. Solo sale en los asientos que se pueden reversar. */
+.rev{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;
+  padding-top:10px;border-top:1px dashed var(--ln)}
+.rev label{flex:1;min-width:180px;font-family:"JetBrains Mono",monospace;font-size:9px;
+  font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--md)}
+.rev input{display:block;margin-top:4px;width:100%;font:inherit;font-size:13px;
+  padding:6px 9px;border:1px solid var(--ln2);border-radius:8px;background:var(--cd);
+  color:var(--ik)}
+.rev button{font:inherit;font-size:13px;font-weight:650;padding:7px 14px;
+  border:1px solid var(--ln2);border-radius:8px;background:transparent;color:var(--ik2);
+  cursor:pointer}
 .sel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:18px 0 6px}
 .sel label{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;
   letter-spacing:.13em;text-transform:uppercase;color:var(--md)}

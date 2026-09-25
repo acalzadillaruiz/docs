@@ -667,5 +667,12 @@
   "pago.error.factura": "Esa factura de proveedor no existe",
   "pago.error.tasa": "No hay tasa del BCV publicada para esa fecha",
   "pago.error.excede": "El pago excede lo que se debe de esa factura: quedan {n}",
-  "pago.error.periodo": "Ese mes no tiene su periodo contable abierto"
+  "pago.error.periodo": "Ese mes no tiene su periodo contable abierto",
+  "diario.reversar": "Reversar este asiento",
+  "diario.motivo": "Motivo del reverso",
+  "diario.reversar_explica": "Reversar escribe otro asiento igual y contrario EN EL MES DEL ORIGINAL, no en el de hoy: el hecho ocurrió cuando ocurrió. Si ese mes está cerrado, hay que abrirlo antes.",
+  "diario.error.motivo": "El reverso necesita un motivo escrito: uno sin motivo, leído dentro de dos años, no se distingue de un error",
+  "diario.error.no_existe": "Ese asiento no existe",
+  "diario.error.ya": "Ese asiento ya fue reversado",
+  "diario.error.cerrado": "El mes de ese asiento está cerrado. Ábrelo antes de reversar."
 }

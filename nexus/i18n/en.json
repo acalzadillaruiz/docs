@@ -667,5 +667,12 @@
   "pago.error.factura": "That supplier invoice does not exist",
   "pago.error.tasa": "There is no central bank rate published for that date",
   "pago.error.excede": "The payment is more than is owed on that invoice: {n} left",
-  "pago.error.periodo": "That month does not have its accounting period open"
+  "pago.error.periodo": "That month does not have its accounting period open",
+  "diario.reversar": "Reverse this entry",
+  "diario.motivo": "Reason for the reversal",
+  "diario.reversar_explica": "Reversing writes an equal and opposite entry IN THE ORIGINAL'S MONTH, not today's: the event happened when it happened. If that month is closed, it has to be reopened first.",
+  "diario.error.motivo": "The reversal needs a written reason: one without a reason, read two years from now, is indistinguishable from a mistake",
+  "diario.error.no_existe": "That entry does not exist",
+  "diario.error.ya": "That entry has already been reversed",
+  "diario.error.cerrado": "The month of that entry is closed. Reopen it before reversing."
 }

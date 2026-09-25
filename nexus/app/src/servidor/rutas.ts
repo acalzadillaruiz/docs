@@ -75,7 +75,7 @@ import { mes as mesGerencia } from '../dominio/gerencia.ts'
 import { pintarGerencia } from '../pantallas/gerencia.ts'
 import { estados } from '../dominio/estados.ts'
 import { pintarEstados } from '../pantallas/estados.ts'
-import { diario } from '../dominio/diario.ts'
+import { diario, reversar } from '../dominio/diario.ts'
 import { pintarDiario } from '../pantallas/diario.ts'
 import { mayor } from '../dominio/mayor.ts'
 import { pintarMayor } from '../pantallas/mayor.ts'
@@ -813,7 +813,10 @@ export async function resolver(
   }
 
   // El libro diario: donde termina de abrirse cualquier cifra del sistema.
-  if (p.ruta === '/diario' && p.metodo === 'GET') {
+  if (p.ruta === '/diario' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
     if (esCliente) return noEncontrado(p.idioma)
     const [org] = (await dentro((q) => q`
       select organizacion_id from persona where id = ${personaId}::uuid
@@ -823,8 +826,19 @@ export async function resolver(
     const cuando = anioMes(p)
     const anio = cuando?.anio ?? hoy.getUTCFullYear()
     const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
+
+    // Reversar es lo unico que se ESCRIBE desde el diario. Todo el sistema dice
+    // «registra su reverso» y hasta ahora no habia ni un sitio donde registrarlo.
+    let errores: readonly string[] = []
+    if (p.metodo === 'POST') {
+      const r = await comoQuien((q) => reversar(q, org!.organizacion_id,
+        (p.campos['asiento'] ?? '').trim(), p.campos['motivo'] ?? '', personaId, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    }
+
     const d = await comoQuien((q) => diario(q, org!.organizacion_id, anio, mes, p.idioma))
-    return html(200, pintarDiario(d, p.idioma, testigoAnti(testigo)))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarDiario(d, p.idioma, testigoAnti(testigo), errores))
   }
 
   // Los estados contables: el balance que pide un banco, el detalle donde mira un

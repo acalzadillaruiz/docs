@@ -1,12 +1,25 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-25, 13:40 (España)
-**Avance:** 133 de 141 sesiones · **94%**
+**Última actualización:** 2026-09-25, 14:25 (España)
+**Avance:** 134 de 141 sesiones · **95%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **pagar una factura de proveedor**, que era el agujero más
+**Lo último terminado:** **reversar un asiento desde el diario.** Todo el sistema
+dice «un asiento no se modifica ni se borra: registra su reverso» — y **no había ni
+un solo sitio donde registrarlo**. La instrucción era correcta y el camino no
+existía, que es la peor combinación posible: quien la seguía al pie de la letra se
+quedaba encallado. Es el mismo fallo que el de «para rehacerlo, reversa su asiento»
+de ayer, y por eso queda escrito como regla: **cuando una pantalla manda hacer algo,
+hay que ir a comprobar que ese algo se puede hacer desde alguna parte.**
+
+El motivo es obligatorio y va dentro de la descripción del reverso: uno sin motivo,
+leído dentro de dos años, no se distingue de un error. Y el reverso se escribe **en
+el mes del original**, no en el de hoy —el hecho ocurrió cuando ocurrió—, con la
+consecuencia dicha antes de pulsar: si ese mes está cerrado, hay que abrirlo.
+
+**Antes:** **pagar una factura de proveedor**, que era el agujero más
 grande que quedaba: estaban la tabla `pago` y el generador `asentar_pago`, y **no
 había forma de llegar a ellos desde ninguna pantalla**. Entraban facturas y no salía
 nunca un pago, así que el saldo de proveedores crecía para siempre y no era el de
@@ -207,7 +220,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**903 comprobaciones** (250 de SQL y diccionario + 653 de TypeScript), todas pasando.
+**910 comprobaciones** (250 de SQL y diccionario + 660 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -317,6 +330,11 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Una pantalla que manda hacer algo tiene que poder hacerlo.** «Registra su
+  reverso» y «para rehacerlo, reversa su asiento» eran las dos ciertas y las dos sin
+  camino. Al escribir una instrucción en pantalla, ir y comprobar que existe el sitio
+  donde se cumple.
 
 - **Un `try/catch` alrededor de una consulta no sirve dentro de una transacción.** La
   excepción de PostgreSQL la aborta entera, y `postgres.js` la vuelve a lanzar al

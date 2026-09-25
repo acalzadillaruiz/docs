@@ -19,7 +19,7 @@
  */
 
 import type { Consulta } from '../db/conexion.ts'
-import { moneda, fecha as fechaF, type Idioma } from '../i18n/t.ts'
+import { moneda, fecha as fechaF, t, type Idioma } from '../i18n/t.ts'
 
 export type Movimiento = {
   readonly linea: number
@@ -128,4 +128,54 @@ export async function diario(
     descuadre: moneda(idioma, suma, 'VES'),
     cuadra: Math.abs(suma) < 0.005,
   }
+}
+
+export type Reversado =
+  | { readonly hecho: true; readonly id: string }
+  | { readonly hecho: false; readonly motivo: string }
+
+/**
+ * Reversar un asiento desde el diario.
+ *
+ * Todo el sistema dice «un asiento no se modifica ni se borra: registra su reverso»
+ * — y hasta ahora no había ni un solo sitio donde registrarlo. La instrucción era
+ * correcta y el camino no existía, que es la peor combinación: quien la seguía al
+ * pie de la letra se quedaba encallado.
+ *
+ * El motivo es obligatorio y va dentro de la descripción del reverso. Un reverso sin
+ * motivo, leído dentro de dos años, es indistinguible de un error.
+ *
+ * El reverso se escribe **en el mes del asiento original**, no en el de hoy: es lo
+ * correcto —el hecho ocurrió cuando ocurrió— y trae una consecuencia que hay que
+ * decir antes de pulsar: si ese mes está cerrado, no entra.
+ */
+export async function reversar(
+  q: Consulta, orgId: string, asientoId: string, motivo: string,
+  personaId: string, idioma: Idioma,
+): Promise<Reversado> {
+  if (motivo.trim().length < 3) return { hecho: false, motivo: t(idioma, 'diario.error.motivo') }
+  if (!/^[0-9a-f-]{36}$/i.test(asientoId)) {
+    return { hecho: false, motivo: t(idioma, 'diario.error.no_existe') }
+  }
+
+  const [a] = (await q`
+    select a.anio, a.mes,
+           exists (select 1 from asiento r where r.reversa_a = a.id) as reversado
+      from asiento a
+     where a.id = ${asientoId}::uuid and a.organizacion_id = ${orgId}::uuid
+  `) as unknown as Array<{ anio: number; mes: number; reversado: boolean }>
+  if (!a) return { hecho: false, motivo: t(idioma, 'diario.error.no_existe') }
+  if (a.reversado) return { hecho: false, motivo: t(idioma, 'diario.error.ya') }
+
+  const [p] = (await q`
+    select 1 as x from periodo
+     where organizacion_id = ${orgId}::uuid and anio = ${a.anio} and mes = ${a.mes}
+       and estado = 'abierto'
+  `) as unknown as Array<{ x: number }>
+  if (!p) return { hecho: false, motivo: t(idioma, 'diario.error.cerrado') }
+
+  const [r] = (await q`
+    select reversar_asiento(${asientoId}::uuid, ${personaId}::uuid, ${motivo.trim()}) as id
+  `) as unknown as Array<{ id: string }>
+  return { hecho: true, id: r!.id }
 }

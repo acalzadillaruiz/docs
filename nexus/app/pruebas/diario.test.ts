@@ -13,7 +13,8 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
-import { diario } from '../src/dominio/diario.ts'
+import { randomUUID } from 'node:crypto'
+import { diario, reversar } from '../src/dominio/diario.ts'
 import { pintarDiario } from '../src/pantallas/diario.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
@@ -143,4 +144,113 @@ test('la pantalla sale entera en los dos idiomas', async () => {
   assert.match(h, /Recorded/)
   assert.doesNotMatch(h, /Libro diario/)
   assert.doesNotMatch(h, /undefined/)
+})
+
+/**
+ * Reversar desde el diario.
+ *
+ * Todo el sistema dice «un asiento no se modifica ni se borra: registra su reverso»
+ * — y hasta ahora no había un solo sitio donde registrarlo. La instrucción era
+ * correcta y el camino no existía, que es la peor combinación posible: quien la
+ * seguía al pie de la letra se quedaba encallado.
+ */
+
+/** Un asiento nuevo y virgen, para poder reversarlo sin depender de otra prueba. */
+async function asientoSuelto(mes: number, dia: string): Promise<string> {
+  const id = randomUUID()
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`
+      insert into asiento (id, organizacion_id, numero, ocurrido_en, anio, mes,
+                           descripcion_es, descripcion_en, origen_tipo, origen_id, creado_por)
+      values (${id}::uuid, ${G}::uuid, siguiente_asiento(${G}::uuid), ${dia}::date,
+              2026, ${mes}, 'Suelto para reversar','Loose entry','aporte',
+              ${id}::uuid, ${YO}::uuid)`
+    await q`
+      insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves,
+                           monto_usd, tasa_id) values
+        (${id}::uuid, 1, ${G}::uuid,'5.2.01', 50000.00, 909.09, ${TASA}::uuid),
+        (${id}::uuid, 2, ${G}::uuid,'1.1.01.02', -50000.00, -909.09, ${TASA}::uuid)`
+  })
+  return id
+}
+
+test('reversar escribe el contrario y deja los dos en el libro', async () => {
+  // Un asiento no se borra: el error también es un hecho que ocurrió.
+  const a = await asientoSuelto(12, '2026-12-18')
+  const r = await dentro((q) => reversar(q, G, a, 'estaba en la cuenta equivocada', YO, 'es'))
+  assert.equal(r.hecho, true)
+
+  const [p] = (await dentro((q) => q`
+    select coalesce(sum(monto_ves), 0)::text as suma,
+           count(*)::int as lineas
+      from partida where asiento_id = ${(r as { id: string }).id}::uuid
+  `)) as unknown as Array<{ suma: string; lineas: number }>
+  assert.equal(p!.lineas, 2)
+  assert.equal(Number(p!.suma), 0)
+
+  const d = await dentro((q) => diario(q, G, 2026, 12, 'es'))
+  const original = d.apuntes.find((x) => x.id === a)!
+  assert.equal(original.reversado, true)
+  const reverso = d.apuntes.find((x) => x.id === (r as { id: string }).id)!
+  assert.equal(reverso.esReverso, true)
+  assert.match(reverso.descripcion, /cuenta equivocada/)
+})
+
+test('el mes sigue cuadrando después de reversar', async () => {
+  const d = await dentro((q) => diario(q, G, 2026, 12, 'es'))
+  assert.equal(d.cuadra, true, `descuadre de ${d.descuadre}`)
+})
+
+test('un reverso SIN motivo no pasa: dentro de dos años no se distingue de un error', async () => {
+  const a = await asientoSuelto(12, '2026-12-19')
+  for (const motivo of ['', '   ', 'ok']) {
+    const r = await dentro((q) => reversar(q, G, a, motivo, YO, 'es'))
+    assert.equal(r.hecho, false, `«${motivo}» no puede valer como motivo`)
+  }
+})
+
+test('el mismo asiento no se reversa dos veces', async () => {
+  const a = await asientoSuelto(12, '2026-12-20')
+  assert.equal((await dentro((q) => reversar(q, G, a, 'la primera vez', YO, 'es'))).hecho, true)
+  const otra = await dentro((q) => reversar(q, G, a, 'la segunda', YO, 'es'))
+  assert.equal(otra.hecho, false)
+  assert.match((otra as { motivo: string }).motivo, /ya fue reversado/)
+})
+
+test('en un mes cerrado se dice ANTES, no con un error de la base de datos', async () => {
+  // El reverso se escribe en el mes del original, no en el de hoy. Si ese mes está
+  // cerrado no entra, y eso hay que decirlo con palabras y no con una excepción.
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`insert into periodo (organizacion_id, anio, mes, estado)
+            values (${G}::uuid, 2026, 11, 'abierto') on conflict do nothing`
+  })
+  const a = await asientoSuelto(11, '2026-11-14')
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`update periodo set estado = 'cerrado'
+             where organizacion_id = ${G}::uuid and anio = 2026 and mes = 11`
+  })
+
+  const r = await dentro((q) => reversar(q, G, a, 'se coló en un mes cerrado', YO, 'es'))
+  assert.equal(r.hecho, false)
+  assert.match((r as { motivo: string }).motivo, /cerrado/)
+})
+
+test('un asiento que no existe se contesta sin tocar la base de datos', async () => {
+  for (const id of ['no-soy-un-id', '00000000-0000-0000-0000-000000000000']) {
+    const r = await dentro((q) => reversar(q, G, id, 'da igual el motivo', YO, 'es'))
+    assert.equal(r.hecho, false)
+  }
+})
+
+test('la pantalla ofrece reversar solo donde se puede', async () => {
+  const d = await dentro((q) => diario(q, G, 2026, 12, 'es'))
+  const h = pintarDiario(d, 'es', 'af')
+  const formularios = (h.match(/class="rev"/g) ?? []).length
+  const reversables = d.apuntes.filter((a) => !a.reversado && !a.esReverso).length
+  assert.ok(reversables > 0, 'sin asientos reversables esta prueba no comprobaría nada')
+  assert.equal(formularios, reversables)
+  assert.equal(h.includes('‹falta:'), false)
 })
