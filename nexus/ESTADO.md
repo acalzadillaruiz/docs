@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 10:00 (España)
-**Avance:** 98 de 141 sesiones · **70%**
+**Avance:** 101 de 141 sesiones · **72%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -15,19 +15,21 @@ aplicación, que es lo que desbloquea el día 1 de cada mes. Y **la factura fisc
 valuación aprobada, con su correlativo puesto por la base de datos. Y **las notas de crédito y débito**, con su
 pantalla: una factura emitida no se toca, se corrige con una nota que deja las dos en
 el libro. Y **la comprobación de firma del testigo de
-identidad**, que es la mitad de SSO que faltaba. Commit `9dd1984`. **636 comprobaciones.**
+identidad**, que es la mitad de SSO que faltaba. Y **el camino entero de entrar con la cuenta
+de la empresa**, probado con testigos firmados de verdad. Commit `d38cc16`. **650 comprobaciones.**
 
 Avisado al CEO el **50%**: https://claude.ai/artifact/KtMi19FhnUhEDL5oB4V98a
 La pantalla del avance: https://claude.ai/artifact/NCjF1TxP2faaEAz5vHJ43K
 
 **Lo siguiente, en este orden exacto:**
 
-1. **Cerrar el SSO: las dos rutas.** La comprobación de firma (`servidor/jwks.ts`) y la
-   de afirmaciones (`dominio/empresa.ts`) están hechas y probadas. Falta:
-   `GET /entrar/empresa` (guarda estado y nonce, manda al proveedor) y
-   `GET /entrar/empresa/vuelta` (recibe el código, lo cambia por el testigo, comprueba
-   firma y afirmaciones, y abre la sesión). La configuración por organización ya existe
-   en `organizacion.metodos` e `idp_tenant`.
+1. **Las dos rutas HTTP del SSO, y el cambio de código por testigo.** `dominio/sso.ts`
+   ya hace el camino entero y está probado con testigos firmados de verdad; lo que falta
+   es fino y concreto: `GET /entrar/empresa` y `GET /entrar/empresa/vuelta` en
+   `rutas.ts`, el `Cambiador` real (un POST al proveedor con el `client_secret`, que
+   sale de una variable de entorno), y el botón en la pantalla de entrada. El
+   `Cambiador` y el verificador se pasan desde fuera **a propósito**, para poder probar
+   todo lo demás sin red.
 2. **Caja chica y lo que falta de contabilidad**, que depende de las ocho respuestas
    del CEO (https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs — **sin contestar**).
 3. **Los avisos, en marcha de verdad.** La cola se llena y nadie la vacía si no se
@@ -57,7 +59,7 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 ```
 
 **Nunca se añade código sin su prueba en la misma sesión.** Ese es el motivo de que
-636 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
+650 comprobaciones hayan encontrado veintisiete fallos reales, veinticuatro de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
 
@@ -226,6 +228,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `db/schema/24-facturar.sql` (notas) | Notas de crédito y débito. **Una factura emitida no se modifica y no se borra:** ya estaba declarada, ya la tiene el cliente y ya lleva su número de control. Se corrige con una nota que apunta a ella y deja las dos en el libro — dentro de dos años hay que poder explicar por qué el importe cambió, y una factura reescrita no explica nada. La de crédito **resta** y la de débito **suma**: confundirlas invierte el signo de la declaración del mes. |
 | `db/schema/24-facturar.sql` | Emitir la factura. **El correlativo lo pone la base de datos**, con un bloqueo sobre la organización: dos personas facturando a la vez esperan una a la otra en vez de sacar el mismo número — que es lo que pasa el día que dos personas cierran el mes. Y **no genera otro asiento**: la cuenta por cobrar ya nació con la valuación, así que un asiento aquí duplicaría el ingreso. |
 | `app/src/servidor/jwks.ts` | La firma del testigo de identidad: **lo único que separa «entrar con la cuenta de la empresa» de «entrar diciendo que eres quien quieras»**. Solo RS256, decidido por quien verifica y no por quien firma — aceptar el algoritmo que venga dentro es el ataque clásico contra JWT. La clave se busca por su `kid`, y el juego de claves se guarda un rato pero **se vuelve a pedir ante un `kid` desconocido**: los proveedores rotan sin avisar. |
+| `db/schema/25-sso.sql` · `app/src/dominio/sso.ts` | Entrar con la cuenta de la empresa. **El motivo entero: cuando la operadora da de baja al ingeniero, pierde el acceso el mismo día**, sin que nadie de GPS se acuerde. El estado y el nonce viven en la base de datos y **se queman al usarse** — en una cookie, quien pueda escribirla elige el nonce, y elegir el nonce es reutilizar un testigo viejo. La empresa se busca **por la persona**, no por el dominio del correo. Y no se crea la persona sola: tener cuenta en Microsoft no es tener acceso a este contrato. |
 | `db/probar.sh` | Lanza todo lo anterior contra un PostgreSQL desechable, y el diccionario en la misma pasada. |
 
 ### Lo que las pruebas demuestran hoy
@@ -474,6 +477,12 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | 241 | Cambiar una coma del cuerpo invalida la firma; otra clave RSA tampoco vale. |
 | 242 | El juego de claves se guarda, y **se vuelve a pedir ante un `kid` nuevo**. |
 | 243 | El error de firma **no lleva el testigo dentro**. |
+| 244 | La petición **se quema**: la misma vuelta dos veces no abre dos sesiones. |
+| 245 | Una petición inexistente, una usada y una caducada **responden igual**. |
+| 246 | Un testigo con otro nonce, de otro inquilino, caducado o firmado por otro **no entra**. |
+| 247 | Un correo sin verificar no entra: puede ser el de otra persona. |
+| 248 | Quien no tiene cuenta aquí **no se crea solo**, y **quien está de baja no entra**. |
+| 249 | La huella del sujeto manda sobre el correo: cambiar de correo sigue siendo la misma persona. |
 
 ## Lo que sigue
 
