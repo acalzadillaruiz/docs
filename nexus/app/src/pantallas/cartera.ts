@@ -108,7 +108,15 @@ export function pintarCartera(
     idioma,
     titulo,
     estilos: `
-.hd .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:14px}
+/* Los enlaces se fueron añadiendo de uno en uno —medidas, alta, importar,
+   proveedores, equipos, reexpresión, libros, banco, meses, perfil— y la fila nunca
+   se partía: en un teléfono la cabecera medía 1077 px sobre una pantalla de 360, y
+   había que arrastrar la página de lado en LO PRIMERO que se ve al entrar. No se
+   notó en dos meses porque las pruebas leían el HTML sin dibujarlo. Ahora se dibuja
+   de verdad, y por eso esto envuelve. */
+.hd .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:10px 14px;
+  flex-wrap:wrap}
+.menu{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 0;min-width:0}
 .hd h1{margin:0;font-size:clamp(23px,5.4vw,32px);font-weight:800;letter-spacing:-.035em}
 .hd form{margin:0}
 .hd button{background:none;border:0;color:#A2B7C9;font:inherit;font-size:14px;
@@ -147,11 +155,12 @@ ${ESTILOS_AVANCE}
 /* El enlace a las medidas va en la cabecera y no en un menú: un cuadro de mando al
    que hay que navegar se mira el día que se instala y nunca más. */
 .medidas{display:inline-block;margin-right:14px;color:#A2B7C9;text-decoration:none;
-  font-size:13.5px;font-weight:600}
+  font-size:13.5px;font-weight:600;padding:5px 0}
 .medidas:hover{color:#E9F0F6}
 `,
     cabecera: `<header class="hd"><div class="wrap">
   <h1>${escapar(titulo)}</h1>
+  <nav class="menu">
   ${esCliente ? '' : `<a class="medidas" href="/medidas">${escapar(t('medida.titulo'))} →</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/contratos/nuevo">${escapar(t('alta.nuevo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/importar">${escapar(t('importar.titulo'))}</a>`}
@@ -163,6 +172,7 @@ ${ESTILOS_AVANCE}
   ${esCliente ? '' : `<a class="medidas" href="/periodos">${escapar(t('periodo.titulo'))}</a>`}
   <a class="medidas" href="/perfil">${escapar(t('perfil.titulo'))}</a>
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
+  </nav>
 </div></header>`,
     cuerpo: `<main class="wrap">
 ${/*
