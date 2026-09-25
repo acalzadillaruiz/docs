@@ -82,7 +82,28 @@ const ESTADO: Record<string, Clave> = {
  * de eso lo que lleva más tiempo esperando. Una lista ordenada por código obliga a
  * leerla entera para encontrar lo que importa.
  */
-export async function cartera(q: Consulta, idioma: Idioma): Promise<readonly ResumenContrato[]> {
+/**
+ * Cuántos contratos se enseñan de una vez.
+ *
+ * Medido, no opinado: con mil contratos dentro, la cartera pesaba **514 KB** porque
+ * los listaba todos. Eso en un teléfono, con datos venezolanos, es medio minuto de
+ * espera para ver el primero. De cincuenta en cincuenta son 26 KB.
+ *
+ * Y no se recorta en silencio: se dice cuántos hay y se puede pasar a los
+ * siguientes. Una lista recortada sin decirlo hace que alguien crea que ha visto
+ * todos sus contratos.
+ */
+export const POR_PAGINA = 50
+
+/** Cuántos contratos ve quien pregunta. Lo filtran las políticas de fila, no esto. */
+export async function cuantosContratos(q: Consulta): Promise<number> {
+  const [n] = (await q`select count(*)::int as n from contrato`) as unknown as Array<{ n: number }>
+  return Number(n?.n ?? 0)
+}
+
+export async function cartera(
+  q: Consulta, idioma: Idioma, desde = 0, cuantos = POR_PAGINA,
+): Promise<readonly ResumenContrato[]> {
   const filas = (await q`
     with v as (
       select contrato_id,
@@ -115,6 +136,7 @@ export async function cartera(q: Consulta, idioma: Idioma): Promise<readonly Res
      order by (coalesce(v.por_aprobar, 0) > 0) desc,
               coalesce(v.desde_aprobar, current_date) asc,
               c.codigo
+     limit ${Math.max(1, Math.min(500, cuantos))} offset ${Math.max(0, desde)}
   `) as unknown as Fila[]
 
   return filas.map((f): ResumenContrato => {

@@ -687,5 +687,8 @@
   "subir.error.sin_archivo": "No file arrived. Choose it before uploading.",
   "subir.error.tipo": "That file type is not accepted as evidence: a PDF, a photo or a spreadsheet is.",
   "subir.error.clase": "You have to say what kind of document it is: a report, an invoice, a certificate…",
-  "subir.error.vacio": "That file is empty: zero bytes. It backs nothing up."
+  "subir.error.vacio": "That file is empty: zero bytes. It backs nothing up.",
+  "cartera.rango": "Contracts {a} to {b} of {n}",
+  "cartera.anteriores": "Previous",
+  "cartera.siguientes": "Next"
 }

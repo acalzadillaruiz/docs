@@ -687,5 +687,8 @@
   "subir.error.sin_archivo": "No llegó ningún archivo. Elígelo antes de subirlo.",
   "subir.error.tipo": "Ese tipo de archivo no se acepta como evidencia: un PDF, una foto o una hoja de cálculo sí.",
   "subir.error.clase": "Hay que decir qué clase de papel es: un acta, una factura, un certificado…",
-  "subir.error.vacio": "Ese archivo está vacío: cero bytes. No respalda nada."
+  "subir.error.vacio": "Ese archivo está vacío: cero bytes. No respalda nada.",
+  "cartera.rango": "Contratos {a} a {b} de {n}",
+  "cartera.anteriores": "Anteriores",
+  "cartera.siguientes": "Siguientes"
 }

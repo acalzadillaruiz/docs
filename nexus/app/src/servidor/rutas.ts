@@ -24,7 +24,7 @@ import { Claves, verificarFirma, partes, traerPorLaRed } from './jwks.ts'
 import { pintarEntrada } from '../pantallas/entrada.ts'
 import { pintarCartera } from '../pantallas/cartera.ts'
 import { pintarContrato } from '../pantallas/contrato.ts'
-import { cartera } from '../dominio/cartera.ts'
+import { cartera, cuantosContratos } from '../dominio/cartera.ts'
 import { bandeja } from '../dominio/bandeja.ts'
 import { ficha, ContratoNoAlcanzable } from '../dominio/contrato.ts'
 import {
@@ -330,8 +330,13 @@ export async function resolver(
     comoPersona<T>({ id: personaId }, esCliente ? 'nexus_cliente' : 'nexus_interno', f)
 
   if (p.ruta === '/') {
+    // De cincuenta en cincuenta. Con mil contratos dentro esta pagina pesaba 514 KB
+    // —medido— y es lo primero que se abre, muchas veces desde un telefono.
+    const pedido = entero(p.campos['desde'])
+    const desde = pedido !== null && pedido >= 0 ? pedido : 0
     const datos = await comoQuien(async (q) => ({
-      lista: await cartera(q, p.idioma),
+      lista: await cartera(q, p.idioma, desde),
+      total: await cuantosContratos(q),
       // La bandeja solo tiene sentido desde dentro: es lo que espera a GPS.
       pendientes: esCliente ? [] : await bandeja(q, p.idioma),
       // Revisar es de GPS. Al cliente no se le pide ni se le enseña.
@@ -339,6 +344,7 @@ export async function resolver(
     }))
     return html(200, pintarCartera(
       datos.lista, p.idioma, esCliente, datos.pendientes, datos.cola,
+      { desde, total: datos.total },
     ))
   }
 

@@ -9,7 +9,7 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
-import { cartera } from '../src/dominio/cartera.ts'
+import { cartera, cuantosContratos, POR_PAGINA } from '../src/dominio/cartera.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = '1a2b3c4d-0000-0000-0000-00000000000a'   // GPS
@@ -243,4 +243,50 @@ test('los días que algo lleva esperando NUNCA son negativos', async () => {
   }
   // Sin esto la prueba pasaría aunque no hubiera ni un contrato esperando.
   assert.ok(mirados > 0, 'no se miró ningún contrato en espera')
+})
+
+test('la cartera va de cincuenta en cincuenta, y DICE cuántos hay', async () => {
+  // Con mil contratos dentro esta página pesaba 514 KB —medido con
+  // herramientas/medir.ts— y es lo primero que se abre, muchas veces desde un
+  // teléfono con datos venezolanos.
+  //
+  // Recortar sin decirlo sería peor que no recortar: alguien con sesenta contratos
+  // creería que ha visto los suyos. Por eso se dice cuántos hay y se puede pasar.
+  const cuantos = 55
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    for (let i = 0; i < cuantos; i++) {
+      await q`
+        insert into contrato (organizacion_id, cliente_id, codigo, tipo, titulo_es,
+                              titulo_en, estado, moneda, monto, tasa_id, creado_por)
+        values (${G}::uuid, ${A}::uuid, ${`PAG-${String(i).padStart(3, '0')}`},
+                'servicio','Relleno','Filler','vigente','VES', 100000, ${TASA}::uuid,
+                ${YO}::uuid)
+        on conflict (organizacion_id, codigo) do nothing`
+    }
+  })
+
+  const total = await dentro((q) => cuantosContratos(q))
+  assert.ok(total > POR_PAGINA, `sin más de ${POR_PAGINA} contratos esto no comprobaría nada`)
+
+  const primera = await dentro((q) => cartera(q, 'es'))
+  assert.equal(primera.length, POR_PAGINA)
+
+  const segunda = await dentro((q) => cartera(q, 'es', POR_PAGINA))
+  assert.ok(segunda.length > 0, 'la segunda página tiene que traer los que faltan')
+  // Y no repite: un contrato en las dos páginas es un contrato que se cuenta dos veces.
+  const codigos = new Set(primera.map((c) => c.codigo))
+  assert.equal(segunda.some((c) => codigos.has(c.codigo)), false)
+
+  const h = pintarCartera(primera, 'es', false, [], [], { desde: 0, total })
+  assert.match(h, new RegExp(`de ${total}`))
+  assert.match(h, /href="\/\?desde=50"/)
+  assert.equal(h.includes('‹falta:'), false)
+
+  // En la última página no se ofrece «siguientes»: un enlace que lleva a una lista
+  // vacía hace dudar de si se ha perdido algo.
+  const ultima = pintarCartera(segunda, 'es', false, [], [],
+    { desde: POR_PAGINA, total })
+  assert.equal(/desde=\d+">Siguientes/.test(ultima), false)
+  assert.match(ultima, /desde=0/)
 })

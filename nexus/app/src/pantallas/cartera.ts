@@ -10,7 +10,7 @@
  * lo bonito de enseñar y lo que menos ayuda.
  */
 
-import type { ResumenContrato } from '../dominio/cartera.ts'
+import { POR_PAGINA, type ResumenContrato } from '../dominio/cartera.ts'
 import type { Pendiente } from '../dominio/bandeja.ts'
 import { pintarBandeja, ESTILOS_BANDEJA } from './bandeja.ts'
 import { pintarPorRevisar, ESTILOS_AVANCE } from './evidencia.ts'
@@ -63,6 +63,13 @@ export function pintarCartera(
    * que hay que acordarse de mirar es una cola que no se mira.
    */
   porRevisar: readonly PorRevisar[] = [],
+  /**
+   * De dónde a dónde va lo que se está viendo, y cuántos hay en total.
+   *
+   * Sin esto la cartera enseñaba los que le cupieran y callaba: alguien con más de
+   * cincuenta contratos creería que ha visto todos los suyos.
+   */
+  trozo: { readonly desde: number; readonly total: number } = { desde: 0, total: 0 },
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -103,6 +110,21 @@ export function pintarCartera(
   </div>
 </a>`
       }).join('\n')
+
+  // El pie: de dónde a dónde va lo que se ve, y cómo llegar a lo siguiente. Solo
+  // aparece cuando hay más de una página; con cuarenta contratos no se ve nunca.
+  const hasta = trozo.desde + contratos.length
+  const paginas = trozo.total <= contratos.length && trozo.desde === 0 ? '' : `
+<nav class="pgs">
+  <span>${escapar(t('cartera.rango')
+    .replace('{a}', String(trozo.desde + 1))
+    .replace('{b}', String(hasta))
+    .replace('{n}', String(trozo.total)))}</span>
+  ${trozo.desde === 0 ? '' :
+    `<a href="/?desde=${Math.max(0, trozo.desde - POR_PAGINA)}">← ${escapar(t('cartera.anteriores'))}</a>`}
+  ${hasta >= trozo.total ? '' :
+    `<a href="/?desde=${hasta}">${escapar(t('cartera.siguientes'))} →</a>`}
+</nav>`
 
   return pagina({
     idioma,
@@ -168,6 +190,11 @@ ${ESTILOS_AVANCE}
 .medidas{display:inline-block;margin-right:14px;color:#A2B7C9;text-decoration:none;
   font-size:13.5px;font-weight:600;padding:5px 0}
 .medidas:hover{color:#E9F0F6}
+.pgs{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:22px;
+  padding-top:16px;border-top:1px solid var(--ln);font-size:13.5px}
+.pgs span{color:var(--md);font-family:"JetBrains Mono",monospace;font-size:11.5px}
+.pgs a{color:var(--enl);text-decoration:none;font-weight:650}
+.pgs a:hover{text-decoration:underline}
 `,
     cabecera: `<header class="hd"><div class="wrap">
   <h1>${escapar(titulo)}</h1>
@@ -200,6 +227,7 @@ ${/*
    */''}${pintarBandeja(esCliente ? [] : pendientes, idioma)}
 ${pintarPorRevisar(esCliente ? [] : porRevisar, idioma)}
 ${tarjetas}
+${paginas}
 </main>`,
   })
 }
