@@ -1,0 +1,51 @@
+# Los avisos de GPS Nexus, saliendo solos.
+#
+# Sin esto, la cola se llena y nadie la vacía: el sistema se usa la primera semana y
+# se abandona la tercera, porque nadie se entera de que tiene algo esperando.
+#
+#   sudo cp operar/nexus-avisos.service /etc/systemd/system/
+#   sudo systemctl enable --now nexus-avisos
+#   systemctl status nexus-avisos
+#   journalctl -u nexus-avisos -f
+#
+# La configuración va en /etc/nexus/avisos.env, que NO está en este repositorio y no
+# debe estarlo: lleva la clave del buzón. Ese archivo es de root y de nadie más
+# (chmod 600), porque cualquiera que pueda leerlo puede mandar correo como GPS.
+#
+#   NEXUS_PERSONA_SERVICIO=<uuid de la persona de servicio>
+#   NEXUS_BASE=https://nexus.grupoprimesupply.com
+#   NEXUS_BD_SOCKET=/var/run/postgresql
+#   NEXUS_SMTP=smtp.ejemplo:587
+#   NEXUS_SMTP_USUARIO=…
+#   NEXUS_SMTP_CLAVE=…
+#   NEXUS_SMTP_DESDE=avisos@…
+
+[Unit]
+Description=GPS Nexus · cola de avisos
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nexus
+WorkingDirectory=/opt/nexus/app
+EnvironmentFile=/etc/nexus/avisos.env
+ExecStart=/usr/bin/node --experimental-strip-types herramientas/avisar.ts --parados --repetir=180
+
+# Termina la vuelta que tenga a medias y sale. Cortar a mitad de un envío dejaría
+# avisos tomados y sin mandar, que es la forma de que un aviso no llegue nunca.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+# Si se cae, vuelve. Pero no diez veces por minuto contra algo que está roto.
+Restart=always
+RestartSec=30
+
+# No necesita nada del sistema, así que no se le da nada.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
