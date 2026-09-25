@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 122 de 141 sesiones · **87%**
+**Avance:** 123 de 141 sesiones · **87%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -79,9 +79,16 @@ usaba un azul marino que no cambia con el tema, invisible sobre fondo oscuro —
 escribí yo esa misma mañana. **Los tres son el mismo error: un color fijo que se lee
 en un tema y desaparece en el otro.**
 
+Y **el recorrido con el teclado**, que cierra este frente: casi toda la aplicación se
+fiaba del anillo que pone el navegador solo —1 px casi negro, invisible sobre la
+cabecera azul marino—, y **los tres campos de fecha no enseñaban ningún foco al
+tabular**. Un campo de fecha se recorre **por dentro** (día, mes, año), y mientras el
+foco está en una de sus partes el campo en sí no cuenta como enfocado: su anillo no
+llega a pintarse. El que se ve es el de la **etiqueta** que lo envuelve.
+
 Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`,
-`16f9c03`, `c0aa778`, `dd3822b`, `a768a76`, `33196cc` y `587f3d0`.
-**825 comprobaciones** (250 de SQL y diccionario + 575 de TypeScript), todas pasando.
+`16f9c03`, `c0aa778`, `dd3822b`, `a768a76`, `33196cc`, `587f3d0` y `20b40bc`.
+**834 comprobaciones** (250 de SQL y diccionario + 584 de TypeScript), todas pasando.
 
 **Trampa nueva:** dentro de una plantilla de TypeScript, **`\d` se queda en `d`**.
 Hay que escribir `\\d` para que al navegador le llegue `\d`. La medición del
