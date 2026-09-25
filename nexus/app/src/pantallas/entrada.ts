@@ -24,7 +24,13 @@ export type PasoEntrada =
   | { readonly paso: 'segundo_factor'; readonly desafio: string; readonly error?: 'rechazado' }
   | { readonly paso: 'espera'; readonly segundos: number }
   | { readonly paso: 'recuperacion'; readonly error?: 'rechazado' }
-  | { readonly paso: 'empresa'; readonly metodo: 'microsoft' | 'google' }
+  | {
+      readonly paso: 'empresa'
+      readonly metodo: 'microsoft' | 'google'
+      /** Se arrastra desde el paso anterior: sin él, la vuelta no sabe de quién es. */
+      readonly correo?: string
+      readonly error?: 'rechazado'
+    }
   | { readonly paso: 'invitacion'; readonly nombre: string; readonly ficha: string }
 
 const TEXTOS = {
@@ -145,8 +151,10 @@ ${p.error ? err(x.rechazadoCodigo) : ''}
       return {
         titulo: x.empresaTitulo,
         html: `<p class="pie">${escapar(x.empresaPie)}</p>
+${p.error !== 'rechazado' ? '' : `<p class="mal">${escapar(x.rechazado)}</p>`}
 <form method="post" action="/entrar/empresa">
   <input type="hidden" name="metodo" value="${escapar(p.metodo)}">
+  <input type="hidden" name="correo" value="${escapar(p.correo ?? '')}">
   <button type="submit" class="emp">${escapar(t('acceso.entrar_empresa'))} · ${nombre}</button>
 </form>`,
       }

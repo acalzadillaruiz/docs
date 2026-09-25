@@ -157,3 +157,26 @@ export async function quienEs(q: Consulta, testigo: string): Promise<string | nu
   await q`update sesion set ultima_en = now() where id = ${s.id}::uuid`
   return s.persona_id
 }
+
+/**
+ * Abre una sesión sin pasar por clave ni por segundo factor.
+ *
+ * Se usa cuando quien autentica es el directorio de la empresa: ahí el segundo
+ * factor lo pone el proveedor, y exigirlo otra vez aquí sería pedirle a alguien que
+ * demuestre dos veces lo mismo — que es como se consigue que la gente desactive el
+ * doble factor.
+ *
+ * No tiene ninguna otra forma de llamarse desde fuera del camino de SSO: quien la
+ * llame ya ha comprobado la firma del proveedor, el inquilino y el nonce.
+ */
+export async function abrirSesionDe(
+  q: Consulta, personaId: string, origen: string,
+): Promise<string> {
+  const testigo = randomBytes(32).toString('base64url')
+  await q`
+    insert into sesion (persona_id, huella, origen, expira_en)
+    values (${personaId}::uuid, ${huellaTestigo(testigo)}, ${origen},
+            now() + ${`${HORAS_SESION} hours`}::interval)`
+  await q`update persona set ultimo_acceso = now() where id = ${personaId}::uuid`
+  return testigo
+}

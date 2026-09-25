@@ -17,7 +17,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { comoPersona, type Consulta } from '../db/conexion.ts'
-import { iniciar, completar, quienEs } from '../dominio/sesion.ts'
+import { iniciar, completar, quienEs, abrirSesionDe } from '../dominio/sesion.ts'
+import { empresaDe, preparar, volver } from '../dominio/sso.ts'
+import { proveedores, cambiarCodigo } from './proveedores.ts'
+import { Claves, verificarFirma, partes, traerPorLaRed } from './jwks.ts'
 import { pintarEntrada } from '../pantallas/entrada.ts'
 import { pintarCartera } from '../pantallas/cartera.ts'
 import { pintarContrato } from '../pantallas/contrato.ts'
@@ -69,6 +72,25 @@ import { ponerCookie, borrarCookie, leerCookie, idiomaPedido } from './cookies.t
 import { fecha as formatearFecha, t, type Idioma } from '../i18n/t.ts'
 
 const MAX_CUERPO = 8 * 1024   // un formulario de entrada no pesa más
+
+/**
+ * Los proveedores de identidad y el juego de claves, uno por proceso.
+ *
+ * Se leen del entorno al arrancar: si no están configurados, la entrada con la
+ * cuenta de la empresa simplemente no se ofrece, y el resto sigue funcionando. Un
+ * sistema que no arranca sin SSO configurado es un sistema que no arranca.
+ */
+const PROVEEDORES = proveedores(process.env)
+const CLAVES = new Claves(traerPorLaRed)
+
+/**
+ * A dónde vuelve el proveedor. Tiene que ser EXACTAMENTE la misma dirección que se
+ * registró en el proveedor y que se mandó al pedir el código: si difiere en una
+ * barra, el proveedor rechaza el cambio, y el mensaje que devuelve no lo dice.
+ */
+function vueltaDe(): string {
+  return `${process.env['NEXUS_BASE'] ?? ''}/entrar/empresa/vuelta`
+}
 
 export type Peticion = {
   readonly metodo: string
@@ -158,7 +180,8 @@ export async function resolver(
       case 'espera':
         return html(429, pintarEntrada({ paso: 'espera', segundos: r.segundos }, p.idioma))
       case 'usa_tu_empresa':
-        return html(200, pintarEntrada({ paso: 'empresa', metodo: r.metodo }, p.idioma))
+        // El correo se arrastra: sin él, el paso siguiente no sabe de quién es.
+        return html(200, pintarEntrada({ paso: 'empresa', metodo: r.metodo, correo }, p.idioma))
       default:
         // El mismo 401 y el mismo texto, falle lo que falle.
         return html(401, pintarEntrada({ paso: 'ingreso', correo, error: 'rechazado' }, p.idioma))
@@ -181,6 +204,65 @@ export async function resolver(
         // El desafío ya está quemado, así que se vuelve al principio.
         return html(401, pintarEntrada({ paso: 'ingreso', error: 'rechazado' }, p.idioma))
     }
+  }
+
+  // ------------------------------------------------- con la cuenta de la empresa
+  // Lo que compra esto: cuando la operadora da de baja al ingeniero, pierde el
+  // acceso el mismo día sin que nadie de GPS tenga que acordarse.
+  if (p.ruta === '/entrar/empresa' && p.metodo === 'POST') {
+    const correo = p.campos['correo'] ?? ''
+    const metodo = p.campos['metodo'] === 'google' ? 'google' : 'microsoft'
+    const prov = PROVEEDORES[metodo]
+    const org = await dentro((q) => empresaDe(q, correo))
+
+    // Si falta el proveedor, la empresa o el método, se responde lo mismo que a un
+    // correo que no existe: la pantalla de entrada no es un buscador de empresas.
+    if (!prov || !org || !org.metodos.includes(metodo) || !org.inquilino) {
+      return html(401, pintarEntrada({ paso: 'ingreso', correo, error: 'rechazado' }, p.idioma))
+    }
+
+    const ida = await dentro((q) =>
+      preparar(q, org, prov, destinoSeguro(p.campos['volver']), p.origen, vueltaDe()))
+    // Se sale del sitio, así que la respuesta no lleva cuerpo ni cabeceras nuestras
+    // que puedan acabar en el proveedor.
+    return { codigo: 303, cabeceras: { ...CABECERAS_BASE, Location: ida.adonde } }
+  }
+
+  if (p.ruta === '/entrar/empresa/vuelta' && p.metodo === 'GET') {
+    // Llegan en la dirección, no en el cuerpo: es una vuelta de navegador.
+    const estado = p.campos['state'] ?? ''
+    const codigo = p.campos['code'] ?? ''
+    if (!estado || !codigo) return aOtroSitio('/entrar')
+
+    const [peticion] = (await dentro((q) => q`
+      select ps.metodo::text, o.idp_tenant
+        from peticion_sso ps join organizacion o on o.id = ps.organizacion_id
+       where ps.estado = ${estado} and ps.usada_en is null
+    `)) as unknown as Array<{ metodo: string; idp_tenant: string | null }>
+    if (!peticion?.idp_tenant) return aOtroSitio('/entrar')
+
+    const prov = PROVEEDORES[peticion.metodo === 'google' ? 'google' : 'microsoft']
+    if (!prov) return aOtroSitio('/entrar')
+
+    const inquilino = peticion.idp_tenant
+    const r = await dentro((q) => volver(q, estado, codigo, prov,
+      (pr, c, v) => cambiarCodigo(pr, c, v, inquilino),
+      async (testigo, urlClaves) => {
+        const { cabecera } = partes(testigo)
+        const juego = await CLAVES.de(
+          urlClaves.replace('{inquilino}', inquilino), String(cabecera['kid'] ?? ''))
+        return verificarFirma(testigo, juego) as never
+      },
+      vueltaDe()))
+
+    if (!r.entra) {
+      // Todos los motivos dan el mismo mensaje. Decir cuál falló convierte esta
+      // pantalla en un banco de pruebas para quien esté intentando entrar.
+      return html(401, pintarEntrada({ paso: 'ingreso', error: 'rechazado' }, p.idioma))
+    }
+
+    const testigoSesion = await dentro<string>((q) => abrirSesionDe(q, r.personaId, p.origen))
+    return aOtroSitio(destinoSeguro(r.destino), { 'Set-Cookie': ponerCookie(testigoSesion, seguro) })
   }
 
   if (p.ruta === '/entrar/recuperacion' && p.metodo === 'GET') {
@@ -980,16 +1062,22 @@ export async function desdeHttp(req: IncomingMessage): Promise<Peticion> {
   let campos: Record<string, string> = {}
   let repetidos: Record<string, readonly string[]> = {}
   let archivo: Peticion['archivo'] = null
+  // Los parámetros de la dirección valen para todos los métodos: la vuelta de un
+  // proveedor de identidad llega por GET con el estado y el código dentro.
+  for (const [k, v] of url.searchParams) campos[k] = v
+
   if (req.method === 'POST') {
     if (limite) {
       const partes = partir(await leerBytes(req, LIMITES.maxBytes), limite)
-      campos = camposDe(partes)
+      // Lo del cuerpo pisa a lo de la dirección: un formulario que manda 'af' gana
+      // a un 'af' colado en la dirección por quien enlazó la página.
+      campos = { ...campos, ...camposDe(partes) }
       repetidos = repetidosDe(partes)
       const a = archivoDe(partes, 'documento')
       archivo = a ? { archivo: a.archivo, tipoMime: a.tipoMime, contenido: a.contenido } : null
     } else {
       const leido = await leerCampos(req)
-      campos = leido.campos
+      campos = { ...campos, ...leido.campos }
       repetidos = leido.repetidos
     }
   }

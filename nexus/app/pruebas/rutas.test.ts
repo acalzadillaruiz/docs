@@ -428,3 +428,31 @@ test('sin sesión, el avance de un renglón ni se mira', async () => {
   const r = await pedir({ ruta: '/renglones/99999999-9999-9999-9999-99999999999a' })
   assert.equal(r.codigo, 303)
 })
+
+test('sin SSO configurado, entrar con la empresa responde como un correo cualquiera', async () => {
+  // No se ofrece y no se distingue: la pantalla de entrada no es un buscador de
+  // empresas con SSO.
+  const r = await pedir({
+    metodo: 'POST', ruta: '/entrar/empresa',
+    campos: { metodo: 'microsoft', correo: 'alguien@operadora.test' },
+  })
+  assert.equal(r.codigo, 401)
+  assert.match(r.cuerpo!, /No hemos podido entrar/)
+})
+
+test('la vuelta sin estado o sin código no llega a mirar nada', async () => {
+  for (const campos of [{}, { state: 'x' }, { code: 'y' }]) {
+    const r = await pedir({ ruta: '/entrar/empresa/vuelta', campos })
+    assert.equal(r.codigo, 303)
+    assert.equal(r.cabeceras!['Location'], '/entrar')
+  }
+})
+
+test('una vuelta con un estado inventado tampoco', async () => {
+  const r = await pedir({
+    ruta: '/entrar/empresa/vuelta',
+    campos: { state: 'estado-que-nadie-guardo', code: 'c' },
+  })
+  assert.equal(r.codigo, 303)
+  assert.equal(r.cabeceras!['Location'], '/entrar')
+})

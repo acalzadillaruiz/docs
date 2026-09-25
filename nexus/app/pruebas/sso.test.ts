@@ -258,3 +258,35 @@ test('la huella del sujeto se guarda la primera vez y manda a partir de entonces
   assert.equal(r.entra, true)
   assert.equal(r.entra && r.personaId, ING)
 })
+
+test('los proveedores solo existen si están configurados, y el secreto sale del entorno', async () => {
+  const { proveedores } = await import('../src/servidor/proveedores.ts')
+  // Sin configurar, la entrada con la cuenta de la empresa simplemente no se ofrece
+  // y el resto sigue funcionando. Un sistema que no arranca sin SSO no arranca.
+  assert.deepEqual(proveedores({}), {})
+
+  const c = proveedores({
+    NEXUS_MS_CLIENTE: 'id-publico', NEXUS_MS_SECRETO: 'el-secreto',
+    NEXUS_GOOGLE_CLIENTE: 'g-id', NEXUS_GOOGLE_SECRETO: 'g-secreto',
+  })
+  assert.equal(c.microsoft!.clienteId, 'id-publico')
+  assert.equal(c.google!.metodo, 'google')
+  // Microsoft pone el inquilino en el emisor; Google usa el mismo para todos y lo
+  // lleva en 'hd'. Confundirlos deja entrar a cuentas personales.
+  assert.match(c.microsoft!.emisor('t-1'), /login\.microsoftonline\.com\/t-1\/v2\.0/)
+  assert.equal(c.google!.emisor('lo-que-sea'), 'https://accounts.google.com')
+})
+
+test('con solo uno configurado, el otro no existe', async () => {
+  const { proveedores } = await import('../src/servidor/proveedores.ts')
+  const c = proveedores({ NEXUS_MS_CLIENTE: 'x', NEXUS_MS_SECRETO: 'y' })
+  assert.ok(c.microsoft)
+  assert.equal(c.google, undefined)
+})
+
+test('un cliente sin secreto no cuenta como configurado', async () => {
+  const { proveedores } = await import('../src/servidor/proveedores.ts')
+  // Medio configurado es peor que nada: se ofrecería el botón y fallaría al volver.
+  assert.deepEqual(proveedores({ NEXUS_MS_CLIENTE: 'x' }), {})
+  assert.deepEqual(proveedores({ NEXUS_MS_SECRETO: 'y' }), {})
+})
