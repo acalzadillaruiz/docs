@@ -1,7 +1,7 @@
 # GPS Nexus · estado
 
 **Última actualización:** 2026-09-25, 09:25 (España)
-**Avance:** 118 de 141 sesiones · **84%**
+**Avance:** 119 de 141 sesiones · **84%**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
 ## RETOMAR AQUÍ
@@ -53,9 +53,16 @@ Y **el barrido de formularios**: cada pantalla, cada formulario, mandado en blan
 como lo mandaría el navegador. Las once aguantan, las que rechazan lo dicen por
 escrito, y el libro sigue cuadrado después.
 
-Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`
-y `16f9c03`. **793 comprobaciones** (250 de SQL y diccionario + 543 de TypeScript),
-todas pasando.
+Y **el mismo barrido con basura dentro**: texto donde va un número, el 31 de febrero,
+importes negativos, y media hoja de cálculo pegada en una casilla. Encontró un fallo
+de los que acaban en página de error: **`Number('hola')` no falla, devuelve `NaN`**, y
+`NaN` llega hasta PostgreSQL, que contesta `invalid input syntax for type integer`.
+Escribir mal un año en la pantalla de meses daba un error de servidor. Ahora hay un
+`entero()` que exige la forma entera y un `anioMes()` que comprueba el rango.
+
+Commits `632b9b0`, `ac7cb5a`, `913314b`, `d95d68c`, `193ef5e`, `9420d12`, `17a0e0b`,
+`16f9c03` y `c0aa778`. **800 comprobaciones** (250 de SQL y diccionario + 550 de
+TypeScript), todas pasando.
 
 **Los dos fallos, porque la lección vale más que el arreglo:**
 
