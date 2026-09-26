@@ -1,0 +1,3 @@
+# El archivo de configuración del servidor: lleva la clave de la base de datos.
+nexus/despliegue/.env
+nexus/despliegue/respaldos/

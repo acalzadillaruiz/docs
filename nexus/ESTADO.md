@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 15:15 (España)
+**Última actualización:** 2026-09-26, 16:10 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,54 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **registrar el régimen de IVA de la empresa.** La pantalla de
+**Lo último terminado:** **todo lo que hace falta para desplegarla de verdad.** El CEO
+probó `localhost:8080` y no funcionaba, con razón: ese servidor corría dentro del
+contenedor de la sesión. Eligió desplegar, con `nexus.grupoprimesupply.com`, y me dejó
+elegir dónde.
+
+**Elegido: un VPS de Hostinger con Docker.** Los documentos van a disco —y sin el acta de
+recepción el avance deja de poder demostrarse, que es de lo que va el producto—, el
+dominio ya está en Hostinger, y pagar a una plataforma de EE. UU. con tarjeta desde
+Venezuela es un problema que no conviene tener entre el CEO y su propio sistema. Está
+escrito con sus contras en `DESPLEGAR.md`.
+
+Lo que hay, en `nexus/despliegue/` y `nexus/DESPLEGAR.md`:
+
+| Pieza | Qué resuelve |
+|---|---|
+| `herramientas/migrar.ts` | Cargar el esquema en una base **con datos**. `probar.sh` la borra y la rehace; un servidor no. Aplica cada archivo una vez, lo anota, y **se para si un archivo ya aplicado cambió** en vez de dejar el servidor con un esquema distinto del repositorio. |
+| `herramientas/instalar.ts` | Un despliegue nuevo tiene cero personas, e invitar exige sesión: **arrancaba y no había forma de entrar**. Crea la empresa, la cuenta de servicio —que **no puede entrar**, inactiva y con credenciales que nadie ve—, el plan de cuentas, y una invitación cuyo enlace imprime. |
+| `Dockerfile` | Sin paso de compilación: Node 22 ejecuta el TypeScript, así que lo que corre es el archivo que se lee. Sin privilegios, documentos en volumen. |
+| `compose.yml` | Base, esquema (corre y se va), aplicación, bucle de avisos y Caddy. Nada más. |
+| `Caddyfile` | TLS que se renueva solo. El certificado caducado a los tres meses queda fuera del mapa. |
+| `respaldar.sh` | Base **y documentos**, catorce días, y al terminar imprime la orden de restaurar — porque un respaldo que nadie restauró no es un respaldo. |
+
+**Probado de verdad:** el migrador contra una base con datos (34 archivos, segunda pasada
+sin hacer nada, y el guardián del archivo cambiado); `instalar.ts` y después el circuito
+entero por HTTP —abrir el enlace sin sesión, crear la cuenta, recibir el secreto y los
+diez códigos, entrar, llegar a Personas y accesos— y que la cuenta de servicio **no**
+entra; que las rutas del diccionario y del esquema resuelven con la disposición de la
+imagen, recreada aparte; y que `compose.yml` es válido y exige sus tres variables
+nombrando la que falta.
+
+**NO ejecutado, y dicho en DESPLEGAR.md:** construir la imagen, `docker compose up` y que
+Caddy saque el certificado. En esta máquina hay cliente de Docker pero **no demonio**.
+
+**Trozo aparcado a medias, a propósito:** el guardián de que una plantilla de hitos sume
+100 (`suma_plantilla` + la comprobación dentro de `crear_hitos_desde_plantilla`). Lo
+escribí y lo borré sin commitear: **sin la pantalla para arreglar una plantilla,
+bloquearía el alta de contratos sin dar forma de desbloquearla**, que es peor que el
+problema. Va junto con la pantalla de plantillas, que es el trozo siguiente — la última
+tabla de `NO_ESCRIBE_LA_APP` que es una pantalla mandando algo imposible (`/medidas` dice
+«ese tipo de contrato todavía no tiene plantilla de hitos»).
+
+El fallo silencioso que ese guardián evita, para no perderlo: si una plantilla suma 90,
+**un renglón con todos sus hitos verificados se queda para siempre en el 90 %** y nadie
+ve un error. Hoy las cinco plantillas suman 100, comprobado.
+
+833 pruebas, todas pasan. **El push ya funciona** desde `6cab0d5`.
+
+**Antes:** **registrar el régimen de IVA de la empresa.** La pantalla de
 proveedores decía, con estas palabras: «Esta empresa no consta como agente de retención
 de IVA en esta fecha, así que no corresponde retener. **Si lo es, hay que registrarlo en
 su régimen de IVA.»** Y no había forma de registrarlo: `regimen_iva` la escribían solo

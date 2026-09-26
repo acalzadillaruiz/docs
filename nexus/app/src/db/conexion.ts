@@ -51,6 +51,25 @@ export async function cerrar(): Promise<void> {
   sql = null
 }
 
+/**
+ * Ejecuta `trabajo` con la conexión desnuda: sin rol y sin persona.
+ *
+ * Existe para UNA cosa: cargar el esquema en un servidor. Las políticas de fila y los
+ * roles son precisamente lo que ese trabajo crea, así que no puede correr debajo de
+ * ellos.
+ *
+ * Nada más debería usarla. Todo lo que atiende una petición pasa por `comoPersona`,
+ * que es lo que hace que la base devuelva lo que a cada uno le toca y nada más; una
+ * consulta que se salte eso se salta el aislamiento entre operadoras.
+ */
+export async function comoDueno<T>(trabajo: (q: Consulta) => Promise<T>): Promise<T> {
+  if (!sql) throw new SinConexion()
+  // Dentro de una transacción, igual que `comoPersona`: si la carga de un archivo de
+  // esquema falla a la mitad, no deja medio esquema puesto. En PostgreSQL el DDL
+  // también se deshace, y eso es justo lo que hace seguro desplegar.
+  return sql.begin(async (q) => trabajo(q as Consulta)) as Promise<T>
+}
+
 export class SinConexion extends Error {
   constructor() {
     super('No hay conexión a la base de datos. Llama a conectar() primero.')

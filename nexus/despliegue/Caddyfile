@@ -1,0 +1,25 @@
+# Caddy saca y renueva el certificado él solo, con Let's Encrypt. Por eso está aquí y no
+# nginx: el certificado caducado a los tres meses es de los fallos más frecuentes que
+# hay, y esto lo quita del mapa.
+#
+# Hace falta que el puerto 80 esté abierto además del 443: por ahí se valida el dominio.
+
+{$DOMINIO} {
+	encode zstd gzip
+
+	# La aplicación ya manda sus propias cabeceras de seguridad —incluida una política
+	# de contenido con `default-src 'none'`—, así que aquí solo se añade la que no
+	# puede poner ella: HSTS, que solo tiene sentido cuando de verdad hay TLS delante.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy app:8080 {
+		# Un documento grande tarda en subir desde el patio, con la cobertura que hay.
+		transport http {
+			read_timeout 120s
+			write_timeout 120s
+		}
+	}
+}

@@ -1,0 +1,116 @@
+# GPS Nexus · todo lo que hace falta en un servidor
+#
+#   docker compose up -d
+#
+# Tres piezas y ninguna más: la aplicación, su PostgreSQL y un Caddy delante que saca el
+# certificado él solo. No hay balanceador, ni caché, ni cola: con una operadora y quince
+# personas, cada pieza de más es una pieza más que se cae a las tres de la madrugada.
+
+name: nexus
+
+services:
+  bd:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexus
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: "${BD_CLAVE:?falta BD_CLAVE en el archivo .env}"
+      # Que el ordenamiento y las mayúsculas no dependan de la máquina: un índice
+      # construido con otra configuración regional deja de encontrar filas.
+      POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
+    volumes:
+      - bd:/var/lib/postgresql/data
+      - ./respaldos:/respaldos
+    # No se publica ningún puerto: la base solo se ve desde la red interna de compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Carga el esquema y se va. Corre en CADA arranque, y la segunda vez no hace nada:
+  # lleva la cuenta de lo ya aplicado. Es lo que hace que actualizar sea `up -d` y no
+  # una lista de pasos que alguien tiene que recordar.
+  esquema:
+    build:
+      context: ..
+      dockerfile: despliegue/Dockerfile
+    depends_on:
+      bd: { condition: service_healthy }
+    environment:
+      NEXUS_BD: "postgres://nexus:${BD_CLAVE}@bd:5432/nexus"
+    command: ["node", "--experimental-strip-types", "herramientas/migrar.ts"]
+    restart: "no"
+
+  app:
+    build:
+      context: ..
+      dockerfile: despliegue/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      bd: { condition: service_healthy }
+      esquema: { condition: service_completed_successfully }
+    environment:
+      NEXUS_PUERTO: 8080
+      NEXUS_BD: "postgres://nexus:${BD_CLAVE}@bd:5432/nexus"
+      NEXUS_ALMACEN: /documentos
+      NEXUS_BASE: "https://${DOMINIO:?falta DOMINIO en el archivo .env}"
+      NEXUS_PERSONA_SERVICIO: "${PERSONA_SERVICIO:?falta PERSONA_SERVICIO, que lo imprime herramientas/instalar.ts}"
+      # El correo es opcional: sin él los avisos se escriben en el registro en vez de
+      # enviarse, y el resto funciona. Un sistema que no arranca sin SMTP configurado es
+      # un sistema que no arranca.
+      NEXUS_SMTP: ${SMTP:-}
+      NEXUS_SMTP_USUARIO: ${SMTP_USUARIO:-}
+      NEXUS_SMTP_CLAVE: ${SMTP_CLAVE:-}
+      NEXUS_SMTP_DESDE: ${SMTP_DESDE:-}
+      # Y el acceso con la cuenta de la empresa, también opcional: sin estas cuatro, la
+      # entrada con Microsoft o Google simplemente no se ofrece.
+      NEXUS_MS_CLIENTE: ${MS_CLIENTE:-}
+      NEXUS_MS_SECRETO: ${MS_SECRETO:-}
+      NEXUS_GOOGLE_CLIENTE: ${GOOGLE_CLIENTE:-}
+      NEXUS_GOOGLE_SECRETO: ${GOOGLE_SECRETO:-}
+    volumes:
+      - documentos:/documentos
+
+  # Los avisos. Va aparte del servidor a propósito: un servidor de correo lento haría
+  # lenta la aplicación, y reiniciarla a mitad de un envío dejaría la cola a medias.
+  # También hace la limpieza de la casa una vez por hora.
+  avisos:
+    build:
+      context: ..
+      dockerfile: despliegue/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      app: { condition: service_started }
+    environment:
+      NEXUS_BD: "postgres://nexus:${BD_CLAVE}@bd:5432/nexus"
+      NEXUS_BASE: "https://${DOMINIO}"
+      NEXUS_PERSONA_SERVICIO: ${PERSONA_SERVICIO}
+      NEXUS_SMTP: ${SMTP:-}
+      NEXUS_SMTP_USUARIO: ${SMTP_USUARIO:-}
+      NEXUS_SMTP_CLAVE: ${SMTP_CLAVE:-}
+      NEXUS_SMTP_DESDE: ${SMTP_DESDE:-}
+    command: ["node", "--experimental-strip-types", "herramientas/avisar.ts",
+              "--parados", "--repetir=180"]
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app: { condition: service_started }
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-datos:/data
+      - caddy-config:/config
+
+volumes:
+  bd:
+  documentos:
+  caddy-datos:
+  caddy-config:
