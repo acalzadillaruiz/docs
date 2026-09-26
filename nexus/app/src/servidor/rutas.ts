@@ -66,7 +66,7 @@ import {
   equipos, depreciarMes, registrarActivo, cuentasPara, contratosDeAlquiler,
 } from '../dominio/activos.ts'
 import { pintarActivos } from '../pantallas/activos.ts'
-import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
+import { cuadro, asentarMes, cargarIndice, indices } from '../dominio/reexpresion.ts'
 import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
          anotarVale, reponer, cerrar as cerrarCaja, abrirCaja } from '../dominio/caja.ts'
 import { pintarCaja } from '../pantallas/caja.ts'
@@ -1100,7 +1100,25 @@ export async function resolver(
     const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
 
     let errores: readonly string[] = []
-    if (p.metodo === 'POST') {
+    let hecho: string | null = null
+    if (p.metodo === 'POST' && p.campos['accion'] === 'indice') {
+      // Cargar el INPC del mes. Esto NO EXISTÍA: la pantalla decía «no hay índice de
+      // precios cargado a esa fecha» y no había forma de cargarlo, así que la
+      // reexpresión por inflación —que es todo este módulo— no podía correr nunca.
+      const ia = entero(p.campos['i_anio'])
+      const im = entero(p.campos['i_mes'])
+      const valor = decimal(p.campos['i_valor'])
+      const r = await comoQuien((q) => cargarIndice(
+        q, org!.organizacion_id, ia ?? Number.NaN, im ?? Number.NaN,
+        // Un valor ilegible llega como NaN y el dominio lo rechaza preguntando por lo
+        // que TIENE que ser. Convertirlo a cero aquí guardaría un índice de cero, y
+        // con un índice de cero el factor de reexpresión es una división por cero.
+        valor ?? Number.NaN, p.idioma))
+      if (r.hecho) {
+        hecho = t(p.idioma, 'reex.indice_cargado')
+          .replace('{m}', `${ia}-${String(im).padStart(2, '0')}`)
+      } else errores = [r.motivo]
+    } else if (p.metodo === 'POST') {
       if (cuando === null) {
         errores = [t(p.idioma, 'periodo.error.fecha')]
       } else {
@@ -1113,9 +1131,13 @@ export async function resolver(
     // El cuadro se mira al ultimo dia del mes elegido, no a hoy: comparar contra hoy
     // mientras se cierra un mes anterior da una cifra que no cuadra con nada.
     const al = new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10)
-    const c = await comoQuien((q) => cuadro(q, org!.organizacion_id, p.idioma, al))
+    const datos = await comoQuien(async (q) => ({
+      c: await cuadro(q, org!.organizacion_id, p.idioma, al),
+      indices: await indices(q, p.idioma),
+    }))
     return html(errores.length === 0 ? 200 : 400,
-      pintarReexpresion(c, p.idioma, testigoAnti(testigo), anio, mes, errores))
+      pintarReexpresion(datos.c, p.idioma, testigoAnti(testigo), anio, mes, errores,
+        datos.indices, hecho))
   }
 
   // El mayor de una cuenta: por que el banco tiene exactamente este saldo.

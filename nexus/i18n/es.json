@@ -816,5 +816,18 @@
   "activo.error.ya": "Ya hay un equipo con ese código",
   "activo.error.cuenta": "Alguna de las tres cuentas no existe o no admite movimientos",
   "activo.error.contrato": "Ese contrato no existe, o no es de esta empresa",
-  "activo.error.tasa": "No hay tasa del BCV para el día en que entra en servicio, así que el costo en la otra moneda saldría inventado"
+  "activo.error.tasa": "No hay tasa del BCV para el día en que entra en servicio, así que el costo en la otra moneda saldría inventado",
+  "reex.cargar": "Cargar el INPC del mes",
+  "reex.cargar_explica": "El número que publica el BCV una vez al mes. Sin él no se puede reexpresar nada, y eso es todo este módulo. Se guarda con fecha del día uno del mes, que es lo que busca el cálculo.",
+  "reex.indice_anio": "Año",
+  "reex.indice_mes": "Mes",
+  "reex.indice_valor": "INPC publicado",
+  "reex.indice_cargado": "INPC de {m} guardado.",
+  "reex.indices": "Índices cargados",
+  "reex.variacion": "Variación",
+  "reex.sin_indices": "Todavía no hay ningún índice cargado.",
+  "reex.error.anio": "Ese año no es un año",
+  "reex.error.mes_numero": "El mes tiene que ser un número del 1 al 12",
+  "reex.error.valor": "El INPC tiene que ser un número mayor que cero",
+  "reex.error.indice_usado": "Ese índice ya lo usó una reexpresión asentada. Cambiarlo por debajo dejaría un libro que nadie puede volver a explicar: primero hay que reversar esa reexpresión."
 }

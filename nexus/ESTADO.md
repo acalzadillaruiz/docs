@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 12:55 (España)
+**Última actualización:** 2026-09-26, 13:45 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,44 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **dar de alta un equipo. No había forma.** `/activos`
+**Lo último terminado:** **cargar el INPC del mes. Sin él la reexpresión no podía
+correr, y la reexpresión es todo ese módulo.**
+
+La pantalla decía «No hay índice de precios (INPC) cargado a esa fecha. Sin índice no
+se puede reexpresar nada» — y no había forma de cargarlo. `indice_precios` la escribía
+**solo una prueba de la base de datos**. En una economía hiperinflacionaria eso no es
+un adorno: un balance histórico dice que la empresa creció cuando lo único que creció
+fue el índice.
+
+Dos cosas que no son obvias y que hacen que sirva:
+
+1. **La lista enseña la variación, no solo el número.** Un INPC escrito con un cero de
+   más pasa desapercibido; un «+1.172 %» salta a la vista. Es lo que pilla un dedo
+   gordo antes de que se reexprese un mes entero con él.
+2. **Un índice no se toca por debajo de una reexpresión ya asentada**, y la regla mira
+   la FECHA, no si la fila existía. Mi primera versión solo impedía *cambiar* uno ya
+   usado y dejaba **cargar por primera vez** uno de un mes anterior — y eso rompe lo
+   mismo: la reexpresión va partida por partida, cada una con el índice de su fecha,
+   así que meter un índice de mayo después de reexpresar julio hace que el asiento de
+   julio deje de salir de los datos que hay. El asiento no cambia, no se puede; deja
+   de poder explicarse, que es peor. Lo encontró la prueba, que tenía mejor intuición
+   que mi regla.
+
+Y el barrido de tablas hizo lo suyo: al cablear la pantalla, **falló** hasta que
+`indice_precios` salió de la lista de tablas sin puerta. Quedan cuatro:
+
+| Tabla | Qué falta |
+|---|---|
+| `regimen_iva` | sin pantalla, y `/proveedores` **dice** que hay que registrarlo |
+| `plantilla_hito` | sin pantalla, y `/medidas` **dice** «ese tipo de contrato todavía no tiene plantilla» |
+| `alicuota_igtf` | hoy la pone el esquema |
+| `capacidad`, `persona_capacidad` | permisos finos escritos y sin usar |
+
+Las dos primeras son el trozo siguiente, por ese orden.
+
+825 pruebas, todas pasan. Verificado apagando la valla para ver fallar la prueba.
+
+**Antes:** **dar de alta un equipo. No había forma.** `/activos`
 enseñaba los equipos, calculaba su valor en libros, el rendimiento de los alquilados
 y corría la depreciación del mes… **sobre una tabla en la que nada, en ninguna parte,
 insertaba una fila.** Un módulo entero mirando por una ventana a una tabla vacía para

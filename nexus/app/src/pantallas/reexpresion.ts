@@ -20,7 +20,7 @@
  * lo que pasó.
  */
 
-import type { Cuadro } from '../dominio/reexpresion.ts'
+import type { Cuadro, Indice } from '../dominio/reexpresion.ts'
 import { traductor, type Idioma } from '../i18n/t.ts'
 import { pagina, escapar } from './base.ts'
 
@@ -32,9 +32,46 @@ const TEXTOS = {
 export function pintarReexpresion(
   c: Cuadro, idioma: Idioma, antifalsificacion: string,
   anio: number, mes: number, errores: readonly string[] = [],
+  /**
+   * Los índices ya cargados. Van con valor por omisión para no romper a quien ya
+   * llamaba a esta función sin ellos.
+   */
+  listaIndices: readonly Indice[] = [],
+  hecho: string | null = null,
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
+
+  // El INPC del mes. Sin esto la pantalla decía «no hay índice cargado» y no había
+  // forma de cargarlo: la tabla la escribía solo una prueba de la base de datos, así
+  // que la reexpresión —que es todo este módulo— no podía correr nunca.
+  const cargarIndice = `
+<h2>${escapar(t('reex.cargar'))}</h2>
+<p class="expl">${escapar(t('reex.cargar_explica'))}</p>
+<form method="post" action="/reexpresion" class="mes">
+  <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
+  <input type="hidden" name="accion" value="indice">
+  <label>${escapar(t('reex.indice_anio'))}
+    <input type="number" name="i_anio" value="${anio}" min="2000" max="2100"></label>
+  <label>${escapar(t('reex.indice_mes'))}
+    <input type="number" name="i_mes" value="${mes}" min="1" max="12"></label>
+  <label>${escapar(t('reex.indice_valor'))}
+    <input type="text" name="i_valor" inputmode="decimal"></label>
+  <button type="submit">${escapar(t('reex.cargar'))}</button>
+</form>
+
+<h2>${escapar(t('reex.indices'))}</h2>
+<div class="caja">${listaIndices.length === 0
+  ? `<p class="nada">${escapar(t('reex.sin_indices'))}</p>`
+  : `<table class="ix"><thead><tr>
+      <th>${escapar(t('reex.indice_mes'))}</th>
+      <th class="n">${escapar(t('reex.indice_valor'))}</th>
+      <th class="n">${escapar(t('reex.variacion'))}</th>
+    </tr></thead><tbody>${listaIndices.map((i) => `<tr>
+      <td>${i.anio}-${String(i.mes).padStart(2, '0')}</td>
+      <td class="n">${escapar(i.valor)}</td>
+      <td class="n">${i.variacion === null ? '—' : escapar(i.variacion)}</td>
+    </tr>`).join('')}</tbody></table>`}</div>`
 
   const cuerpo = c.sinIndice
     ? `<p class="nada">${escapar(t('reex.sin_indice'))}</p>`
@@ -81,8 +118,11 @@ export function pintarReexpresion(
     <p class="reme-x">${escapar(t('reex.reme_explica'))}</p>
   </div>`}
 
+  ${hecho === null ? '' : `<div class="bien-caja">${escapar(hecho)}</div>`}
+
   <form method="post" action="/reexpresion" class="mes">
     <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
+    <input type="hidden" name="accion" value="asentar">
     <label>${escapar(x.anio)}
       <input type="number" name="anio" value="${anio}" min="2000" max="2100"></label>
     <label>${escapar(x.mes)}
@@ -91,6 +131,7 @@ export function pintarReexpresion(
   </form>
 
   <p class="al">${escapar(t('reex.al'))} ${escapar(c.al)}</p>
+  ${cargarIndice}
   <div class="caja">${cuerpo}</div>
   <p class="expl">${escapar(t('reex.monetaria_explica'))}</p>
 </main>`,
@@ -98,6 +139,17 @@ export function pintarReexpresion(
 }
 
 export const ESTILOS_REEX = `
+/* Lo que salió bien se dice igual de claro que lo que salió mal. */
+.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
+  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
+/* La tabla de índices. La columna de variación existe para que un cero de más se
+   vea: un «+1.240 %» salta a la vista y el número solo no. */
+.ix{width:100%;border-collapse:collapse;font-size:13.5px}
+.ix th{text-align:left;padding:9px 14px;border-bottom:1px solid var(--ln2);
+  font-family:"JetBrains Mono",monospace;font-size:9px;font-weight:700;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--md)}
+.ix td{padding:9px 14px;border-top:1px solid var(--ln)}
+.ix td.n,.ix th.n{text-align:right;font-family:"JetBrains Mono",monospace}
 .mes{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:18px 0 6px}
 .mes label{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;
   letter-spacing:.13em;text-transform:uppercase;color:var(--md)}

@@ -269,7 +269,6 @@ test('NINGUNA función del esquema se queda sin que nadie la llame', async () =>
 const NO_ESCRIBE_LA_APP = new Map<string, string>([
   // Tablas de referencia que hoy se cargan con el esquema. Las tres necesitan su
   // pantalla, y las dos primeras bloquean un módulo entero:
-  ['indice_precios', 'sin pantalla para cargar el INPC del mes: la reexpresión no puede correr'],
   ['regimen_iva', 'sin pantalla para registrarlo, y /proveedores DICE que hay que registrarlo'],
   ['alicuota_igtf', 'sin pantalla para la alícuota de IGTF; hoy la pone el esquema'],
   // Y ésta cierra un círculo: /medidas dice «ese tipo de contrato todavía no tiene

@@ -816,5 +816,18 @@
   "activo.error.ya": "There is already a piece of equipment with that code",
   "activo.error.cuenta": "One of the three accounts does not exist or does not take entries",
   "activo.error.contrato": "That contract does not exist, or does not belong to this company",
-  "activo.error.tasa": "There is no BCV rate for the in-service date, so the cost in the other currency would be made up"
+  "activo.error.tasa": "There is no BCV rate for the in-service date, so the cost in the other currency would be made up",
+  "reex.cargar": "Load the month's CPI",
+  "reex.cargar_explica": "The figure the central bank publishes once a month. Without it nothing can be restated, and restatement is what this whole module is. It is stored dated the first of the month, which is what the calculation looks for.",
+  "reex.indice_anio": "Year",
+  "reex.indice_mes": "Month",
+  "reex.indice_valor": "Published CPI",
+  "reex.indice_cargado": "CPI for {m} saved.",
+  "reex.indices": "Loaded indices",
+  "reex.variacion": "Change",
+  "reex.sin_indices": "No index has been loaded yet.",
+  "reex.error.anio": "That year is not a year",
+  "reex.error.mes_numero": "The month must be a number from 1 to 12",
+  "reex.error.valor": "The CPI must be a number greater than zero",
+  "reex.error.indice_usado": "A posted restatement already used that index. Changing it underneath would leave books nobody can explain again: that restatement has to be reversed first."
 }
