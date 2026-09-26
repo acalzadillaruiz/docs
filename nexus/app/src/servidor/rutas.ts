@@ -62,7 +62,9 @@ import {
 import { pintarProveedores } from '../pantallas/proveedores.ts'
 import { conciliacion, casar, aceptarConNota } from '../dominio/banco.ts'
 import { pintarBanco } from '../pantallas/banco.ts'
-import { equipos, depreciarMes } from '../dominio/activos.ts'
+import {
+  equipos, depreciarMes, registrarActivo, cuentasPara, contratosDeAlquiler,
+} from '../dominio/activos.ts'
 import { pintarActivos } from '../pantallas/activos.ts'
 import { cuadro, asentarMes } from '../dominio/reexpresion.ts'
 import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
@@ -843,7 +845,43 @@ export async function resolver(
     const mes = cuando?.mes ?? hoy.getUTCMonth() + 1
 
     let errores: readonly string[] = []
-    if (p.metodo === 'POST') {
+    let hecho: string | null = null
+    if (p.metodo === 'POST' && p.campos['accion'] === 'alta') {
+      // Dar de alta un equipo. Esto NO EXISTÍA: la pantalla enseñaba los equipos,
+      // calculaba su valor en libros y corría la depreciación del mes sobre una tabla
+      // en la que nada insertaba una fila. Un módulo entero mirando por una ventana a
+      // una tabla vacía para siempre — y alquiler de equipos es uno de los cinco
+      // tipos de contrato de GPS.
+      const costo = decimal(p.campos['costo'])
+      const residual = decimal(p.campos['residual'] ?? '0')
+      const vida = entero(p.campos['vida_meses'])
+      const unidades = decimal(p.campos['unidades_vida'])
+      const contrato = (p.campos['contrato'] ?? '').trim()
+      const r = await comoQuien((q) => registrarActivo(q, org!.organizacion_id, {
+        codigo: p.campos['codigo'] ?? '',
+        descripcionEs: p.campos['descripcion_es'] ?? '',
+        descripcionEn: p.campos['descripcion_en'] ?? '',
+        cuenta: p.campos['cuenta'] ?? '',
+        cuentaDepre: p.campos['cuenta_depre'] ?? '',
+        cuentaGasto: p.campos['cuenta_gasto'] ?? '',
+        enServicio: (p.campos['en_servicio'] ?? '').trim(),
+        moneda: p.campos['moneda'] === 'USD' ? 'USD' : 'VES',
+        // Un campo ilegible llega como NaN, y el dominio lo rechaza preguntando por
+        // lo que TIENE que ser. Aquí no se convierte a cero: un cero silencioso
+        // registraría un equipo con costo cero, que es peor que un error.
+        costo: costo ?? Number.NaN,
+        residual: residual ?? Number.NaN,
+        metodo: p.campos['metodo'] === 'unidades_produccion'
+          ? 'unidades_produccion' : 'linea_recta',
+        vidaMeses: vida,
+        unidadesVida: unidades,
+        contratoId: /^[0-9a-f-]{36}$/i.test(contrato) ? contrato : null,
+      }, p.idioma))
+      if (r.hecho) {
+        hecho = t(p.idioma, 'activo.dado_alta')
+          .replace('{c}', (p.campos['codigo'] ?? '').trim())
+      } else errores = r.errores
+    } else if (p.metodo === 'POST') {
       if (cuando === null) {
         errores = [t(p.idioma, 'periodo.error.fecha')]
       } else {
@@ -853,9 +891,19 @@ export async function resolver(
       }
     }
 
-    const lista = await comoQuien((q) => equipos(q, org!.organizacion_id, p.idioma))
+    const datos = await comoQuien(async (q) => ({
+      lista: await equipos(q, org!.organizacion_id, p.idioma),
+      cuentasActivo: await cuentasPara(q, org!.organizacion_id, 'activo', p.idioma),
+      cuentasGasto: await cuentasPara(q, org!.organizacion_id, 'gasto', p.idioma),
+      contratos: await contratosDeAlquiler(q, org!.organizacion_id),
+    }))
     return html(errores.length === 0 ? 200 : 400,
-      pintarActivos(lista, p.idioma, testigoAnti(testigo), anio, mes, errores))
+      pintarActivos(datos.lista, p.idioma, testigoAnti(testigo), anio, mes, errores, {
+        cuentasActivo: datos.cuentasActivo,
+        cuentasGasto: datos.cuentasGasto,
+        contratos: datos.contratos,
+        hoy: new Date().toISOString().slice(0, 10),
+      }, hecho))
   }
 
   // Donde esta el material. De momento solo de dentro, y es una decision, no un

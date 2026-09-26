@@ -256,6 +256,115 @@ test('NINGUNA función del esquema se queda sin que nadie la llame', async () =>
     huerfanas.join('\n  '))
 })
 
+/**
+ * Tablas que la aplicación no escribe a propósito, y por qué.
+ *
+ * Una tabla que nadie escribe es, casi siempre, **una función que no existe**. Así se
+ * encontró que no había forma de dar de alta un equipo, con `/activos` entera mirando
+ * por una ventana a una tabla vacía para siempre.
+ *
+ * Las que quedan aquí son las que siguen sin puerta, y están escritas con nombre y
+ * apellido en vez de calladas, porque cada una es una pantalla pendiente:
+ */
+const NO_ESCRIBE_LA_APP = new Map<string, string>([
+  // Tablas de referencia que hoy se cargan con el esquema. Las tres necesitan su
+  // pantalla, y las dos primeras bloquean un módulo entero:
+  ['indice_precios', 'sin pantalla para cargar el INPC del mes: la reexpresión no puede correr'],
+  ['regimen_iva', 'sin pantalla para registrarlo, y /proveedores DICE que hay que registrarlo'],
+  ['alicuota_igtf', 'sin pantalla para la alícuota de IGTF; hoy la pone el esquema'],
+  // Y ésta cierra un círculo: /medidas dice «ese tipo de contrato todavía no tiene
+  // plantilla de hitos» y no hay forma de crear una. La pantalla manda hacer algo que
+  // no se puede hacer, que es justo lo que se arregló en el otro extremo.
+  ['plantilla_hito', 'sin pantalla para crear la plantilla de hitos de un tipo de contrato'],
+  // El modelo de capacidades por persona está escrito y no se usa: hoy el alcance lo
+  // decide ser de GPS o ser cliente. No se borra porque es la base de los permisos
+  // finos, pero mientras nada lo escriba ni lo lea, es decoración.
+  ['capacidad', 'modelo de permisos finos sin usar: hoy el alcance es interno/cliente'],
+  ['persona_capacidad', 'igual: ni se escribe ni se lee'],
+])
+
+test('las tablas que la aplicación no escribe están DICHAS, no calladas', async () => {
+  // Es el barrido que encontró que no se podía dar de alta un equipo. No exige que
+  // todas las tablas se escriban —hay tablas de referencia—: exige que las que no se
+  // escriben estén nombradas arriba con el motivo. Una tabla vacía en silencio es un
+  // módulo que no funciona y nadie se ha enterado.
+  const dir = new URL('../../db/schema/', import.meta.url)
+  const archivos = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()
+
+  const sinComentarios = (t: string) => t
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n').map((l) => l.replace(/(--|\/\/).*$/, '')).join('\n')
+
+  const tablas = new Map<string, string>()
+  // Y las funciones del esquema, con su cuerpo: una tabla puede escribirse solo desde
+  // dentro de la base de datos, y entonces la aplicación la escribe llamando a esa
+  // función sin nombrar la tabla nunca. `intento_acceso` es así: la escribe
+  // `anotar_intento()`, y sin esto el barrido la daba por muda estando bien.
+  const funciones = new Map<string, string>()
+  for (const f of archivos) {
+    const limpio = sinComentarios(await readFile(new URL(f, dir), 'utf8'))
+    for (const m of limpio.matchAll(/create table (?:if not exists )?([a-z_0-9]+)/g)) {
+      if (!tablas.has(m[1]!)) tablas.set(m[1]!, f)
+    }
+    // El cuerpo de cada función: desde su cabecera hasta el `$$;` que la cierra.
+    for (const m of limpio.matchAll(
+      /create or replace function ([a-z_0-9]+)\s*\([\s\S]*?\$\$;/g)) {
+      funciones.set(m[1]!, m[0])
+    }
+  }
+  assert.ok(tablas.size >= 40, `solo se leyeron ${tablas.size} tablas: el barrido no barrió`)
+
+  const app: string[] = []
+  const recogerApp = async (base: URL) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recogerApp(u)
+      else if (e.name.endsWith('.ts')) app.push(sinComentarios(await readFile(u, 'utf8')))
+    }
+  }
+  await recogerApp(new URL('../src/', import.meta.url))
+  await recogerApp(new URL('../herramientas/', import.meta.url))
+  const texto = app.join('\n')
+
+  const mudas: string[] = []
+  for (const [tabla, archivo] of tablas) {
+    // Lo que cuenta es que la APLICACIÓN la escriba, directamente o llamando a una
+    // función que lo haga. Lo segundo no se puede ver desde aquí, así que basta con
+    // que el nombre aparezca en un insert, update o delete del código.
+    const escribe = new RegExp(`(insert\\s+into|update|delete\\s+from)\\s+${tabla}\\b`, 'i')
+    if (escribe.test(texto)) continue
+    // O que una función del esquema que la aplicación llama la escriba por ella.
+    if (NO_ESCRIBE_LA_APP.has(tabla)) continue
+    // O que la escriba una función del esquema a la que la aplicación sí llama.
+    const porFuncion = [...funciones.entries()].some(([nombre, cuerpo]) =>
+      escribe.test(cuerpo) && new RegExp(`\\b${nombre}\\s*\\(`).test(texto))
+    if (porFuncion) continue
+    mudas.push(`${tabla} (${archivo})`)
+  }
+  assert.deepEqual(mudas, [],
+    'tablas que la aplicación no escribe ni nombra, y no están declaradas ' +
+    '—casi siempre, una pantalla que falta—:\n  ' + mudas.join('\n  '))
+})
+
+test('y las declaradas siguen sin escribirse: la lista solo puede encoger', async () => {
+  // Si una ya tiene su pantalla, sale de la lista. Si no, la lista miente y vuelve a
+  // dar por resuelto lo que no lo está — que es de lo que va todo este archivo.
+  const app: string[] = []
+  const recogerApp = async (base: URL) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recogerApp(u)
+      else if (e.name.endsWith('.ts')) app.push(await readFile(u, 'utf8'))
+    }
+  }
+  await recogerApp(new URL('../src/', import.meta.url))
+  const texto = app.join('\n')
+  const yaTienen = [...NO_ESCRIBE_LA_APP.keys()].filter((t) =>
+    new RegExp(`(insert\\s+into|update|delete\\s+from)\\s+${t}\\b`, 'i').test(texto))
+  assert.deepEqual(yaTienen, [],
+    `ya se escriben desde la aplicación: quítalas de NO_ESCRIBE_LA_APP: ${yaTienen.join(', ')}`)
+})
+
 test('y el bucle que corre siempre es quien las llama', async () => {
   // Que existan llamadas no basta: tienen que estar en lo que se queda corriendo.
   // Antes estaban llamadas desde las pruebas del esquema y desde ningún sitio más.

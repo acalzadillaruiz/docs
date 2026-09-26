@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 12:05 (España)
+**Última actualización:** 2026-09-26, 12:55 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,45 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el ingreso de una valuación facturada ya entra al libro.
+**Lo último terminado:** **dar de alta un equipo. No había forma.** `/activos`
+enseñaba los equipos, calculaba su valor en libros, el rendimiento de los alquilados
+y corría la depreciación del mes… **sobre una tabla en la que nada, en ninguna parte,
+insertaba una fila.** Un módulo entero mirando por una ventana a una tabla vacía para
+siempre — y alquiler de equipos es uno de los cinco tipos de contrato de GPS.
+
+Lo encontró un barrido nuevo: **tablas del esquema que la aplicación nunca escribe.**
+Una tabla que nadie escribe es una función que no existe. Y las pruebas viejas no lo
+veían porque insertan sus equipos a mano: el fixture hacía lo que la aplicación no
+hacía, otra vez.
+
+El formulario tiene trece casillas y devuelve **todos** los errores de una vez, no el
+primero: de uno en uno son cuatro vueltas. Las tres cuentas vienen ya en la que casi
+siempre toca, con la lista entera al lado. Un costo ilegible no entra como cero (se
+pregunta `!(x > 0)`, porque `NaN <= 0` es falso). Y sin tasa del BCV del día en que
+entra en servicio no se registra: el costo en la otra moneda saldría inventado.
+
+**El barrido ya es permanente, y lo que aún no tiene puerta está DICHO, no callado.**
+`pruebas/mantenimiento.test.ts` lleva un mapa con las tablas que la aplicación no
+escribe y el motivo de cada una. Hoy quedan cinco, y la lista solo puede encoger:
+
+| Tabla | Qué falta |
+|---|---|
+| `indice_precios` | sin pantalla para cargar el INPC del mes: **la reexpresión no puede correr** |
+| `regimen_iva` | sin pantalla, y `/proveedores` **dice** que hay que registrarlo |
+| `plantilla_hito` | sin pantalla, y `/medidas` **dice** «ese tipo de contrato todavía no tiene plantilla» |
+| `alicuota_igtf` | hoy la pone el esquema |
+| `capacidad`, `persona_capacidad` | permisos finos escritos y sin usar; hoy el alcance es interno/cliente |
+
+Las tres primeras son pantallas que mandan hacer algo que no se puede hacer. Son el
+trozo siguiente, por ese orden.
+
+De paso, el barrido de claves del diccionario funcionó al revés y también está bien:
+`activo.costo` dejó de estar sin usar, así que **falló** hasta que salió de
+`i18n/sin_pantalla.txt`. La raya encoge sola o no encoge.
+
+818 pruebas, todas pasan.
+
+**Antes:** **el ingreso de una valuación facturada ya entra al libro.
 No entraba.**
 
 `asentar_valuacion()` existe en el esquema desde el principio, hace el asiento de la

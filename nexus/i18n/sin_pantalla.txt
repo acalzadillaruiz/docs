@@ -12,7 +12,6 @@ acceso.codigo_recuperacion
 acceso.entrar
 acceso.segundo_factor
 acceso.sin_permiso
-activo.costo
 activo.depreciado
 activo.rendimiento
 avance.declarado

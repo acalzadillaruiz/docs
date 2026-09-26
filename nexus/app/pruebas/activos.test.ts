@@ -189,3 +189,184 @@ test('el cliente no llega a los equipos', async () => {
     /permission denied|no existe/,
   )
 })
+
+// ===========================================================================
+// Y ANTES DE TODO ESTO: dar de alta un equipo.
+//
+// No existía. La pantalla enseñaba los equipos, calculaba su valor en libros, el
+// rendimiento de los alquilados y corría la depreciación del mes... sobre una tabla en
+// la que **nada, en ninguna parte, insertaba una fila**. Un módulo entero mirando por
+// una ventana a una tabla vacía para siempre, y alquiler de equipos es uno de los
+// cinco tipos de contrato de GPS.
+//
+// Lo encontró un barrido nuevo: tablas del esquema que la aplicación nunca escribe.
+// Una tabla que nadie escribe es una función que no existe. Las pruebas de arriba no
+// lo veían porque insertan sus equipos a mano — el fixture hacía lo que la aplicación
+// no hacía, otra vez.
+
+const { registrarActivo, cuentasPara, contratosDeAlquiler } =
+  await import('../src/dominio/activos.ts')
+
+/** Un equipo válido, al que cada prueba le cambia lo que quiere romper. */
+const bueno = () => ({
+  codigo: `ALTA-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+  descripcionEs: 'Compresor de alta', descripcionEn: 'High pressure compressor',
+  cuenta: '1.2.01.04', cuentaDepre: '1.2.02', cuentaGasto: '5.2.05',
+  enServicio: '2026-01-15', moneda: 'VES' as const,
+  costo: 120000, residual: 20000,
+  metodo: 'linea_recta' as const, vidaMeses: 60, unidadesVida: null,
+  contratoId: null,
+})
+
+test('dar de alta un equipo: antes no había forma, y el módulo entero era una ventana', async () => {
+  const e = bueno()
+  const r = await dentro((q) => registrarActivo(q, G, e, 'es'))
+  assert.equal(r.hecho, true, (r as { errores?: string[] }).errores?.join(' · '))
+
+  // Y aparece en la pantalla, que es la mitad que importa.
+  const lista = await dentro((q) => equipos(q, G, 'es'))
+  assert.ok(lista.some((x) => x.codigo === e.codigo), 'no salió en la lista de equipos')
+})
+
+test('y entra en la depreciación del mes, que es para lo que sirve', async () => {
+  const e = { ...bueno(), enServicio: '2026-01-15' }
+  const r = await dentro((q) => registrarActivo(q, G, e, 'es'))
+  assert.equal(r.hecho, true)
+  const id = (r as { id: string }).id
+  // Línea recta: (120.000 − 20.000) / 60 = 1.666,67 al mes.
+  const [c] = (await dentro((q) => q`
+    select cuota_depreciacion(${id}::uuid, 2026, 3)::text as cuota
+  `)) as unknown as Array<{ cuota: string }>
+  assert.equal(Number(c!.cuota), 1666.67)
+})
+
+test('el formulario da TODOS los errores de una vez, no el primero', async () => {
+  // Trece casillas. Uno de cada vez son cuatro vueltas al formulario.
+  const r = await dentro((q) => registrarActivo(q, G, {
+    ...bueno(), codigo: '  ', descripcionEn: '', costo: Number.NaN, enServicio: 'ayer',
+  }, 'es'))
+  assert.equal(r.hecho, false)
+  const errs = (r as { errores: readonly string[] }).errores
+  assert.ok(errs.length >= 4, `solo dio ${errs.length} errores: ${errs.join(' · ')}`)
+})
+
+test('un costo ilegible NO entra como cero', async () => {
+  // `Number('mucho')` no falla: devuelve NaN. Y `NaN <= 0` es falso, así que una
+  // comprobación escrita al revés lo dejaría pasar y registraría un equipo de coste
+  // cero, que no se deprecia nunca y nadie entiende por qué.
+  const r = await dentro((q) => registrarActivo(q, G, { ...bueno(), costo: Number.NaN }, 'es'))
+  assert.equal(r.hecho, false)
+  assert.ok((r as { errores: readonly string[] }).errores.some((x) => /costo/i.test(x)))
+})
+
+test('el valor residual no puede llegar al costo', async () => {
+  for (const residual of [120000, 130000]) {
+    const r = await dentro((q) => registrarActivo(q, G, { ...bueno(), residual }, 'es'))
+    assert.equal(r.hecho, false, `residual ${residual} no puede valer`)
+  }
+})
+
+test('por horas de operación hacen falta las horas, y por meses los meses', async () => {
+  const sinHoras = await dentro((q) => registrarActivo(q, G, {
+    ...bueno(), metodo: 'unidades_produccion', unidadesVida: null,
+  }, 'es'))
+  assert.equal(sinHoras.hecho, false)
+
+  const sinMeses = await dentro((q) => registrarActivo(q, G, {
+    ...bueno(), metodo: 'linea_recta', vidaMeses: null,
+  }, 'es'))
+  assert.equal(sinMeses.hecho, false)
+
+  // Y por horas, con sus horas, sí entra.
+  const bien = await dentro((q) => registrarActivo(q, G, {
+    ...bueno(), metodo: 'unidades_produccion', vidaMeses: null, unidadesVida: 20000,
+  }, 'es'))
+  assert.equal(bien.hecho, true, (bien as { errores?: string[] }).errores?.join(' · '))
+})
+
+test('el mismo código no se da de alta dos veces', async () => {
+  const e = bueno()
+  assert.equal((await dentro((q) => registrarActivo(q, G, e, 'es'))).hecho, true)
+  const otra = await dentro((q) => registrarActivo(q, G, e, 'es'))
+  assert.equal(otra.hecho, false)
+})
+
+test('hace falta la descripción en los DOS idiomas', async () => {
+  // Bilingüe desde el primer día: un equipo con nombre en un solo idioma sale como un
+  // hueco en la pantalla del otro.
+  const r = await dentro((q) => registrarActivo(q, G, { ...bueno(), descripcionEn: '' }, 'es'))
+  assert.equal(r.hecho, false)
+  const en = await dentro((q) => registrarActivo(q, G, { ...bueno(), descripcionEs: '' }, 'es'))
+  assert.equal(en.hecho, false)
+})
+
+test('una cuenta de agrupación no vale: dejaría saldo donde no debe haberlo', async () => {
+  // '1.2' es un nivel de agrupación, no imputable. La base de datos lo aceptaría
+  // —solo mira que exista— y el mayor quedaría con saldo en un nivel intermedio.
+  const r = await dentro((q) => registrarActivo(q, G, { ...bueno(), cuenta: '1.2' }, 'es'))
+  assert.equal(r.hecho, false)
+  const inventada = await dentro((q) =>
+    registrarActivo(q, G, { ...bueno(), cuentaGasto: '9.9.99' }, 'es'))
+  assert.equal(inventada.hecho, false)
+})
+
+test('sin tasa del BCV de ese día no se registra: el costo en la otra moneda sería inventado', async () => {
+  const r = await dentro((q) =>
+    registrarActivo(q, G, { ...bueno(), enServicio: '2019-03-07' }, 'es'))
+  assert.equal(r.hecho, false)
+  assert.ok((r as { errores: readonly string[] }).errores.some((x) => /BCV|tasa/i.test(x)))
+})
+
+test('el contrato de otra empresa no se le puede imputar', async () => {
+  const otra = '0b1c2d3e-9900-0000-0000-00000000000a'
+  const ctrAjeno = '0b1c2d3e-9900-0000-0000-00000000000b'
+  await dentro(async (q) => {
+    await q.unsafe(`
+      set local role none;
+      insert into organizacion (id, tipo, nombre, rif)
+        values ('${otra}','gps','GPS Equipos Otra','J-907100000-0')
+        on conflict (id) do nothing;
+      insert into contrato (id, organizacion_id, cliente_id, codigo, tipo, titulo_es,
+                            titulo_en, estado, moneda, monto, tasa_id, creado_por)
+        values ('${ctrAjeno}','${otra}','${C}','EQ-AJENO','alquiler','De otra','Other',
+                'vigente','VES', 1000.00,'${TASA}','${YO}')
+        on conflict (id) do nothing;
+    `)
+  })
+  const r = await dentro((q) =>
+    registrarActivo(q, G, { ...bueno(), contratoId: ctrAjeno }, 'es'))
+  assert.equal(r.hecho, false)
+  assert.ok((r as { errores: readonly string[] }).errores.some((x) => /contrato/i.test(x)))
+})
+
+test('las listas del formulario traen lo que se puede elegir, y nada más', async () => {
+  const activo = await dentro((q) => cuentasPara(q, G, 'activo', 'es'))
+  const gasto = await dentro((q) => cuentasPara(q, G, 'gasto', 'es'))
+  assert.ok(activo.some((c) => c.codigo === '1.2.01.04'), 'falta la cuenta de equipos de alquiler')
+  assert.ok(gasto.some((c) => c.codigo === '5.2.05'), 'falta la cuenta de gasto de depreciación')
+  // Ninguna de agrupación: si sale en la lista, alguien la elige.
+  assert.equal(activo.some((c) => c.codigo === '1.2'), false)
+
+  const ctrs = await dentro((q) => contratosDeAlquiler(q, G))
+  assert.ok(ctrs.every((c) => c.codigo !== 'EQ-AJENO'), 'ofrece el contrato de otra empresa')
+})
+
+test('la pantalla trae el formulario, y en los dos idiomas', async () => {
+  const lista = await dentro((q) => equipos(q, G, 'es'))
+  const alta = {
+    cuentasActivo: await dentro((q) => cuentasPara(q, G, 'activo', 'es')),
+    cuentasGasto: await dentro((q) => cuentasPara(q, G, 'gasto', 'es')),
+    contratos: await dentro((q) => contratosDeAlquiler(q, G)),
+    hoy: '2026-03-01',
+  }
+  for (const idioma of ['es', 'en'] as const) {
+    const h = pintarActivos(lista, idioma, 'af', 2026, 3, [], alta)
+    assert.match(h, /name="accion" value="alta"/, `${idioma}: no hay formulario de alta`)
+    assert.match(h, /name="cuenta_depre"/)
+    assert.equal(h.includes('‹falta:'), false, `${idioma} tiene una clave sin traducir`)
+  }
+  // Y sin los datos del alta, la pantalla sigue saliendo: es lo que llaman las
+  // pruebas viejas, y romperlas para añadir esto habría sido peor.
+  const sin = pintarActivos(lista, 'es', 'af', 2026, 3)
+  assert.doesNotMatch(sin, /name="accion" value="alta"/)
+})
