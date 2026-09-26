@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 16:10 (España)
+**Última actualización:** 2026-09-26, 19:40 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -10,8 +10,11 @@
 > avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
 > avance lo que el sistema impide hacer con el de un contrato.
 >
-> Lo que hay construido, contado: **40 direcciones que se pueden abrir** y 26
-> pantallas, sobre las 119 vistas del plan completo. Lo que está **entero y probado
+> Lo que hay construido, contado a mano sobre el código de hoy: **28 módulos de
+> pantalla** y **137 páginas** en el recorrido exportado, sobre las 119 vistas del plan
+> completo (una vista del plan sale en varias páginas: con datos, vacía, y con error).
+> Las cifras de antes decían «40 direcciones y 26 pantallas» y no salen de ninguna
+> cuenta que sepa repetir, así que se cambian por las que sí. Lo que está **entero y probado
 > de punta a punta** es la contabilidad —las 36 vistas que el CEO mandó primero— más
 > el núcleo de contratos, evidencia y valuaciones que la sostiene. Lo que **no está**
 > son las fases de logística y procura, calidad, el portal del cliente más allá de lo
@@ -31,52 +34,85 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **todo lo que hace falta para desplegarla de verdad.** El CEO
+**Lo último terminado:** **las plantillas de hitos, y el guardián de que sumen 100.** Era
+el trozo que estaba aparcado a propósito, y con razón: el guardián solo, sin pantalla para
+arreglar una plantilla, bloquearía el alta de contratos sin dar forma de desbloquearla.
+Ahora van los dos juntos. `plantilla_hito` **sale de `NO_ESCRIBE_LA_APP`**: era la última
+tabla de esa lista que era una pantalla mandando algo imposible (`/medidas` decía «ese tipo
+de contrato todavía no tiene plantilla de hitos» y no había forma de crear una).
+
+El fallo silencioso que esto cierra: **si una plantilla suma 90, un renglón con TODOS sus
+hitos verificados se queda para siempre en el 90 %** y no sale un error en ninguna parte.
+Sale un contrato que no acaba de avanzar y la explicación está en una tabla que nadie
+mira. El comentario «la suma por tipo debe dar 100» llevaba ahí desde el primer día y era
+un comentario, no una comprobación.
+
+Cómo queda sujeto, en tres sitios y a propósito:
+
+1. **La base de datos.** `suma_plantilla(tipo)` y, dentro de
+   `crear_hitos_desde_plantilla`, el rechazo con su explicación. Es la que no se puede
+   saltar: la comprueba cualquier camino que alguien añada mañana.
+2. **El dominio**, en los DOS sitios que crean hitos —el alta de un contrato y el botón de
+   `/medidas`—, para que quien pulsa lea una frase en su idioma en vez de encontrarse una
+   transacción abortada.
+3. **La pantalla** `/plantillas`, donde **la suma va delante**, en verde o en rojo, con el
+   número de renglones que ya tienen hitos hechos con cada plantilla. Se puede guardar una
+   plantilla a medias —montar una nueva empieza por dejarla en 25— pero no usarla.
+
+**El agujero que encontró el barrido de formularios en blanco**, y que es lo más
+importante de este trozo: la primera versión puso un botón «Quitar» por paso, con el tipo
+y el orden ya metidos en campos escondidos. Mandar los formularios sin tocar nada **dejaba
+la tabla vacía**, y con la tabla vacía no se puede dar de alta ni un contrato de ningún
+tipo, porque los hitos salen de ahí. Ahora quitar un paso **exige escribir su clave**,
+igual que dar de baja a una persona exige escribir el motivo. Es el mismo fallo y la
+segunda vez.
+
+**Dos pruebas que pasaban en vano, encontradas por el camino y arregladas:**
+
+- *«un tipo de contrato sin plantilla lo DICE»* buscaba un tipo sin plantilla y, al no
+  haber ninguno, afirmaba `true` y salía — lo decía en un comentario. Al construir la
+  situación seguía pasando **con el borrado desactivado**, porque le pedía los hitos a un
+  renglón que ya los tenía: el rechazo venía de otra cosa. Ahora el renglón nace limpio
+  dentro de la prueba y se afirma **cuál** de los cinco rechazos vuelve. Un
+  `hecho === false` no dice nada cuando hay cinco maneras de ser falso.
+- Y eso destapó **dos términos del diccionario con la misma frase exacta**
+  (`medida.error.sin_plantilla` y `plantilla.error.sin_plantilla`) y una comprobación
+  muerta en `medidas.ts`: `plantillaUsable` ya llegaba a la misma conclusión con las
+  mismas palabras. Fuera la rama y fuera el término duplicado. Dos maneras de llegar al
+  mismo sitio no son dos cerraduras: son una cerradura y una copia que hay que acordarse
+  de cambiar.
+
+**Y una lección de pruebas que costó una vuelta entera:** las doce pruebas nuevas pasaban
+solas y **tumbaban trece de otros dos archivos**. `plantilla_hito` no lleva
+`organizacion_id`: es la misma tabla para todas las operadoras y para todos los archivos de
+prueba, que corren **a la vez**. Rompían la plantilla, comprobaban, y la devolvían a su
+sitio — y en esa ventana otro archivo daba de alta un contrato de alquiler y se la
+encontraba a medias. **Restaurar después no sirve; lo que sirve es que lo roto no se
+publique nunca.** Todo va dentro de una transacción que se deshace, y un `after` comprueba
+que la plantilla quedó exactamente como la trajo el esquema, para que quien añada mañana
+una prueba que escriba fuera de ahí lo vea fallar en su archivo y no en el de otro.
+
+**850 pruebas, todas pasan.** Verificado rompiendo a propósito: el guardián de la suma (la
+prueba que llama a la función de la base se pone roja), el barrido de tablas sin puerta (se
+pone rojo si se vuelve a declarar `plantilla_hito`), el guardián del `after` (se pone rojo
+si una prueba deja rastro), y la cerradura de `plantillaUsable`.
+
+Quedan **tres tablas sin puerta** y **ninguna es ya una pantalla mandando algo
+imposible**: `alicuota_igtf` (la alícuota de IGTF cambia por gaceta y hoy cambiarla es
+editar el esquema), y `capacidad` / `persona_capacidad`, que son el modelo de permisos
+finos sin usar — hoy el alcance lo decide ser de GPS o ser cliente.
+
+**Antes:** **todo lo que hace falta para desplegarla de verdad.** El CEO
 probó `localhost:8080` y no funcionaba, con razón: ese servidor corría dentro del
 contenedor de la sesión. Eligió desplegar, con `nexus.grupoprimesupply.com`, y me dejó
-elegir dónde.
+elegir dónde. **Elegido: un VPS de Hostinger con Docker**, con sus contras escritos en
+`DESPLEGAR.md`. Está todo preparado y probado salvo las tres cosas que necesitan un demonio
+de Docker, que esta máquina no tiene: construir la imagen, `docker compose up`, y que Caddy
+saque el certificado.
 
-**Elegido: un VPS de Hostinger con Docker.** Los documentos van a disco —y sin el acta de
-recepción el avance deja de poder demostrarse, que es de lo que va el producto—, el
-dominio ya está en Hostinger, y pagar a una plataforma de EE. UU. con tarjeta desde
-Venezuela es un problema que no conviene tener entre el CEO y su propio sistema. Está
-escrito con sus contras en `DESPLEGAR.md`.
-
-Lo que hay, en `nexus/despliegue/` y `nexus/DESPLEGAR.md`:
-
-| Pieza | Qué resuelve |
-|---|---|
-| `herramientas/migrar.ts` | Cargar el esquema en una base **con datos**. `probar.sh` la borra y la rehace; un servidor no. Aplica cada archivo una vez, lo anota, y **se para si un archivo ya aplicado cambió** en vez de dejar el servidor con un esquema distinto del repositorio. |
-| `herramientas/instalar.ts` | Un despliegue nuevo tiene cero personas, e invitar exige sesión: **arrancaba y no había forma de entrar**. Crea la empresa, la cuenta de servicio —que **no puede entrar**, inactiva y con credenciales que nadie ve—, el plan de cuentas, y una invitación cuyo enlace imprime. |
-| `Dockerfile` | Sin paso de compilación: Node 22 ejecuta el TypeScript, así que lo que corre es el archivo que se lee. Sin privilegios, documentos en volumen. |
-| `compose.yml` | Base, esquema (corre y se va), aplicación, bucle de avisos y Caddy. Nada más. |
-| `Caddyfile` | TLS que se renueva solo. El certificado caducado a los tres meses queda fuera del mapa. |
-| `respaldar.sh` | Base **y documentos**, catorce días, y al terminar imprime la orden de restaurar — porque un respaldo que nadie restauró no es un respaldo. |
-
-**Probado de verdad:** el migrador contra una base con datos (34 archivos, segunda pasada
-sin hacer nada, y el guardián del archivo cambiado); `instalar.ts` y después el circuito
-entero por HTTP —abrir el enlace sin sesión, crear la cuenta, recibir el secreto y los
-diez códigos, entrar, llegar a Personas y accesos— y que la cuenta de servicio **no**
-entra; que las rutas del diccionario y del esquema resuelven con la disposición de la
-imagen, recreada aparte; y que `compose.yml` es válido y exige sus tres variables
-nombrando la que falta.
-
-**NO ejecutado, y dicho en DESPLEGAR.md:** construir la imagen, `docker compose up` y que
-Caddy saque el certificado. En esta máquina hay cliente de Docker pero **no demonio**.
-
-**Trozo aparcado a medias, a propósito:** el guardián de que una plantilla de hitos sume
-100 (`suma_plantilla` + la comprobación dentro de `crear_hitos_desde_plantilla`). Lo
-escribí y lo borré sin commitear: **sin la pantalla para arreglar una plantilla,
-bloquearía el alta de contratos sin dar forma de desbloquearla**, que es peor que el
-problema. Va junto con la pantalla de plantillas, que es el trozo siguiente — la última
-tabla de `NO_ESCRIBE_LA_APP` que es una pantalla mandando algo imposible (`/medidas` dice
-«ese tipo de contrato todavía no tiene plantilla de hitos»).
-
-El fallo silencioso que ese guardián evita, para no perderlo: si una plantilla suma 90,
-**un renglón con todos sus hitos verificados se queda para siempre en el 90 %** y nadie
-ve un error. Hoy las cinco plantillas suman 100, comprobado.
-
-833 pruebas, todas pasan. **El push ya funciona** desde `6cab0d5`.
+**Lo que espera al CEO, y bloquea el despliegue:** crear el VPS en Hostinger, añadir el
+registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md` y ninguno lleva más de diez minutos.
 
 **Antes:** **registrar el régimen de IVA de la empresa.** La pantalla de
 proveedores decía, con estas palabras: «Esta empresa no consta como agente de retención

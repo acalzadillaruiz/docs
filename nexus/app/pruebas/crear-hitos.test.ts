@@ -18,6 +18,7 @@ import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { resolver, type Peticion } from '../src/servidor/rutas.ts'
 import { crearHitos } from '../src/dominio/medidas.ts'
+import { t } from '../src/i18n/t.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
@@ -240,26 +241,42 @@ test('sin el testigo antifalsificación no pasa, y no escribe nada', async () =>
   assert.equal(despues!.n, antes!.n)
 })
 
-test('un tipo de contrato sin plantilla lo DICE, no se queda callado', async () => {
-  // Sin plantilla la función devuelve cero y la pantalla saldría igual, sin una línea.
-  // Ninguna acción contesta con el cuerpo vacío.
-  const sinPlantilla = (await dentro((q) => q`
-    select t.tipo::text as tipo from unnest(enum_range(null::tipo_contrato)) as t(tipo)
-     where not exists (select 1 from plantilla_hito pl where pl.tipo = t.tipo)
-     limit 1
-  `)) as unknown as Array<{ tipo: string }>
-
-  if (sinPlantilla.length === 0) {
-    // Si algún día todos los tipos tienen plantilla, esta prueba no puede comprobar
-    // nada — y decirlo es mejor que pasar en vano.
-    assert.ok(true)
-    return
+test('un tipo de contrato sin plantilla lo DICE, y lo dice por ESO', async () => {
+  // Esta prueba llevaba dos vidas sin comprobar nada.
+  //
+  // La primera buscaba un tipo de contrato sin plantilla y, al no encontrar ninguno —los
+  // cinco la tienen desde el primer día—, afirmaba `true` y salía. La segunda vaciaba la
+  // plantilla a propósito, que era lo que faltaba, pero se la pedía a un renglón que YA
+  // tenía hitos: `crearHitos` lo rechazaba por eso, y la prueba pasaba igual con el
+  // borrado desactivado. Comprobado desactivándolo.
+  //
+  // De ahí las dos cosas que hace ahora: el renglón es el que no tiene hitos, y lo que se
+  // afirma es CUÁL de los cinco rechazos vuelve. Un `hecho === false` no dice nada cuando
+  // hay cinco maneras distintas de ser falso.
+  //
+  // Y todo dentro de una transacción que se deshace: `plantilla_hito` es la misma tabla
+  // para todos los archivos de prueba, que corren a la vez.
+  class Deshacer extends Error {}
+  try {
+    await dentro(async (q) => {
+      await q`update contrato set tipo = 'alquiler'::tipo_contrato
+               where id = ${CTR}::uuid`
+      await q`delete from plantilla_hito where tipo = 'alquiler'::tipo_contrato`
+      // Un renglón nuevo, y no uno de los de arriba: las pruebas de este archivo corren
+      // en orden y les han ido saliendo hitos, así que `RG` tampoco estaba limpio a
+      // estas alturas. Nace aquí dentro y se va con la transacción.
+      const [nuevo] = (await q`
+        insert into renglon (contrato_id, numero, descripcion_es, descripcion_en,
+                             unidad, cantidad, precio_unitario)
+        values (${CTR}::uuid, 99,'Recién nacido','Newborn','und', 1, 1000.00)
+        returning id`) as unknown as Array<{ id: string }>
+      const r = await crearHitos(q, nuevo!.id, G, 'es')
+      assert.equal(r.hecho, false, 'creó hitos sin plantilla de la que sacarlos')
+      assert.equal((r as { motivo: string }).motivo, t('es', 'plantilla.error.sin_plantilla'),
+        'lo rechazó, pero por otra cosa: la prueba no está comprobando la plantilla')
+      throw new Deshacer()
+    })
+  } catch (e) {
+    if (!(e instanceof Deshacer)) throw e
   }
-  await dentro((q) => q`
-    update contrato set tipo = ${sinPlantilla[0]!.tipo}::tipo_contrato
-     where id = ${CTR}::uuid`)
-  const r = await comoMi((q) => crearHitos(q, RG_CON, G, 'es'))
-  assert.equal(r.hecho, false)
-  await dentro((q) => q`
-    update contrato set tipo = 'procura'::tipo_contrato where id = ${CTR}::uuid`)
 })

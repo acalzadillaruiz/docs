@@ -26,6 +26,7 @@
  */
 
 import type { Consulta } from '../db/conexion.ts'
+import { plantillaUsable } from './plantillas.ts'
 import { t, type Clave, type Idioma } from '../i18n/t.ts'
 
 export type TipoContrato =
@@ -117,6 +118,18 @@ export async function crearContrato(
        where organizacion_id = ${orgId}::uuid and codigo = ${c.codigo.trim()}
     `) as unknown as Array<{ x: number }>
     if (ya) errores.push(t(idioma, 'alta.error.codigo'))
+  }
+
+  // La plantilla de hitos de ese tipo tiene que sumar 100 antes de crear nada. La base
+  // de datos también lo comprueba y levanta una excepción, pero una excepción dentro de
+  // la transacción la aborta entera y deja a quien pulsó sin nada que leer. Las dos
+  // cosas: el mensaje aquí, la cerradura allí.
+  //
+  // Va aquí y no en `revisar` porque `revisar` es sincrona y pura, y está bien que lo
+  // sea: lo que necesita preguntar a la base se pregunta donde hay una consulta.
+  if (errores.length === 0) {
+    const u = await plantillaUsable(q, c.tipo, idioma)
+    if (!u.sirve) errores.push(u.motivo)
   }
 
   // La tasa del día se congela al crear. Sin ella no hay contrato: un monto sin tasa

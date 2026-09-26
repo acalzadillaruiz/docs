@@ -78,6 +78,8 @@ import {
   desactivar, reactivar, abrirInvitacion, aceptar,
 } from '../dominio/personas.ts'
 import { pintarPersonas } from '../pantallas/personas.ts'
+import { plantillas, guardarPaso, quitarPaso, plantillaUsable } from '../dominio/plantillas.ts'
+import { pintarPlantillas } from '../pantallas/plantillas.ts'
 import { iconoPng, iconoSvg } from './icono.ts'
 import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
 import { pintarPagar } from '../pantallas/pagar.ts'
@@ -1052,6 +1054,53 @@ export async function resolver(
     return html(errores.length === 0 ? 200 : 400,
       pintarCaja({ cajas: lista, cuentas, contratos, porContrato: porCtr, hoy },
         p.idioma, testigoAnti(testigo), errores))
+  }
+
+  // Las plantillas de hitos. De aquí salen los hitos de todos los renglones y del hito
+  // verificado sale el avance: es la pantalla de la que cuelga la tesis del producto, y
+  // la escribía solo el archivo de esquema que la sembró el primer día.
+  if (p.ruta === '/plantillas' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    let errores: readonly string[] = []
+    let hecho: string | null = null
+    if (p.metodo === 'POST') {
+      const tipo = (p.campos['tipo'] ?? '').trim()
+      const orden = entero(p.campos['orden'])
+      if (p.campos['accion'] === 'quitar') {
+        const r = await comoQuien((q) => quitarPaso(
+          q, tipo, orden ?? -1, p.campos['clave'] ?? '', p.idioma))
+        if (r.hecho) hecho = t(p.idioma, 'plantilla.quitado').replace('{t}', tipo)
+        else errores = r.errores
+      } else {
+        // Las casillas de evidencia llegan repetidas —`exige=foto&exige=acta`— y
+        // `campos` solo guarda la última. Leerlas de ahí dejaría marcada siempre una.
+        const exige = p.repetidos?.['exige'] ?? (p.campos['exige'] ? [p.campos['exige']] : [])
+        const r = await comoQuien((q) => guardarPaso(q, {
+          tipo,
+          orden: orden ?? Number.NaN,
+          clave: p.campos['clave'] ?? '',
+          nombreEs: p.campos['nombre_es'] ?? '',
+          nombreEn: p.campos['nombre_en'] ?? '',
+          // Un peso ilegible llega como NaN y el dominio lo rechaza. Cero silencioso
+          // dejaría un paso que no aporta nada al avance y no se vería.
+          peso: decimal(p.campos['peso']) ?? Number.NaN,
+          exige,
+        }, p.idioma))
+        if (r.hecho) {
+          hecho = t(p.idioma, 'plantilla.guardado')
+            .replace('{c}', (p.campos['clave'] ?? '').trim().toLowerCase())
+            .replace('{t}', tipo)
+        } else errores = r.errores
+      }
+    }
+
+    const lista = await comoQuien((q) => plantillas(q, p.idioma))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarPlantillas(lista, p.idioma, testigoAnti(testigo), errores, hecho))
   }
 
   // Personas y accesos. Solo GPS: si el cliente pudiera invitar a su propia gente,

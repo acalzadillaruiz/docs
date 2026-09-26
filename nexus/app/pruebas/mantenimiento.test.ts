@@ -267,13 +267,9 @@ test('NINGUNA función del esquema se queda sin que nadie la llame', async () =>
  * apellido en vez de calladas, porque cada una es una pantalla pendiente:
  */
 const NO_ESCRIBE_LA_APP = new Map<string, string>([
-  // Tablas de referencia que hoy se cargan con el esquema. Las tres necesitan su
-  // pantalla, y las dos primeras bloquean un módulo entero:
+  // La única tabla de referencia que sigue sin pantalla. La alícuota de IGTF cambia por
+  // gaceta, y hoy cambiarla es editar el esquema y volver a desplegar:
   ['alicuota_igtf', 'sin pantalla para la alícuota de IGTF; hoy la pone el esquema'],
-  // Y ésta cierra un círculo: /medidas dice «ese tipo de contrato todavía no tiene
-  // plantilla de hitos» y no hay forma de crear una. La pantalla manda hacer algo que
-  // no se puede hacer, que es justo lo que se arregló en el otro extremo.
-  ['plantilla_hito', 'sin pantalla para crear la plantilla de hitos de un tipo de contrato'],
   // El modelo de capacidades por persona está escrito y no se usa: hoy el alcance lo
   // decide ser de GPS o ser cliente. No se borra porque es la base de los permisos
   // finos, pero mientras nada lo escriba ni lo lea, es decoración.

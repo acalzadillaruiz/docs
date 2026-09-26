@@ -27,6 +27,7 @@
 
 import type { Consulta } from '../db/conexion.ts'
 import { moneda, numero, t, type Idioma } from '../i18n/t.ts'
+import { plantillaUsable } from './plantillas.ts'
 
 export type FilaBrecha = {
   readonly contrato: string
@@ -233,11 +234,14 @@ export async function crearHitos(
   // contestan lo mismo. Distinguirlas diría si existe un renglón que no es tuyo.
   if (!r) return { hecho: false, motivo: t(idioma, 'medida.error.no_existe') }
   if (r.hitos > 0) return { hecho: false, motivo: t(idioma, 'medida.error.ya_tiene') }
-  if (r.pasos === 0) {
-    // Sin plantilla la función devolvería 0 y la pantalla se quedaría igual, sin
-    // decir nada. Ninguna acción contesta con el cuerpo vacío.
-    return { hecho: false, motivo: t(idioma, 'medida.error.sin_plantilla') }
-  }
+  // Que haya plantilla, y que sume 100. Con 90, este renglón no pasaría del 90 % ni con
+  // todo verificado, y no saldría ningún error en ninguna parte: saldría un contrato que
+  // no avanza. Las dos cosas las contesta `plantillaUsable`, y por eso aquí ya no hay un
+  // `pasos === 0` aparte: lo había, con su propio término del diccionario, y decía
+  // exactamente la misma frase. Dos maneras de llegar al mismo sitio no son dos
+  // cerraduras, son una cerradura y una copia que hay que acordarse de cambiar.
+  const u = await plantillaUsable(q, r.tipo, idioma)
+  if (!u.sirve) return { hecho: false, motivo: u.motivo }
 
   const [n] = (await q`
     select crear_hitos_desde_plantilla(${renglonId}::uuid) as n

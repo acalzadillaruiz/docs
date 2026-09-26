@@ -124,6 +124,7 @@ const PAGINAS: Array<Pagina> = [
   { archivo: 'importar', ruta: '/importar' },
   { archivo: 'contratos-nuevo', ruta: '/contratos/nuevo' },
   { archivo: 'personas', ruta: '/personas' },
+  { archivo: 'plantillas', ruta: '/plantillas' },
   { archivo: 'perfil', ruta: '/perfil' },
   // Lo de antes de entrar. Va sin sesion a proposito: es lo que ve alguien que
   // todavia no tiene cuenta, y es la mitad del producto que nadie habia visto.

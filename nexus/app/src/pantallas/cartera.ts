@@ -215,6 +215,7 @@ ${ESTILOS_AVANCE}
   ${esCliente ? '' : `<a class="medidas" href="/banco">${escapar(t('banco.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/caja">${escapar(t('caja.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/periodos">${escapar(t('periodo.titulo'))}</a>`}
+  ${esCliente ? '' : `<a class="medidas" href="/plantillas">${escapar(t('plantilla.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/personas">${escapar(t('persona.titulo'))}</a>`}
   <a class="medidas" href="/perfil">${escapar(t('perfil.titulo'))}</a>
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
