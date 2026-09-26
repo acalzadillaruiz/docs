@@ -509,7 +509,7 @@
   "libro.debito": "Output VAT",
   "libro.credito": "Input VAT",
   "libro.retenido": "VAT withheld",
-  "libro.total": "Total",
+  "libro.total": "Total incl. VAT",
   "libro.totales": "Month totals",
   "libro.totales_explica": "These are the figures that get filed. There is no other version anywhere.",
   "libro.bajar": "Download the ledger as a spreadsheet",

@@ -13,7 +13,7 @@
  */
 
 import type { Consulta } from '../db/conexion.ts'
-import { moneda, type Idioma } from '../i18n/t.ts'
+import { moneda, traductor, type Idioma } from '../i18n/t.ts'
 
 export type Asiento = {
   readonly fecha: string
@@ -127,17 +127,20 @@ export async function libro(
  * convierte en 1,23456 o en texto. El que lo lee es una máquina, no una persona.
  */
 export function aFilas(l: Libro, idioma: Idioma, crudos: readonly Record<string, unknown>[] = []): Crudo {
-  const es = idioma === 'es'
-  const quien = l.cual === 'ventas'
-    ? (es ? 'RIF del cliente' : 'Client tax ID')
-    : (es ? 'RIF del proveedor' : 'Supplier tax ID')
-  const cabeceras = es
-    ? ['Fecha', quien, 'Nombre', 'Tipo', 'Número', 'Control', 'Afecta a',
-       'Base imponible', 'Exento', 'Alícuota', l.cual === 'ventas' ? 'Débito fiscal' : 'Crédito fiscal',
-       'IVA retenido', 'Total']
-    : ['Date', quien, 'Name', 'Type', 'Number', 'Control', 'Affects',
-       'Taxable base', 'Exempt', 'Rate', l.cual === 'ventas' ? 'Output VAT' : 'Input VAT',
-       'VAT withheld', 'Total']
+  // Las cabeceras salen del DICCIONARIO, no escritas aquí en los dos idiomas. Estaban
+  // escritas aquí, y por eso se separaron de la pantalla: la columna de total pasó a
+  // llamarse «Total con IVA» arriba —porque ahora lo incluye— y en el archivo que se baja
+  // seguía diciendo «Total». Dos nombres para la misma columna en el documento que se
+  // declara es exactamente la clase de detalle que hace dudar del resto.
+  const tr = traductor(idioma)
+  const cabeceras = [
+    tr('libro.fecha'),
+    tr(l.cual === 'ventas' ? 'libro.rif_cliente' : 'libro.rif_proveedor'),
+    tr('libro.nombre_col'), tr('libro.tipo'), tr('libro.numero'), tr('libro.control'),
+    tr('libro.afecta'), tr('libro.base'), tr('libro.exento'), tr('libro.alicuota'),
+    tr(l.cual === 'ventas' ? 'libro.debito' : 'libro.credito'),
+    tr('libro.retenido'), tr('libro.total'),
+  ]
 
   const filas = crudos.map((c) => [
     String(c['fecha'] ?? ''), String(c['rif'] ?? ''), String(c['nombre'] ?? ''),

@@ -509,7 +509,7 @@
   "libro.debito": "Débito fiscal",
   "libro.credito": "Crédito fiscal",
   "libro.retenido": "IVA retenido",
-  "libro.total": "Total",
+  "libro.total": "Total con IVA",
   "libro.totales": "Totales del mes",
   "libro.totales_explica": "Estas son las cifras que se declaran. No hay otra versión en ningún sitio.",
   "libro.bajar": "Bajar el libro en hoja de cálculo",

@@ -120,7 +120,6 @@ hito.sin_evidencia
 hito.titulo
 importar.columna
 importar.hecho
-libro.tipo
 libro.titulo
 logistica.aduana
 logistica.asn
