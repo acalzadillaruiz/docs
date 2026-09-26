@@ -84,6 +84,8 @@ import {
   guardarTasa, guardarValor, guardarConcepto,
 } from '../dominio/fiscales.ts'
 import { pintarFiscales } from '../pantallas/fiscales.ts'
+import { situacion, cambiarEstado } from '../dominio/ciclo.ts'
+import { pintarCiclo } from '../pantallas/ciclo.ts'
 import { pintarPlantillas } from '../pantallas/plantillas.ts'
 import { iconoPng, iconoSvg } from './icono.ts'
 import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
@@ -1625,6 +1627,50 @@ export async function resolver(
       if (e instanceof ContratoNoValuable) return noEncontrado(p.idioma)
       throw e
     }
+  }
+
+  // El estado de un contrato: suspenderlo, cerrarlo, liquidarlo, reabrirlo. Solo GPS: el
+  // estado lo decide quien ejecuta, y al cliente se le dice. `estado_contrato` declaraba
+  // cinco estados y la aplicación sabía llegar a dos, así que un contrato terminado se
+  // quedaba vigente para siempre.
+  const ciclo = /^\/contratos\/([0-9a-f-]{36})\/estado$/.exec(p.ruta)
+  if (ciclo && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+    const contratoId = ciclo[1]!
+    const [org] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const orgId = org!.organizacion_id
+
+    let errores: readonly string[] = []
+    let hecho: string | null = null
+
+    if (p.metodo === 'POST') {
+      const r = await comoQuien((q) => cambiarEstado(q, {
+        contratoId,
+        a: (p.campos['a'] ?? '').trim(),
+        motivo: p.campos['motivo'] ?? '',
+        finReal: (p.campos['fin_real'] ?? '').trim(),
+      }, personaId, orgId, p.idioma))
+      if (r.hecho) {
+        hecho = t(p.idioma, 'ciclo.hecho')
+          .replace('{a}', t(p.idioma, `contrato.estado.${r.a}` as Clave))
+      } else errores = r.errores
+    }
+
+    const s = await comoQuien((q) => situacion(q, contratoId, orgId, p.idioma))
+    // No existe o no es de esta organización: lo mismo que no existir. Decir «no es tuyo»
+    // diría que existe.
+    if (!s) return noEncontrado(p.idioma)
+    const [ctr] = (await comoQuien((q) => q`
+      select codigo from contrato where id = ${contratoId}::uuid
+    `)) as unknown as Array<{ codigo: string }>
+    return html(errores.length === 0 ? 200 : 400,
+      pintarCiclo(s, ctr?.codigo ?? '', contratoId, p.idioma, testigoAnti(testigo),
+        errores, hecho))
   }
 
   // Poner un contrato en vigor. Es el segundo acto deliberado: hasta aquí era un

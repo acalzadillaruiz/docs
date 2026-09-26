@@ -170,10 +170,6 @@ test('NINGUNA función de limpieza del esquema se queda sin quien la llame', asy
   // comentario de cabecera de este mismo archivo la nombraba. Un barrido que se
   // conforma con que alguien la mencione es exactamente el barrido que no habría
   // encontrado el fallo que viene a impedir.
-  const sinComentarios = (t: string) => t
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .split('\n').map((l) => l.replace(/(--|\/\/).*$/, '')).join('\n')
-
   const fuentes: string[] = []
   const recoger = async (base: URL) => {
     for (const e of await readdir(base, { withFileTypes: true })) {
@@ -280,6 +276,15 @@ test('NINGUNA función del esquema se queda sin que nadie la llame', async () =>
  * `migrar.ts` e `instalar.ts` sí cuentan: son parte del despliegue y lo que escriben lo
  * escribe el sistema de verdad.
  */
+/**
+ * El texto sin comentarios. Hace falta en los dos barridos que buscan nombres: contar el
+ * nombre de una función dentro de un comentario hizo que el barrido de funciones sin llamar
+ * pasara con la llamada quitada.
+ */
+const sinComentarios = (t: string) => t
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .split('\n').map((l) => l.replace(/(--|\/\/).*$/, '')).join('\n')
+
 const NO_ES_LA_APP = [
   'sembrar.ts',   // la empresa de muestra: datos inventados, no un camino de uso
   'medir.ts',     // el banco de pruebas de rendimiento
@@ -386,4 +391,112 @@ test('y el bucle que corre siempre es quien las llama', async () => {
   assert.match(avisar, /await limpiar\(q\)/)
   assert.match(avisar, /tocaLimpiar\(/,
     'limpia en cada vuelta en vez de una vez por hora')
+})
+
+/**
+ * Las columnas que nadie nombra: el barrido que destapó que un contrato no podía terminar.
+ *
+ * Los otros tres barridos miran funciones, términos del diccionario y tablas. Faltaba el
+ * grano más fino, y es donde estaba escondido lo más grave que ha aparecido:
+ * `contrato.fin_real` no la escribía nadie, y tirando de ese hilo salió que
+ * `estado_contrato` declara CINCO estados y la aplicación sabía llegar a dos. Un contrato
+ * terminado se quedaba vigente para siempre.
+ *
+ * Se pregunta a la base de datos qué columnas existen, y luego se busca cada nombre en el
+ * código y en el resto del esquema. Se excluye a propósito la propia declaración de la
+ * tabla: nombrar una columna al crearla no es usarla, y sin quitarla el barrido no
+ * encontraría nada nunca.
+ */
+const COLUMNAS_SIN_USO = new Map<string, string>([
+  // El modelo de permisos finos sin usar, igual que sus dos tablas.
+  ['capacidad.modulo', 'el modelo de capacidades no se usa (decisión 5)'],
+  ['persona_capacidad.concedida_en', 'el modelo de capacidades no se usa (decisión 5)'],
+  ['persona_capacidad.concedida_por', 'igual'],
+  // Se escribe por defecto y no se lee. Es el dato con el que se sabría cuánto lleva
+  // abierta una sesión; hoy «último acceso» sale de `persona.ultimo_acceso`.
+  ['sesion.iniciada_en', 'se escribe por defecto y no la lee nadie todavía'],
+])
+
+test('las columnas que nadie nombra están DICHAS, no calladas', async () => {
+  const columnas = (await dentro((q) => q`
+    select table_name || '.' || column_name as col
+      from information_schema.columns
+     where table_schema = 'public'
+     order by table_name, ordinal_position
+  `)) as unknown as Array<{ col: string }>
+
+  // Si el barrido deja de leer columnas, tiene que fallar en vez de pasar en vano. Esto
+  // ya salvó al barrido de tablas una vez, y a este le hizo falta el primer día: lanzado
+  // desde otro directorio, los comodines no encontraban nada y daba las 470 por huérfanas.
+  assert.ok(columnas.length > 400,
+    `solo se leyeron ${columnas.length} columnas: el barrido no barrió`)
+
+  const dir = new URL('../../db/schema/', import.meta.url)
+  const sqls = await Promise.all(
+    (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()
+      .map(async (f) => sinComentarios(await readFile(new URL(f, dir), 'utf8'))))
+
+  const fuentes: string[] = []
+  const recoger = async (base: URL, saltar: readonly string[] = []) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      if (saltar.includes(e.name)) continue
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recoger(u, saltar)
+      else if (e.name.endsWith('.ts')) fuentes.push(await readFile(u, 'utf8'))
+    }
+  }
+  await recoger(new URL('../src/', import.meta.url))
+  await recoger(new URL('../herramientas/', import.meta.url), NO_ES_LA_APP)
+  assert.ok(fuentes.length > 40, `solo se leyeron ${fuentes.length} archivos de código`)
+  const codigo = fuentes.join('\n')
+
+  const mudas: string[] = []
+  for (const { col } of columnas) {
+    const [tabla, nombre] = col.split('.') as [string, string]
+    if (COLUMNAS_SIN_USO.has(col)) continue
+    const palabra = new RegExp(`\\b${nombre}\\b`)
+    if (palabra.test(codigo)) continue
+    // En el esquema, sin el CREATE TABLE de su propia tabla: declararla no es usarla.
+    const sinDeclarar = new RegExp(
+      `create table (?:if not exists )?${tabla}\\s*\\([^;]*?\\);`, 'is')
+    if (sqls.some((t) => palabra.test(t.replace(sinDeclarar, ' ')))) continue
+    mudas.push(col)
+  }
+
+  assert.deepEqual(mudas, [],
+    'columnas que ni la aplicación ni el esquema nombran, y no están declaradas ' +
+    'arriba con su motivo:\n  ' + mudas.join('\n  '))
+})
+
+test('y la lista de columnas sin uso solo puede encoger', async () => {
+  // El mismo freno que el de las tablas: una columna declarada aquí que ya se usa tiene
+  // que salir de la lista, o la lista se convierte en un cajón donde todo cabe.
+  const columnas = (await dentro((q) => q`
+    select table_name || '.' || column_name as col
+      from information_schema.columns where table_schema = 'public'
+  `)) as unknown as Array<{ col: string }>
+  const existen = new Set(columnas.map((c) => c.col))
+
+  const fuentes: string[] = []
+  const recoger = async (base: URL, saltar: readonly string[] = []) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      if (saltar.includes(e.name)) continue
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recoger(u, saltar)
+      else if (e.name.endsWith('.ts')) fuentes.push(await readFile(u, 'utf8'))
+    }
+  }
+  await recoger(new URL('../src/', import.meta.url))
+  const codigo = fuentes.join('\n')
+
+  const sobran: string[] = []
+  for (const [col, motivo] of COLUMNAS_SIN_USO) {
+    if (!existen.has(col)) { sobran.push(`${col} ya no existe (${motivo})`); continue }
+    const nombre = col.split('.')[1]!
+    if (new RegExp(`\\b${nombre}\\b`).test(codigo)) {
+      sobran.push(`${col} ya la usa la aplicación (${motivo})`)
+    }
+  }
+  assert.deepEqual(sobran, [],
+    'entradas que ya no hacen falta en COLUMNAS_SIN_USO:\n  ' + sobran.join('\n  '))
 })

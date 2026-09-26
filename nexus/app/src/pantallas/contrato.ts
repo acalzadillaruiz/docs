@@ -174,6 +174,8 @@ export function pintarContrato(
   </form>`}
   ${esCliente || f.estadoCrudo !== 'vigente' ? '' : `<a class="nueva" href="/contratos/${escapar(f.id)}/valuar">${
     escapar(t('valuar.titulo'))} →</a>`}
+  ${esCliente || f.estadoCrudo === 'borrador' ? '' : `<a class="nueva" href="/contratos/${escapar(f.id)}/estado">${
+    escapar(t('ciclo.titulo'))} →</a>`}
 </main>`,
   })
 }

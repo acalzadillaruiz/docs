@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 23:10 (España)
+**Última actualización:** 2026-09-27, 02:40 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -10,8 +10,8 @@
 > avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
 > avance lo que el sistema impide hacer con el de un contrato.
 >
-> Lo que hay construido, contado a mano sobre el código de hoy: **29 módulos de
-> pantalla** y **138 páginas** en el recorrido exportado, sobre las 119 vistas del plan
+> Lo que hay construido, contado a mano sobre el código de hoy: **30 módulos de
+> pantalla** y **153 páginas** en el recorrido exportado, sobre las 119 vistas del plan
 > completo (una vista del plan sale en varias páginas: con datos, vacía, y con error).
 > Las cifras de antes decían «40 direcciones y 26 pantallas» y no salen de ninguna
 > cuenta que sepa repetir, así que se cambian por las que sí. Lo que está **entero y probado
@@ -34,8 +34,86 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **los valores fiscales** — y con ellos, el agujero más grave que
-ha aparecido en todo el proyecto.
+**Lo último terminado:** **un contrato que termina ya puede terminarse** — y un barrido
+nuevo que es el que lo encontró.
+
+`estado_contrato` declara cinco estados desde el primer día —borrador, vigente, suspendido,
+cerrado, liquidado— y la aplicación sabía llegar a **dos**. `alta.ts` pasa de borrador a
+vigente y ahí se acababa: nada suspendía, nada cerraba y nada liquidaba. Lo que eso
+significaba en uso:
+
+- **Un contrato terminado se quedaba vigente para siempre.** La cartera enseñaba los
+  acabados junto a los que están corriendo, sin forma de distinguirlos.
+- **«¿Terminamos tarde?» no tenía respuesta**, en un producto que existe para medir la
+  ejecución de contratos. `fin_real` no la escribía nadie.
+- Dos pantallas —equipos y caja chica— ya consultaban `estado in ('vigente','suspendido')`,
+  escritas contando con una suspensión que no existía.
+- Y **liquidado**, que es el finiquito, no se alcanzaba de ninguna manera.
+
+Ahora hay `/contratos/:id/estado`, con el histórico de por dónde ha pasado, **el motivo
+escrito de cada cambio y quién lo hizo**, y delante de todo **cuántos días tarde terminó**.
+Reabrir un contrato cerrado **borra la fecha real de fin**, porque un contrato que vuelve a
+estar en marcha no terminó; el histórico sí la conserva.
+
+**Lo que sujeta la liquidación no es criterio de nadie, es una resta:** no se liquida un
+contrato al que se le debe dinero o al que le queda obra verificada sin facturar, y el
+mensaje dice la cifra. «No se puede» manda a buscar; «quedan 12.400 sin cobrar» manda a
+cobrar.
+
+### El barrido nuevo: columnas que nadie nombra
+
+Los otros tres barridos miran funciones, términos del diccionario y tablas. Faltaba el grano
+más fino, y ahí estaba escondido esto: se pregunta a la base qué columnas existen y se busca
+cada nombre en el código y en el resto del esquema, quitando la propia declaración de la
+tabla —nombrar una columna al crearla no es usarla—. De 470 columnas salieron cinco, y una
+era `contrato.fin_real`.
+
+Las otras cuatro: **`sesion.cerrada_por`**, que tampoco escribía nadie y ya sí. Cerrar la
+sesión de alguien es echarlo del sistema en ese momento, y para la única pregunta que se hace
+después de un incidente —quién la echó— quedaba el motivo y no el autor. `persona_actual()`
+ya estaba ahí sin recogerse. Las tres restantes son del modelo de capacidades sin usar y
+están declaradas con su motivo.
+
+### Dos pruebas mías que pasaban en vano, cazadas apagando lo que vigilan
+
+1. **«cerrar exige la fecha real de fin»** seguía verde con la comprobación apagada en las
+   DOS capas. El motivo de siempre: un `hecho === false` no dice nada cuando hay varias
+   maneras de ser falso, y aquí eran tres —sin fecha, fecha imposible y fecha anterior al
+   inicio— porque una cadena vacía es menor que cualquier fecha y todas caían en la misma
+   comparación. Ahora se afirma **cuál** de los tres mensajes vuelve, comparándolo con el
+   del diccionario y no con un trozo escrito a mano.
+2. **«el cliente no puede escribir el histórico»** seguía verde con la política de fila
+   abierta del todo, porque la cerradura de verdad es otra: al cliente no se le concede
+   `insert` sobre esa tabla. La prueba afirma lo que importa —que no puede— y ahora lo dice
+   con precisión en vez de atribuirlo a la política.
+
+**Y casi me llevo por delante un archivo:** escribí este módulo en `src/dominio/estados.ts`,
+que ya existía y es el de los **estados contables** —balance y resultados—. Lo salvó que
+`tsc` gritó en el acto y que estaba en git. El módulo se llama `ciclo.ts`.
+
+**884 pruebas, todas pasan.** Verificado rompiendo a propósito: la comprobación del dinero
+para liquidar, la de la fecha de fin (en las dos capas), la política de vista del histórico,
+el barrido nuevo —añadiéndole una columna huérfana a `contrato` para verlo nombrarla—, y la
+escritura de `sesion.cerrada_por`.
+
+### Lo que queda de la lista de deudas
+
+- **`capacidad` / `persona_capacidad`**, el modelo de permisos finos: dos tablas y tres
+  columnas que nadie escribe ni lee. **No lo he construido a propósito**, y conviene que
+  quede dicho por qué: `capacidad` no tiene ni una fila, así que `persona_capacidad` no
+  puede tener ninguna y el disparador que dice «esta capacidad es interna y no se concede a
+  un cliente» **nunca ha corrido**. Hoy el alcance lo decide ser de GPS o ser cliente, y eso
+  funciona y está probado. Encenderlo es la **decisión 5** —quién más toca la contabilidad—,
+  que es del CEO y no mía.
+- **La decisión 14**, que es de dinero: `valuar.ts` elige el concepto de ISLR de cada
+  valuación con `order by vigente_desde desc limit 1`, sin mirar de qué concepto se trata.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **los valores fiscales** — y con ellos, el agujero más grave que ha aparecido en
+todo el proyecto.
 
 La tasa del BCV **no se podía cargar.** Cambia todos los días, de ella cuelga cada
 contrato, cada valuación y cada cobro, y no existía ninguna pantalla donde ponerla. El
@@ -108,20 +186,11 @@ comprueba los cinco avisos en vez de dos.
 aviso de lo que falta, el barrido de tablas sin puerta, y la guardia de variables de
 entorno de `avisar.ts`, que ahora dice **cuál** falta y no las dos.
 
-De la lista de tablas sin puerta quedan **dos, y ninguna es una pantalla que manda algo
-imposible**: `capacidad` y `persona_capacidad`, el modelo de permisos finos que no se usa
-—hoy el alcance lo decide ser de GPS o ser cliente—. Eso no es una pantalla que falta: es
-una decisión sobre si ese modelo hace falta.
-
 **Y una decisión nueva para el CEO, la 14, que es de dinero:** `valuar.ts` elige el
 concepto de ISLR de cada valuación con `order by vigente_desde desc limit 1`, sin mirar de
 qué concepto se trata. Con uno solo sembrado sale el bueno por casualidad; con dos, la
 retención la decide un `order by`. No lo he tocado porque el concepto correcto es una
 clasificación fiscal y depende de qué se factura.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **las plantillas de hitos, y el guardián de que sumen 100.** Era
 el trozo que estaba aparcado a propósito, y con razón: el guardián solo, sin pantalla para

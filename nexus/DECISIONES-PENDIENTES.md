@@ -9,7 +9,7 @@ Preguntas abiertas en https://claude.ai/artifact/LyvqcKwc6vevhbTHTFhyvs
 | 2 | Moneda funcional del negocio | Qué columna manda en cada cálculo de margen |
 | 3 | ¿Contribuyente especial? | Módulo de retención de IVA al 75% como agente |
 | 4 | Desde cuándo se importa el Excel | Alcance del importador y de los saldos de apertura |
-| 5 | Quién más toca la contabilidad | Permisos y registro de auditoría |
+| 5 | Quién más toca la contabilidad | Permisos y registro de auditoría. **Al día de hoy:** el esquema trae un modelo de capacidades por persona (`capacidad`, `persona_capacidad`) que **no se usa, y no puede usarse**: `capacidad` no tiene ni una fila, así que `persona_capacidad` no puede tener ninguna y el disparador que impide conceder una capacidad interna a un cliente nunca ha corrido. Hoy el alcance lo decide ser de GPS o ser cliente, y eso está probado y funciona. No lo enciendo porque encenderlo es esta decisión: qué puede ver y hacer cada persona dentro de GPS. Si la respuesta es «todos lo mismo», el modelo se borra y se gana claridad. |
 | 6 | ¿Hay plan de cuentas? | Si no, se crea uno estándar de servicios petroleros |
 | 7 | Errores del Track GPS actual a no repetir | Prioridades de diseño |
 | 8 | Qué parte de la contabilidad va primero si hay que trocear | Orden de las 28 sesiones de la fase |

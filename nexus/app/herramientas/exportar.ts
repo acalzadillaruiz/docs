@@ -152,6 +152,12 @@ for (const r of renglones) {
 for (const c of contratos) {
   PAGINAS.push({ archivo: `contrato-${c.codigo}`, ruta: `/contratos/${c.id}` })
 }
+// El estado de CADA contrato. Con uno solo, el exportador contaba catorce enlaces
+// apagados: la ficha de cada contrato enlaza al suyo, y una instantanea con enlaces muertos
+// es una instantanea que se rompe justo donde alguien pincha.
+for (const c of contratos) {
+  PAGINAS.push({ archivo: `estado-${c.codigo}`, ruta: `/contratos/${c.id}/estado` })
+}
 
 /** De una ruta de la aplicacion al archivo que le toca en la instantanea. */
 const mapa = new Map<string, string>()

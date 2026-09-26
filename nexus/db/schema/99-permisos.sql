@@ -47,6 +47,11 @@ grant insert, select on objecion to nexus_cliente;
 -- del proveedor: esa la aparta la politica de fila de 'evidencia', porque lleva
 -- dentro el precio de compra.
 grant select on hito, plantilla_hito to nexus_cliente;
+-- Y el historico de estados del contrato. Que una obra se suspendio, cuando se cerro y por
+-- que, no es informacion interna de GPS: es lo primero que el cliente quiere saber de su
+-- propio contrato, y se lo dijo GPS. Escribirlo no puede —eso lo niega la politica de fila—,
+-- pero leerlo sin poder es lo que obliga a pedirlo por telefono.
+grant select on contrato_estado to nexus_cliente;
 -- Incluido el motivo del rechazo: si un papel que sostenia su avance no vale, el
 -- cliente tiene derecho a saber por que, y enterarse por telefono no deja rastro.
 -- Fuera quedan 'subida_por' y 'verificada_por': quien de GPS movio cada papel es

@@ -292,13 +292,21 @@ test('dar de baja corta la sesión en el acto, no cuando cierre el navegador', a
   // fila, porque una sesión que sigue abierta en la tabla vuelve a valer en cuanto
   // alguien reactive la cuenta — y entonces la baja no habrá cortado nada.
   const [ses] = (await dentro((q) => q`
-    select cerrada_en, motivo_cierre from sesion
+    select cerrada_en, motivo_cierre, cerrada_por from sesion
      where persona_id = ${p!.id}::uuid order by iniciada_en desc limit 1
-  `)) as unknown as Array<{ cerrada_en: Date | null; motivo_cierre: string | null }>
+  `)) as unknown as Array<{
+    cerrada_en: Date | null; motivo_cierre: string | null; cerrada_por: string | null
+  }>
   assert.ok(ses, 'no quedó rastro de la sesión')
   assert.notEqual(ses.cerrada_en, null,
     'la cuenta está de baja pero su sesión sigue abierta en la tabla')
   assert.equal(ses.motivo_cierre, 'persona desactivada')
+  // Y QUIÉN lo ordenó. `cerrada_por` estaba declarada desde el primer día y no la
+  // escribía nadie: lo encontró el barrido de columnas que nadie nombra. Cerrar la sesión
+  // de alguien es echarlo del sistema en ese momento, y para la única pregunta que se hace
+  // después —quién la echó— la respuesta estaba a medias: quedaba el motivo y no el autor.
+  assert.equal(ses.cerrada_por, YO,
+    'cerró la sesión de alguien sin dejar dicho quién lo ordenó')
 
   // Y se dice CUÁNTAS se cortaron. Antes esta función llamaba a cerrar_sesiones_de()
   // después de la baja y devolvía cero siempre, porque el disparador ya las había
