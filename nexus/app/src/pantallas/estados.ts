@@ -97,7 +97,8 @@ export function pintarEstados(e: Estados, idioma: Idioma, antifalsificacion: str
       </div>`).join('')}
       <div class="bl-f"><span>${escapar(t('est.total'))}</span><b>${escapar(s.total)}</b></div>
     </div>`).join('')}
-  </div>`}
+  </div>
+  <p class="expl">${escapar(t('est.resultado_calculado'))}</p>`}
 
   <div class="dos">
     ${deudas(t('est.cobrar'), e.cobrar, e.totalCobrar, t('est.nada_cobrar'))}

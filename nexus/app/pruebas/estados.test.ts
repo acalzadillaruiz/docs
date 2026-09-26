@@ -23,6 +23,11 @@ const C = 'd3e4f5a6-0000-0000-0000-00000000000b'
 const YO = 'd3e4f5a6-0000-0000-0000-00000000000d'
 const TASA = 'd3e4f5a6-1111-0000-0000-00000000000a'
 const ASI = 'd3e4f5a6-2222-0000-0000-00000000000a'
+// Un mes aparte para el balance CON resultado. No en el mismo que el aporte: las pruebas
+// de arriba cuentan el activo y el patrimonio exactos de noviembre, y meterles una venta
+// dentro las haría fallar por algo que no es el fallo.
+const VTA = 'd3e4f5a6-2222-0000-0000-00000000000b'
+const CST = 'd3e4f5a6-2222-0000-0000-00000000000c'
 
 const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
   comoPersona<T>({ id: YO }, 'nexus_interno', f)
@@ -47,6 +52,8 @@ before(async () => {
       select instalar_plan_cuentas('${G}');
       insert into periodo (organizacion_id, anio, mes) values ('${G}', 2026, 11)
         on conflict do nothing;
+      insert into periodo (organizacion_id, anio, mes) values ('${G}', 2026, 12)
+        on conflict do nothing;
     `)
     const [hay] = (await q`
       select count(*)::int as n from asiento asi
@@ -67,9 +74,73 @@ before(async () => {
           ('${ASI}', 2,'${G}','3.1.01', -2000000.00, -40000.00,'${TASA}');
       `)
     }
+    // Y en DICIEMBRE, una venta y un costo. Esto es lo que le faltaba a este archivo: con
+    // solo el aporte de capital, el balance balanceaba sin necesitar el resultado del
+    // ejercicio, y la comprobación de que balancea pasaba sin poder fallar. Con ganancia
+    // dentro, el activo NO iguala al pasivo más el patrimonio salvo que el balance incluya
+    // el resultado — que es exactamente lo que no incluía.
+    const [dic] = (await q`
+      select count(*)::int as n from asiento where id = ${VTA}::uuid
+    `) as unknown as Array<{ n: number }>
+    if (Number(dic?.n ?? 0) === 0) {
+      await q.unsafe(`
+        insert into asiento (id, organizacion_id, numero, ocurrido_en, anio, mes,
+                             descripcion_es, descripcion_en, origen_tipo, origen_id, creado_por)
+          values ('${VTA}','${G}', siguiente_asiento('${G}'),'2026-12-10', 2026, 12,
+                  'Venta','Sale','prueba','${VTA}','${YO}');
+        insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves,
+                             monto_usd, tasa_id) values
+          ('${VTA}', 1,'${G}','1.1.02.01', 1000000.00, 20000.00,'${TASA}'),
+          ('${VTA}', 2,'${G}','4.1.02',   -1000000.00,-20000.00,'${TASA}');
+        insert into asiento (id, organizacion_id, numero, ocurrido_en, anio, mes,
+                             descripcion_es, descripcion_en, origen_tipo, origen_id, creado_por)
+          values ('${CST}','${G}', siguiente_asiento('${G}'),'2026-12-11', 2026, 12,
+                  'Costo','Cost','prueba','${CST}','${YO}');
+        insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves,
+                             monto_usd, tasa_id) values
+          ('${CST}', 1,'${G}','5.2.01',     300000.00,  6000.00,'${TASA}'),
+          ('${CST}', 2,'${G}','2.1.01.01', -300000.00, -6000.00,'${TASA}');
+      `)
+    }
   })
 })
 after(async () => { await cerrar() })
+
+test('CON GANANCIA DENTRO el balance sigue balanceando. Antes no', async () => {
+  // El aviso «el balance no balancea por X» salía en la instantánea publicada, con X igual
+  // a la ganancia del periodo, sobre un libro que cuadraba exacto. Acusaba de un asiento a
+  // medias a un libro impecable — y un aviso que salta sin que pase nada deja de leerse.
+  const e = await dentro((q) => estados(q, G, 'es', '2026-12-31'))
+  assert.equal(e.cuadra, true, `descuadre de ${e.descuadre}`)
+  const activo = e.secciones.find((s) => s.cual === 'activo')!
+  const pasivo = e.secciones.find((s) => s.cual === 'pasivo')!
+  const patrim = e.secciones.find((s) => s.cual === 'patrimonio')!
+  // Banco 2.000.000 + clientes 1.000.000 = 3.000.000 de activo.
+  // Proveedores 300.000 de pasivo. Capital 2.000.000 + ganancia 700.000 de patrimonio.
+  assert.equal(activo.totalCrudo, 3000000)
+  assert.equal(pasivo.totalCrudo, 300000)
+  assert.equal(patrim.totalCrudo, 2700000)
+})
+
+test('y el resultado del ejercicio sale como una línea del patrimonio', async () => {
+  const e = await dentro((q) => estados(q, G, 'es', '2026-12-31'))
+  const patrim = e.secciones.find((s) => s.cual === 'patrimonio')!
+  const res = patrim.lineas.find((l) => l.codigo === '3.1.04')
+  assert.ok(res, 'el resultado del ejercicio no aparece en el patrimonio')
+  // Ingresos 1.000.000 menos gastos 300.000. La misma cifra que da la pantalla de gerencia:
+  // si estas dos no coinciden, hay dos verdades sobre la ganancia del mes.
+  assert.match(res!.monto, /700\.000,00/, `salió ${res!.monto}`)
+})
+
+test('y la pantalla dice que esa línea es calculada, no asentada', async () => {
+  // Si no lo dijera, alguien abriría el mayor de esa cuenta, lo encontraría vacío, y a
+  // partir de ahí no se creería ninguna de las dos cosas.
+  const e = await dentro((q) => estados(q, G, 'es', '2026-12-31'))
+  const h = pintarEstados(e, 'es', 'af')
+  assert.match(h, /no está asentado/, 'no se avisa de que el resultado es calculado')
+  const en = pintarEstados(await dentro((q) => estados(q, G, 'en', '2026-12-31')), 'en', 'af')
+  assert.match(en, /is not posted/, 'y en inglés tampoco')
+})
 
 test('el balance BALANCEA: activo igual a pasivo más patrimonio', async () => {
   // Es la comprobación que da sentido a todas las demás.

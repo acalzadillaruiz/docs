@@ -34,7 +34,48 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **las dos cifras mal del libro que se declara.**
+**Lo último terminado:** **el balance decía que no balanceaba, y balanceaba.**
+
+La pantalla de estados contables llevaba arriba, en ámbar, el aviso más grave que hay en este
+producto: *«el balance no balancea por Bs.S 31.804.500,00 — el activo tiene que ser igual al
+pasivo más el patrimonio. Si no lo es, hay un asiento a medias y ninguna cifra de esta
+pantalla se sostiene.»* Y el libro cuadraba exacto: `descuadre()` devolvía cero y cero. Salía
+así en la instantánea publicada, en la pantalla con la que se enseña la fase que va primera, y
+llevaba ahí varias versiones.
+
+Lo que faltaba era **el resultado del ejercicio**. El balance solo miraba las cuentas de
+activo, pasivo y patrimonio; las de ingreso y gasto quedaban fuera, y su saldo neto —la
+ganancia— no está asentado en ninguna cuenta de patrimonio porque no hay cierre de ejercicio
+que lo mueva. Así que el activo salía mayor por exactamente la ganancia del periodo:
+31.804.500, que es **la misma cifra que la pantalla de gerencia enseñaba al lado** como
+«resultado del mes». El descuadre era la ganancia, con otro nombre.
+
+**Un aviso que salta sin que pase nada es peor que no tener aviso.** Este acusaba de un asiento
+a medias a un libro impecable; el día que hubiera uno de verdad, ya no lo habría leído nadie.
+
+Ahora el balance incluye el resultado en el patrimonio, que es como se presenta un balance
+antes del cierre, y el activo iguala al pasivo más el patrimonio **por construcción**: la suma
+de todas las partidas es cero —lo garantiza el control del cuadre— y esa igualdad es esa suma
+reordenada. La línea es calculada y no asentada, y la pantalla lo dice debajo del balance en
+los dos idiomas: sin eso, alguien abre el mayor de esa cuenta, lo encuentra vacío, y a partir
+de ahí no se cree ninguna de las dos cosas.
+
+**Y por qué lo daba por bueno una prueba que se llama «el balance BALANCEA».** Porque su
+fixture es un aporte de capital y nada más: sin ingresos ni gastos, el balance balancea sin
+necesitar el resultado, y la comprobación pasaba **sin poder fallar**. Es el mismo error que
+ya salió dos veces esta noche con otra cara: una comprobación montada sobre un caso que no
+puede dar el fallo. El fixture ahora tiene una venta y un costo en un mes aparte, y con
+ganancia dentro el balance no cuadra salvo que el resultado esté. Verificado devolviendo la
+vista vieja: se ponen rojas las dos nuevas **y la vieja sigue verde**, que es la prueba de
+que nunca podía haberlo cogido.
+
+**933 pruebas, todas pasan.**
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **las dos cifras mal del libro que se declara.**
 
 De todo lo que hay en esta aplicación, los libros de ventas y de compras son lo único que
 sale de la empresa con destino al SENIAT. Su propio archivo lo dice —«lo que importa no es
@@ -83,10 +124,6 @@ una nota de crédito y una de débito dentro y las comparan contra una cuenta he
 mano. Verificadas devolviendo la vista vieja —se ponen rojas cuatro— y devolviendo la cabecera
 escrita a mano, que pone roja la séptima. Y la séptima lleva dentro una comprobación de que
 no pasaría con el diccionario vacío.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **dos formas de cuadrar que no eran cuadrar, y la mitad de la
 contabilidad que nunca se había visto.**
@@ -1675,6 +1712,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
 | `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
 | `app/src/pantallas/valuacion.ts` | **La primera pantalla.** Una sola función para las dos superficies: en escritorio las líneas son una tabla, en el móvil tarjetas apiladas. No son dos pantallas, es la misma reacomodada por la hoja de estilos. No enseña un total: enseña el camino hasta el total. |
+| `db/schema/42-resultado-en-el-balance.sql` | **El balance decía que no balanceaba, y balanceaba.** Le faltaba el resultado del ejercicio: las cuentas de ingreso y gasto quedaban fuera y su saldo neto no está asentado en patrimonio porque no hay cierre de ejercicio. El activo salía mayor por exactamente la ganancia del periodo, y la pantalla acusaba de un asiento a medias a un libro impecable. Un aviso que salta sin que pase nada deja de leerse el día que pasa algo. La línea es calculada, y la pantalla lo dice. |
 | `db/schema/41-libro-que-se-declara.sql` | **Las dos cifras mal del libro que se declara.** La columna «Total» se calculaba `base + exento`, sin el IVA, y **una nota de crédito sumaba** en vez de restar: se declaraba de más por su importe, al doble, en ventas y en compras. Las pruebas que había contaban FILAS, y contar filas comprueba que la nota aparece, no en qué dirección. El signo va en la vista porque la pantalla no es la única que lee esto: también la hoja que se baja, y mañana la declaración. |
 | `db/schema/39-asiento-sin-lineas.sql` · `40-centimos-de-conversion.sql` | **Dos formas de cuadrar que no son cuadrar.** Un asiento sin ninguna línea no dispara el control del cuadre, y si lo disparara diría que cuadra: la suma de cero líneas es cero. Y la columna en dólares de un asiento en bolívares es una conversión línea a línea, así que redondear seis veces y sumar deja un céntimo — con eso, `asentar_valuacion` no podía asentar casi ninguna valuación de la muestra y **el botón de facturar no funcionaba.** El residuo se absorbe antes de rechazar, y el perdón es estrecho: solo si una columna cuadra exacta y la otra no, solo hasta un céntimo por línea, solo con dos líneas o más. Un control que perdona se convierte en un control que no controla. |
 | `app/src/servidor/rutas.ts` → `/valuaciones/:id/hoja` | **La hoja de la valuación, en un archivo que se baja.** El proceso interno de una operadora pide un documento para autorizar un pago; si el portal no lo produce, alguien pide un Excel por correo, y desde ese momento las cifras viajan fuera del sistema y el portal deja de ser de donde sale la verdad. El archivo lo produce **la misma llamada que pinta la pantalla**: si se calculara por su cuenta, un día diría otra cifra y nadie sabría cuál de las dos creer. |
@@ -2039,7 +2077,7 @@ verdad, por orden de lo que más cambia las cosas.)*
    diccionario ya tiene el vocabulario de las dos; las pantallas no existen. El portal del
    cliente ya no está en esta lista: tiene su bandeja, su estado de cuenta y la hoja de cada
    valuación en un archivo.
-6. **Un segundo par de ojos.** 930 comprobaciones automáticas no sustituyen a una
+6. **Un segundo par de ojos.** 933 comprobaciones automáticas no sustituyen a una
    persona usando esto una semana con datos de verdad.
 
 ## Bloqueado
