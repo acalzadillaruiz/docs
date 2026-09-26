@@ -17,7 +17,9 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { comoPersona, type Consulta } from '../db/conexion.ts'
-import { iniciar, completar, quienEs, abrirSesionDe } from '../dominio/sesion.ts'
+import {
+  iniciar, completar, quienEs, abrirSesionDe, entrarConCodigo, codigosVivos,
+} from '../dominio/sesion.ts'
 import { empresaDe, preparar, volver } from '../dominio/sso.ts'
 import { proveedores, cambiarCodigo } from './proveedores.ts'
 import { Claves, verificarFirma, partes, traerPorLaRed } from './jwks.ts'
@@ -302,8 +304,48 @@ export async function resolver(
     return aOtroSitio(destinoSeguro(r.destino), { 'Set-Cookie': ponerCookie(testigoSesion, seguro) })
   }
 
+  // «Perdí el teléfono». La pantalla estaba escrita desde el primer día y mandaba el
+  // formulario aquí... y aquí solo había un GET: el POST se caía por la puerta de
+  // sesión y devolvía a la entrada sin una palabra. Se entregaban diez códigos de
+  // recuperación, se pedía guardarlos en papel, y no había forma de usar uno.
   if (p.ruta === '/entrar/recuperacion' && p.metodo === 'GET') {
-    return html(200, pintarEntrada({ paso: 'recuperacion' }, p.idioma))
+    // El desafío llega del enlace de la pantalla anterior, donde la clave ya se
+    // comprobó. Sin él no hay a quién referirse, y un código suelto no dice de quién
+    // es: esto sustituye al teléfono, no a la clave.
+    const d = (p.campos['d'] ?? '').trim()
+    if (d === '') return aOtroSitio('/entrar')
+    return html(200, pintarEntrada({ paso: 'recuperacion', desafio: d }, p.idioma))
+  }
+
+  if (p.ruta === '/entrar/recuperacion' && p.metodo === 'POST') {
+    const desafio = (p.campos['desafio'] ?? '').trim()
+    const codigo = p.campos['codigo'] ?? ''
+    if (desafio === '' || codigo.trim() === '') {
+      return html(400, pintarEntrada(
+        { paso: 'recuperacion', desafio, error: 'rechazado' }, p.idioma))
+    }
+    const r = await dentro((q) => entrarConCodigo(q, desafio, codigo, p.origen))
+    if (r.estado === 'espera') {
+      return html(429, pintarEntrada({ paso: 'espera', segundos: r.segundos }, p.idioma))
+    }
+    if (r.estado !== 'dentro') {
+      // El desafío se quemó al fallar, así que no se devuelve: reintentar con él no
+      // llevaría a ninguna parte y la pantalla parecería estropeada.
+      return html(401, pintarEntrada({ paso: 'ingreso', error: 'rechazado' }, p.idioma))
+    }
+    // Está dentro. Y antes de dejarle pasar se le dice cuántos códigos le quedan: el
+    // que acaba de gastar el noveno tiene que saberlo AHORA, no el día que gaste el
+    // décimo y se quede sin teléfono y sin códigos a la vez.
+    const quedan = await dentro((q) => codigosVivos(q, r.personaId))
+    return {
+      codigo: 200,
+      cabeceras: {
+        ...CABECERAS_BASE,
+        'Content-Type': 'text/html; charset=utf-8',
+        'Set-Cookie': ponerCookie(r.testigo, seguro),
+      },
+      cuerpo: pintarEntrada({ paso: 'gastado', quedan }, p.idioma),
+    }
   }
 
   // ------------------------------------------------------------ invitación

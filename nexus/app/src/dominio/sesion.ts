@@ -17,7 +17,7 @@
 
 import { randomBytes, createHash } from 'node:crypto'
 import type { Consulta } from '../db/conexion.ts'
-import { verificarClave } from './clave.ts'
+import { verificarClave, huellaCodigo } from './clave.ts'
 import { verificar as verificarTotp } from './totp.ts'
 
 export type Credenciales = {
@@ -144,6 +144,93 @@ export async function completar(
   `
   await q`update persona set ultimo_acceso = now() where id = ${s.persona_id}::uuid`
   return { estado: 'dentro', testigo, personaId: s.persona_id }
+}
+
+/**
+ * Entrar con un código de recuperación, cuando el teléfono ya no está.
+ *
+ * Esto **no existía**. La pantalla de «Perdí el teléfono» estaba escrita desde el
+ * primer día, mandaba el formulario a `/entrar/recuperacion`, y esa ruta solo
+ * respondía a GET: el POST se caía por la puerta de sesión y devolvía a la pantalla
+ * de entrada sin una palabra. `gastar_codigo()` existía en la base de datos, probada,
+ * y no la llamaba nadie.
+ *
+ * O sea: se generaban diez códigos, se le decían una sola vez, se le pedía guardarlos
+ * en papel «para cuando pierdas el teléfono»… y quien perdía el teléfono se quedaba
+ * fuera para siempre con los diez códigos en el bolsillo. Novena vez que aparece la
+ * misma forma y la peor de todas: las otras ocho estorbaban; ésta cierra la puerta.
+ *
+ * Tres cosas que se hacen igual que en el segundo factor, y por los mismos motivos:
+ *
+ *   - **Va contra un desafío, no contra un correo.** Un código que se pudiera probar
+ *     sabiendo solo el correo convertiría los diez códigos en el único secreto. Aquí
+ *     ya se demostró la clave: esto sustituye al teléfono, no a la clave.
+ *   - **El desafío se quema al primer código equivocado.** Si no, se podrían probar
+ *     códigos en serie con una sola verificación de clave.
+ *   - **Y cuenta para el freno**, con su propia fase en el registro, para que se
+ *     distinga de un segundo factor fallado al mirar qué pasó.
+ */
+export async function entrarConCodigo(
+  q: Consulta, desafio: string, codigo: string, origen: string,
+): Promise<Resultado> {
+  const [s] = (await q`
+    select s.id, s.persona_id, p.correo, p.activa
+      from sesion s join persona p on p.id = s.persona_id
+     where s.huella = ${huellaTestigo(desafio)}
+       and s.cerrada_en is null
+       and s.expira_en > now()
+  `) as unknown as Array<{
+    id: string; persona_id: string; correo: string; activa: boolean
+  }>
+  if (!s || !s.activa) return { estado: 'rechazado' }
+
+  const espera = (await q`
+    select espera_requerida(${s.correo}, ${origen}) as segundos
+  `) as unknown as Array<{ segundos: number }>
+  if (espera[0] && espera[0].segundos > 0) {
+    return { estado: 'espera', segundos: espera[0].segundos }
+  }
+
+  // Gastarlo es atómico: dos peticiones con el mismo código a la vez no pueden
+  // gastarlo las dos, y eso lo sujeta el `update ... where gastado_en is null`.
+  const [g] = (await q`
+    select gastar_codigo(${s.persona_id}::uuid, ${huellaCodigo(codigo)}, ${origen}) as bien
+  `) as unknown as Array<{ bien: boolean }>
+  const bien = g?.bien === true
+  await q`select anotar_intento(${s.correo}, ${origen}, ${bien}, 'codigo_recuperacion')`
+
+  if (!bien) {
+    await q`
+      update sesion set cerrada_en = now(), motivo_cierre = 'código de recuperación incorrecto'
+       where id = ${s.id}::uuid
+    `
+    return { estado: 'rechazado' }
+  }
+
+  const testigo = randomBytes(32).toString('base64url')
+  await q`
+    update sesion
+       set huella = ${huellaTestigo(testigo)},
+           expira_en = now() + ${`${HORAS_SESION} hours`}::interval,
+           ultima_en = now()
+     where id = ${s.id}::uuid
+  `
+  await q`update persona set ultimo_acceso = now() where id = ${s.persona_id}::uuid`
+  return { estado: 'dentro', testigo, personaId: s.persona_id }
+}
+
+/**
+ * Cuántos códigos le quedan vivos a una persona.
+ *
+ * Se enseña al entrar con uno, y no es un adorno: quedarse sin códigos y sin teléfono
+ * a la vez es como se pierde una cuenta de verdad. Quien acaba de gastar el noveno
+ * tiene que saberlo en ese momento, no el día que gaste el décimo.
+ */
+export async function codigosVivos(q: Consulta, personaId: string): Promise<number> {
+  const [r] = (await q`
+    select codigos_vivos(${personaId}::uuid) as n
+  `) as unknown as Array<{ n: number }>
+  return Number(r?.n ?? 0)
 }
 
 /** Quién es el dueño de un testigo, si sigue siendo válido. */

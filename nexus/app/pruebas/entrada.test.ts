@@ -74,15 +74,26 @@ test('quien entra por su empresa no ve un campo de clave', () => {
   assert.match(h, /Microsoft/)
 })
 
-test('las seis pantallas existen en los dos idiomas y ninguna queda sin traducir', () => {
-  const pasos: PasoEntrada[] = [
-    { paso: 'ingreso' },
-    { paso: 'segundo_factor', desafio: 'x' },
-    { paso: 'recuperacion' },
-    { paso: 'espera', segundos: 8 },
-    { paso: 'empresa', metodo: 'google' },
-    { paso: 'invitacion', nombre: 'Ana', ficha: 'f' },
-  ]
+/**
+ * Una por cada paso del tipo, y sin `as`: el molde exige los campos de cada uno.
+ *
+ * Si se añade un paso y no se añade aquí, los barridos dejan de mirarlo. Ya pasó:
+ * el paso que enseña «entraste con un código de recuperación» no existía porque
+ * tampoco existía la ruta que lo pinta.
+ */
+const TODOS: PasoEntrada[] = [
+  { paso: 'ingreso' },
+  { paso: 'segundo_factor', desafio: 'x' },
+  { paso: 'recuperacion', desafio: 'x' },
+  { paso: 'espera', segundos: 8 },
+  { paso: 'empresa', metodo: 'google' },
+  { paso: 'invitacion', nombre: 'Ana', ficha: 'f' },
+  { paso: 'creada', correo: 'a@b.test', secreto: 'ABC', codigos: ['A-1', 'B-2'] },
+  { paso: 'gastado', quedan: 9 },
+]
+
+test('TODAS las pantallas de entrada salen en los dos idiomas, sin nada sin traducir', () => {
+  const pasos = TODOS
   for (const p of pasos) {
     for (const idioma of ['es', 'en'] as const) {
       const h = pintarEntrada(p, idioma)
@@ -95,10 +106,15 @@ test('las seis pantallas existen en los dos idiomas y ninguna queda sin traducir
 
 test('la pantalla de espera es la única que lleva guion', () => {
   // Menos código en el camino de entrada es menos superficie que vigilar.
-  for (const p of [
-    { paso: 'ingreso' }, { paso: 'segundo_factor', desafio: 'x' }, { paso: 'recuperacion' },
-  ] as PasoEntrada[]) {
-    assert.equal(pintarEntrada(p, 'es').includes('<script>'), false, `${p.paso} no debería llevar guion`)
+  //
+  // Esta lista estaba escrita a mano Y con un `as PasoEntrada[]` encima, que es lo
+  // peor de las dos cosas: la copia se quedaba vieja y el molde de TypeScript no
+  // avisaba porque el `as` lo desactiva. Al añadirle un campo obligatorio al paso de
+  // recuperación, la prueba se cayó por dentro en vez de decir qué faltaba. Ahora
+  // sale de la misma lista que el barrido de arriba, sin ningún `as`.
+  for (const p of TODOS.filter((x) => x.paso !== 'espera')) {
+    assert.equal(pintarEntrada(p, 'es').includes('<script>'), false,
+      `${p.paso} no debería llevar guion`)
   }
   assert.match(pintarEntrada({ paso: 'espera', segundos: 5 }, 'es'), /<script>/)
 })

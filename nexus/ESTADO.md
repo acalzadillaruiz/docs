@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 10:35 (España)
+**Última actualización:** 2026-09-26, 11:20 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,55 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **dos acciones que salían bien y contestaban sin decir
+> ## MIRAR ESTO PRIMERO · hueco grande sin tapar
+>
+> **`asentar_valuacion()` no la llama la aplicación. Nunca.** Existe en el esquema
+> desde el principio, está probada, y hace el asiento de la venta: debe cuenta por
+> cobrar + retenciones, haber ingresos + IVA débito fiscal. La llaman **solo las
+> pruebas**, que se lo montan a mano en su fixture.
+>
+> Consecuencia, si esto se usara hoy: GPS aprueba una valuación, emite la factura, y
+> **el ingreso no entra al libro** — mientras el cobro sí, porque `registrarCobro` sí
+> llama a `asentar_cobro`. La cuenta por cobrar se iría a negativo, el estado de
+> resultados saldría sin ingresos, y el libro de ventas —que se construye desde
+> `documento_fiscal`— enseñaría una factura que el diario no tiene.
+>
+> Y el motivo de que ninguna prueba lo pillara es del mismo tipo que ya ha salido
+> cuatro veces: **el fixture hace lo que la aplicación no hace.** Los libros cuadran
+> en las pruebas porque la prueba asienta la venta antes de mirar.
+>
+> No se ha tocado: es el trozo siguiente y es de contabilidad, así que se hace con
+> cuidado, comprobando antes de creérselo (no vaya a acabar asentando dos veces la
+> venta importada, que sí tiene su `asentar_lote_ventas`). **El barrido general de
+> funciones del esquema que no llama nadie se añade en ese mismo commit**, para no
+> tener que declarar un hueco real como si estuviera bien.
+
+**Lo último terminado:** **perder el teléfono y volver a entrar — que NO FUNCIONABA.**
+
+La pantalla de «Perdí el teléfono» estaba escrita desde el primer día y mandaba el
+formulario a `/entrar/recuperacion`. Esa ruta **solo respondía a GET**: el POST se
+caía por la puerta de sesión y devolvía a la pantalla de entrada sin una palabra.
+`gastar_codigo()` existía en la base de datos, probada, y no la llamaba nadie.
+
+O sea: se generan diez códigos, se enseñan una sola vez, se pide guardarlos en papel
+«para cuando pierdas el teléfono», y quien perdía el teléfono **se quedaba fuera para
+siempre con los diez códigos en el bolsillo**. Novena máquina sin puerta y la peor:
+las otras ocho estorbaban, ésta cerraba la puerta.
+
+Lo que faltaba además del POST: el código de recuperación **no identifica a nadie**,
+así que va contra el desafío que dejó la clave ya comprobada, igual que el código del
+teléfono. El enlace de la pantalla anterior ahora lo arrastra. Y al entrar se dice
+cuántos códigos quedan: quien acaba de gastar el noveno tiene que saberlo entonces,
+no el día que gaste el décimo sin teléfono.
+
+Once pruebas nuevas, verificadas apagando la ruta para verlas fallar. De paso salió
+que una prueba de la pantalla de entrada llevaba la lista escrita a mano **y un `as`
+encima**, que desactiva el molde: al añadir un campo obligatorio se cayó por dentro
+en vez de decir qué faltaba. Ahora las dos salen de la misma lista y sin `as`.
+
+795 pruebas, todas pasan.
+
+**Antes:** **dos acciones que salían bien y contestaban sin decir
 nada — y el barrido que las encontró, ya permanente.**
 
 Deshacer una carga volvía a la misma pantalla con la misma caja vacía: la única señal

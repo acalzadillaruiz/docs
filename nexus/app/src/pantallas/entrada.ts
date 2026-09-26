@@ -23,7 +23,22 @@ export type PasoEntrada =
   | { readonly paso: 'ingreso'; readonly correo?: string; readonly error?: 'rechazado' }
   | { readonly paso: 'segundo_factor'; readonly desafio: string; readonly error?: 'rechazado' }
   | { readonly paso: 'espera'; readonly segundos: number }
-  | { readonly paso: 'recuperacion'; readonly error?: 'rechazado' }
+  | {
+      readonly paso: 'recuperacion'
+      /**
+       * A qué entrada pertenece. Un código de recuperación NO identifica a nadie: va
+       * contra el desafío que dejó la clave ya comprobada, igual que el código del
+       * teléfono. Sin esto, el formulario no tenía a quién referirse y el POST no
+       * podía existir — que es exactamente lo que pasaba.
+       */
+      readonly desafio: string
+      readonly error?: 'rechazado'
+    }
+  | {
+      /** Entró con un código. Se le dice cuántos le quedan, aquí y no otro día. */
+      readonly paso: 'gastado'
+      readonly quedan: number
+    }
   | {
       readonly paso: 'empresa'
       readonly metodo: 'microsoft' | 'google'
@@ -74,6 +89,12 @@ const TEXTOS = {
     claveNueva: 'Clave nueva',
     minimo: 'Doce caracteres como mínimo.',
     crear: 'Crear mi clave',
+    gastadoTitulo: 'Entraste con un código de recuperación',
+    gastadoPie: (n: number) => n === 0
+      ? 'Era el último que te quedaba. Sin códigos y sin teléfono no hay forma de volver a entrar: pide unos nuevos antes de cambiar de teléfono.'
+      : `Ese código ya no vale para nada más. Te quedan ${n}.`,
+    gastadoPocos: 'Quedarse sin códigos y sin teléfono a la vez es como se pierde una cuenta.',
+    gastadoIr: 'Entrar',
     rechazado: 'No hemos podido entrar con esos datos.',
     rechazadoCodigo: 'Ese código no es válido. Vuelve a empezar.',
   },
@@ -100,6 +121,12 @@ const TEXTOS = {
     claveNueva: 'New password',
     minimo: 'Twelve characters minimum.',
     crear: 'Create my password',
+    gastadoTitulo: 'You signed in with a recovery code',
+    gastadoPie: (n: number) => n === 0
+      ? 'That was your last one. With no codes and no phone there is no way back in: ask for new ones before you change phones.'
+      : `That code is now good for nothing else. You have ${n} left.`,
+    gastadoPocos: 'Running out of codes and losing the phone at the same time is how an account is lost.',
+    gastadoIr: 'Continue',
     rechazado: 'We could not sign you in with those details.',
     rechazadoCodigo: 'That code is not valid. Start again.',
   },
@@ -140,7 +167,8 @@ ${p.error ? err(x.rechazadoCodigo) : ''}
          autocomplete="one-time-code" autofocus>
   <button type="submit">${escapar(x.entrar)}</button>
 </form>
-<a class="alt" href="/entrar/recuperacion">${escapar(x.perdiTelefono)}</a>`,
+<a class="alt" href="/entrar/recuperacion?d=${encodeURIComponent(p.desafio)}">${
+  escapar(x.perdiTelefono)}</a>`,
       }
 
     case 'recuperacion':
@@ -149,11 +177,20 @@ ${p.error ? err(x.rechazadoCodigo) : ''}
         html: `<p class="pie">${escapar(x.recuperaPie)}</p>
 ${p.error ? err(x.rechazadoCodigo) : ''}
 <form method="post" action="/entrar/recuperacion">
+  <input type="hidden" name="desafio" value="${escapar(p.desafio)}">
   <label for="rec">${escapar(x.codigoRec)}</label>
   <input id="rec" name="codigo" class="cod" required autocapitalize="characters"
          spellcheck="false" autocomplete="off" autofocus>
   <button type="submit">${escapar(x.entrar)}</button>
 </form>`,
+      }
+
+    case 'gastado':
+      return {
+        titulo: x.gastadoTitulo,
+        html: `<p class="pie">${escapar(x.gastadoPie(p.quedan))}</p>
+${p.quedan === 0 || p.quedan > 3 ? '' : `<p class="err">${escapar(x.gastadoPocos)}</p>`}
+<a class="btn" href="/">${escapar(x.gastadoIr)}</a>`,
       }
 
     case 'espera':
