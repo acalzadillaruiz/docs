@@ -718,5 +718,18 @@
   "campo.referencia": "Reference",
   "campo.cuenta": "Account",
   "campo.moneda": "Currency",
-  "importar.banco_explica": "The statement is NOT posted: a bank line is not an accounting entry, it is a fact to be matched against a collection or payment already in the books. Posting it would count everything twice."
+  "importar.banco_explica": "The statement is NOT posted: a bank line is not an accounting entry, it is a fact to be matched against a collection or payment already in the books. Posting it would count everything twice.",
+  "periodo.sin_plan": "This company has no chart of accounts yet",
+  "periodo.sin_plan_explica": "Without it you cannot import an invoice, post a collection, or get anything out of opening a month. The one installed is a proposal for Venezuelan oilfield services: nothing in the system depends on those codes, so if you already have your own, yours is loaded and this one is discarded.",
+  "periodo.instalar_plan": "Install the proposed chart",
+  "periodo.plan_puesto": "Chart of accounts installed",
+  "periodo.error.plan_ya": "This company already has accounts: installing another chart on top would mix two numbering schemes",
+  "importar.revertir": "Undo this import",
+  "importar.motivo": "Reason",
+  "importar.revertida": "Import undone: {n} entry (entries) reversed",
+  "importar.error.motivo": "Undoing an import needs a written reason: a year from now, one without a reason is indistinguishable from a mistake",
+  "importar.error.no_existe": "That import does not exist",
+  "importar.error.ya_revertido": "That import was already undone",
+  "importar.error.mes_cerrado": "Month {m} is closed, and that is where the reversal would go. Reopen it before undoing the import.",
+  "importar.revertir_explica": "Undoing does not delete the entries: it records their reversal, which is the only thing that can be done with something that happened. Bank movements are deleted, but only the ones nobody has reconciled."
 }

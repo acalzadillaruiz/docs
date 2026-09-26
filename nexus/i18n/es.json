@@ -718,5 +718,18 @@
   "campo.referencia": "Referencia",
   "campo.cuenta": "Cuenta",
   "campo.moneda": "Moneda",
-  "importar.banco_explica": "El extracto NO se asienta: una línea del banco no es un apunte contable, es un hecho que hay que casar con un cobro o un pago que ya está en el libro. Asentarlo lo contaría todo dos veces."
+  "importar.banco_explica": "El extracto NO se asienta: una línea del banco no es un apunte contable, es un hecho que hay que casar con un cobro o un pago que ya está en el libro. Asentarlo lo contaría todo dos veces.",
+  "periodo.sin_plan": "Esta empresa todavía no tiene plan de cuentas",
+  "periodo.sin_plan_explica": "Sin él no se puede importar una factura, ni asentar un cobro, ni sirve de nada abrir un mes. El que se instala es una propuesta para servicios petroleros en Venezuela: nada del sistema depende de esos códigos, así que si ya tenéis el vuestro se carga el vuestro y este se descarta.",
+  "periodo.instalar_plan": "Instalar el plan propuesto",
+  "periodo.plan_puesto": "Plan de cuentas instalado",
+  "periodo.error.plan_ya": "Esta empresa ya tiene cuentas: instalar otro plan encima mezclaría dos numeraciones",
+  "importar.revertir": "Deshacer esta carga",
+  "importar.motivo": "Motivo",
+  "importar.revertida": "Carga deshecha: {n} asiento(s) reversado(s)",
+  "importar.error.motivo": "Deshacer una carga necesita un motivo escrito: dentro de un año, una sin motivo no se distingue de un error",
+  "importar.error.no_existe": "Esa carga no existe",
+  "importar.error.ya_revertido": "Esa carga ya estaba deshecha",
+  "importar.error.mes_cerrado": "El mes {m} está cerrado y ahí es donde iría el reverso. Ábrelo antes de deshacer la carga.",
+  "importar.revertir_explica": "Deshacer no borra los asientos: registra su reverso, que es lo único que se puede hacer con un hecho que ocurrió. Los movimientos del banco sí se borran, pero solo los que nadie ha conciliado."
 }

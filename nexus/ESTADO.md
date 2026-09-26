@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 04:10 (España)
+**Última actualización:** 2026-09-26, 05:05 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,32 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el extracto del banco entra por Excel** — y con eso, **la
+**Lo último terminado:** **deshacer una carga — y al construir el botón salió que
+`revertir_lote` NO REVERSABA NADA.**
+
+Buscaba los asientos por `origen_tipo = 'importacion_excel'` y `origen_id = <lote>`,
+y esos asientos no existen: los crea el generador de la factura, que los marca con su
+origen de verdad —la factura— porque es lo correcto para el libro. Así que deshacer
+una carga marcaba el lote como «revertido» y **dejaba la contabilidad intacta**. Eso
+es peor que no poder deshacer: la pantalla decía que la carga estaba deshecha y el
+libro seguía cargado.
+
+Llevaba ahí desde el principio, sin que nadie pudiera verlo, **porque el botón no
+existía en ninguna parte** — el propio importador mandaba hacerlo («para rehacerlo,
+reviértelo antes») y no había una sola pantalla desde donde hacerlo. La cuarta vez
+que aparece la misma forma de fallo.
+
+La causa de fondo era que **no había forma de saber qué documentos creó un lote**: se
+adivinaba cruzando números contra las filas crudas. Ahora el documento lo dice
+(`documento_fiscal.lote_id`), y de eso vive tanto el reverso como la comprobación del
+mes cerrado.
+
+Y **el plan de cuentas del día 1**: el importador decía «esta empresa todavía no tiene
+plan de cuentas instalado» y **no había forma de instalarlo**. Ahora la pantalla de
+meses lo ofrece, en ámbar y con su explicación: es una propuesta, nada del sistema
+depende de esos códigos, y si GPS tiene el suyo se carga el suyo.
+
+**Antes:** **el extracto del banco entra por Excel** — y con eso, **la
 conciliación bancaria deja de ser una pantalla sin nada que conciliar.**
 
 Llevaba días comparando `movimiento_banco` contra los cobros y los pagos, y **no
@@ -460,7 +485,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**986 comprobaciones** (250 de SQL y diccionario + 736 de TypeScript), todas pasando.
+**991 comprobaciones** (250 de SQL y diccionario + 741 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno
@@ -570,6 +595,13 @@ NEXUS_PERSONA=<uuid> node --experimental-strip-types \
 702 comprobaciones hayan encontrado veintinueve fallos reales, veintiséis de ellos míos.
 
 ### Trampas con las que ya se tropezó — no repetirlas
+
+- **Una variable de plpgsql con el nombre de una columna hace ambiguo el `update`.**
+  `nota := ...; update ... set nota = nota` no compila y el error —«column reference
+  nota is ambiguous»— no dice dónde está. Nombres distintos: `texto`.
+- **En un fixture, lo que apunta a otra cosa se borra ANTES que aquello a lo que
+  apunta.** Ya mordió dos veces seguidas en el mismo archivo: los movimientos del
+  banco y las facturas apuntan a su lote, así que el lote se borra el último.
 
 - **Una lista de pantallas escrita a mano se queda vieja en dos días.** Estaba
   copiada en tres barridos y los tres miraban media aplicación. Sale de `rutas.ts`,

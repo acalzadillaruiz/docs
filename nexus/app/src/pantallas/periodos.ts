@@ -24,6 +24,8 @@ const TEXTOS = {
 
 export function pintarPeriodos(
   m: Meses, idioma: Idioma, antifalsificacion: string, errores: readonly string[] = [],
+  /** Cuántas cuentas tiene la empresa. Cero es el día 1, y el día 1 hay que actuar. */
+  cuentas = 1,
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -60,6 +62,17 @@ export function pintarPeriodos(
     errores.map((e) => `<li>${escapar(e)}</li>`).join('')
   }</ul></div>`}
 
+  ${cuentas > 0 ? '' : `
+  <div class="plan">
+    <b>${escapar(t('periodo.sin_plan'))}</b>
+    <p>${escapar(t('periodo.sin_plan_explica'))}</p>
+    <form method="post" action="/periodos">
+      <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
+      <input type="hidden" name="accion" value="plan">
+      <button type="submit">${escapar(t('periodo.instalar_plan'))}</button>
+    </form>
+  </div>`}
+
   ${!m.siguiente ? '' : `
   <form method="post" action="/periodos" class="abrir">
     <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
@@ -80,6 +93,15 @@ export function pintarPeriodos(
 }
 
 export const ESTILOS_PERIODOS = `
+/* El aviso del día 1. Sale en ámbar y con su botón dentro porque es lo único que hay
+   que hacer antes de nada: sin plan de cuentas no se importa una factura, no se
+   asienta un cobro y no sirve de nada abrir un mes. */
+.plan{margin-top:18px;background:var(--amb);border:1px solid var(--am);
+  border-radius:14px;padding:17px 19px}
+.plan b{color:var(--am);font-size:15.5px}
+.plan p{margin:6px 0 12px;font-size:14px;line-height:1.5;color:var(--ik);max-width:64ch}
+.plan button{font:inherit;font-size:14px;font-weight:700;padding:9px 20px;border:0;
+  border-radius:9px;background:var(--nv);color:#E9F0F6;cursor:pointer}
 /* Lo primero que se ve es abrir el siguiente, con su nombre ya escrito: buscar el
    mes en un desplegable es un paso más entre alguien y lo que ha venido a hacer. */
 .abrir{display:flex;align-items:center;justify-content:space-between;gap:16px;

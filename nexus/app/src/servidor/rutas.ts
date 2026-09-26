@@ -47,13 +47,13 @@ import {
   proponer, emitir, presentar, facturar, facturaDe, emitirNota, ContratoNoValuable,
 } from '../dominio/valuar.ts'
 import {
-  cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, mapeoGuardado,
+  cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, revertir, mapeoGuardado,
   CAMPOS, DESTINOS, HojaRepetida, type Campo, type Destino,
 } from '../dominio/importar.ts'
 import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
 import { estadoDeCobro, registrarCobro, NoCobrable, type Medio } from '../dominio/cobrar.ts'
 import { pintarCobrar } from '../pantallas/cobrar.ts'
-import { meses, abrirMes, cerrarMes } from '../dominio/periodos.ts'
+import { meses, instalarPlan, tienePlan, abrirMes, cerrarMes } from '../dominio/periodos.ts'
 import {
   facturasDeProveedor, conceptosIslr, retener, esAgenteDeRetencion,
 } from '../dominio/proveedores.ts'
@@ -516,6 +516,16 @@ export async function resolver(
 
     const a = p.archivo
     const listaDe = () => comoQuien((q) => lotes(q, org!.organizacion_id))
+
+    // Deshacer una carga. El propio importador lo mandaba hacer —«para rehacerlo,
+    // reviertelo antes»— y no habia una sola pantalla desde donde revertir nada.
+    if (p.campos['accion'] === 'revertir') {
+      const r = await comoQuien((q) => revertir(q, (p.campos['lote'] ?? '').trim(),
+        p.campos['motivo'] ?? '', personaId, p.idioma))
+      return html(r.hecho ? 200 : 400, pintarSubirHoja(p.idioma, testigoAnti(testigo),
+        await listaDe(), r.hecho ? '' : r.motivo))
+    }
+
     if (!a) {
       return html(400, pintarSubirHoja(p.idioma, testigoAnti(testigo), await listaDe(),
         t(p.idioma, 'importar.error.sin_hoja')))
@@ -609,7 +619,13 @@ export async function resolver(
     `)) as unknown as Array<{ organizacion_id: string }>
 
     let errores: readonly string[] = []
-    if (p.metodo === 'POST') {
+    if (p.metodo === 'POST' && p.campos['accion'] === 'plan') {
+      // Instalar el plan de cuentas. Va aqui porque es lo PRIMERO de una empresa
+      // nueva, y porque el error que lo pedia —«esta empresa todavia no tiene plan de
+      // cuentas»— no tenia ninguna pantalla desde donde arreglarlo.
+      const r = await comoQuien((q) => instalarPlan(q, org!.organizacion_id, p.idioma))
+      if (!r.hecho) errores = [r.motivo]
+    } else if (p.metodo === 'POST') {
       const cuando = anioMes(p)
       if (cuando === null) {
         errores = [t(p.idioma, 'periodo.error.fecha')]
@@ -622,9 +638,12 @@ export async function resolver(
       }
     }
 
-    const m = await comoQuien((q) => meses(q, org!.organizacion_id, p.idioma))
+    const [m, cuentas] = await Promise.all([
+      comoQuien((q) => meses(q, org!.organizacion_id, p.idioma)),
+      comoQuien((q) => tienePlan(q, org!.organizacion_id)),
+    ])
     return html(errores.length === 0 ? 200 : 400,
-      pintarPeriodos(m, p.idioma, testigoAnti(testigo), errores))
+      pintarPeriodos(m, p.idioma, testigoAnti(testigo), errores, cuentas))
   }
 
   // Las retenciones a proveedores. GPS es agente de retención: no retener cuando

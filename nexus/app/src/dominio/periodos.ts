@@ -149,3 +149,38 @@ export async function cerrarMes(
   await q`select cerrar_periodo(${orgId}::uuid, ${anio}, ${mes}, ${personaId}::uuid)`
   return { hecho: true }
 }
+
+/**
+ * Si esta empresa tiene ya su plan de cuentas.
+ *
+ * Hace falta preguntarlo porque **sin plan no se puede hacer nada**: no se importa
+ * una factura, no se asienta un cobro, no se abre un mes con sentido. El importador
+ * ya lo decía —«esta empresa todavía no tiene plan de cuentas instalado»— y **no
+ * había forma de instalarlo desde ninguna pantalla**. Otra instrucción sin camino.
+ */
+export async function tienePlan(q: Consulta, orgId: string): Promise<number> {
+  const [n] = (await q`
+    select count(*)::int as n from cuenta where organizacion_id = ${orgId}::uuid
+  `) as unknown as Array<{ n: number }>
+  return Number(n?.n ?? 0)
+}
+
+/**
+ * Instala el plan de cuentas propuesto para servicios petroleros en Venezuela.
+ *
+ * Es una PROPUESTA, no una imposición, y la pantalla lo dice: nada del sistema
+ * depende de estos códigos concretos, porque las cuentas se referencian por concepto
+ * a través de `mapa_cuenta`. Si GPS tiene el suyo, se carga el suyo.
+ *
+ * No se instala dos veces: con cuentas ya creadas, volver a pasar por aquí no añade
+ * nada, pero tampoco tiene por qué ser un botón que se pueda pulsar.
+ */
+export async function instalarPlan(
+  q: Consulta, orgId: string, idioma: Idioma,
+): Promise<Cambio> {
+  if (await tienePlan(q, orgId) > 0) {
+    return { hecho: false, motivo: t(idioma, 'periodo.error.plan_ya') }
+  }
+  await q`select instalar_plan_cuentas(${orgId}::uuid)`
+  return { hecho: true }
+}

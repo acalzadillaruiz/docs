@@ -448,3 +448,74 @@ export async function mapeoGuardado(q: Consulta, loteId: string): Promise<Propue
     }
   })
 }
+
+export type Revertido =
+  | { readonly hecho: true; readonly asientos: number }
+  | { readonly hecho: false; readonly motivo: string }
+
+/**
+ * Deshacer una carga.
+ *
+ * El propio importador lo mandaba hacer —«el lote ya está confirmado; para rehacerlo,
+ * reviértelo antes»— y **no había una sola pantalla desde donde revertir nada**. Es
+ * la misma forma de fallo que ya apareció tres veces: existe la regla, existe el
+ * texto, y no existe el camino.
+ *
+ * Revertir no borra los asientos: **registra su reverso**, que es lo único que se
+ * puede hacer con un hecho que ocurrió. Los movimientos del banco sí se borran, pero
+ * solo los que nadie ha conciliado todavía.
+ *
+ * El motivo es obligatorio. Una carga deshecha sin motivo, leída dentro de un año, es
+ * indistinguible de un error.
+ */
+export async function revertir(
+  q: Consulta, loteId: string, motivo: string, personaId: string, idioma: Idioma,
+): Promise<Revertido> {
+  if (motivo.trim().length < 3) {
+    return { hecho: false, motivo: t(idioma, 'importar.error.motivo') }
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(loteId)) {
+    return { hecho: false, motivo: t(idioma, 'importar.error.no_existe') }
+  }
+
+  const [l] = (await q`
+    select estado::text from lote_importacion where id = ${loteId}::uuid
+  `) as unknown as Array<{ estado: string }>
+  if (!l) return { hecho: false, motivo: t(idioma, 'importar.error.no_existe') }
+  if (l.estado === 'revertido') {
+    return { hecho: false, motivo: t(idioma, 'importar.error.ya_revertido') }
+  }
+
+  // Los asientos del lote viven en el mes en que ocurrieron, así que el reverso entra
+  // ahí también. Si ese mes está cerrado, no entra: se comprueba antes de llamar,
+  // porque la excepción abortaría la transacción entera.
+  //
+  // Y se buscan como los busca `revertir_lote`: por los documentos que el lote selló.
+  // Los asientos de una carga NO llevan el lote como origen —los crea el generador de
+  // la factura, que los marca con la factura— y buscarlos por el lote era justo el
+  // fallo que hacía que revertir no reversara nada.
+  const [cerrado] = (await q`
+    select a.anio, a.mes from asiento a
+      left join periodo pe on pe.organizacion_id = a.organizacion_id
+                          and pe.anio = a.anio and pe.mes = a.mes
+     where a.reversa_a is null
+       and not exists (select 1 from asiento r where r.reversa_a = a.id)
+       and ((a.origen_tipo = 'importacion_excel' and a.origen_id = ${loteId}::uuid)
+            or a.origen_id in (select df.id from documento_fiscal df
+                                where df.lote_id = ${loteId}::uuid))
+       and (pe.estado is null or pe.estado <> 'abierto')
+     limit 1
+  `) as unknown as Array<{ anio: number; mes: number }>
+  if (cerrado) {
+    return {
+      hecho: false,
+      motivo: t(idioma, 'importar.error.mes_cerrado')
+        .replace('{m}', `${cerrado.anio}-${String(cerrado.mes).padStart(2, '0')}`),
+    }
+  }
+
+  const [r] = (await q`
+    select revertir_lote(${loteId}::uuid, ${personaId}::uuid, ${motivo.trim()}) as n
+  `) as unknown as Array<{ n: number }>
+  return { hecho: true, asientos: Number(r?.n ?? 0) }
+}

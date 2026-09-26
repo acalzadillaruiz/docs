@@ -12,8 +12,9 @@ import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import {
   cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes,
-  formatoNumero, formatoFecha, HojaRepetida, type Campo,
+  formatoNumero, formatoFecha, HojaRepetida, revertir, type Campo,
 } from '../src/dominio/importar.ts'
+import { instalarPlan, tienePlan } from '../src/dominio/periodos.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = '4b5c6d7e-0000-0000-0000-00000000000a'
@@ -76,9 +77,18 @@ async function limpio(): Promise<void> {
     // Los movimientos del banco van PRIMERO: apuntan a su lote, y borrar el lote con
     // un movimiento colgando falla por clave foránea. Es la clase de cosa que rompe
     // el archivo entero en la segunda corrida y no en la primera.
+    // El orden importa, y ya ha mordido dos veces: los movimientos del banco y las
+    // facturas apuntan a su lote, así que el lote se borra EL ÚLTIMO. Borrarlo antes
+    // falla por clave foránea y se lleva por delante el archivo entero.
     await q`delete from movimiento_banco where organizacion_id = ${G}::uuid`
-    await q`delete from lote_importacion where organizacion_id = ${G}::uuid`
     await q`delete from documento_fiscal where organizacion_id = ${G}::uuid`
+    await q`delete from lote_importacion where organizacion_id = ${G}::uuid`
+    // Y el mes vuelve a abrirse: una de estas pruebas lo CIERRA para comprobar que
+    // deshacer una carga lo dice antes de intentarlo. Si esa prueba se corta por
+    // medio, el mes se queda cerrado y a partir de ahí falla todo el archivo — y
+    // falla la segunda vez, no la primera, que es lo que cuesta de encontrar.
+    await q`update periodo set estado = 'abierto'
+             where organizacion_id = ${G}::uuid and anio = 2026 and mes = 4`
   })
 }
 
@@ -625,4 +635,136 @@ test('la pantalla ofrece los TRES destinos, y avisa de que el extracto no se asi
   assert.match(h, /Extracto del banco/)
   assert.match(h, /no es un apunte contable/)
   assert.equal(h.includes('‹falta:'), false)
+})
+
+/**
+ * Deshacer una carga, y el plan de cuentas del día 1.
+ *
+ * Dos máquinas que estaban enteras y sin puerta. El propio importador mandaba
+ * revertir un lote —«para rehacerlo, reviértelo antes»— y no había una sola pantalla
+ * desde donde hacerlo; y decía «esta empresa todavía no tiene plan de cuentas» sin
+ * ofrecer en ningún sitio la forma de instalarlo.
+ */
+
+/** Una hoja de compras traída hasta el final: cargada, mapeada, validada y confirmada. */
+async function traerHasta(_estado: 'confirmado'): Promise<string> {
+  const r = await dentro((q) => cargar(q, G, YO, 'abril.csv', bytes(HOJA), 'facturas_recibidas'))
+  await dentro((q) => guardarMapeo(q, r.loteId, proponerMapeo(r.cabeceras, r.muestras,
+    'facturas_recibidas')))
+  await dentro((q) => validar(q, r.loteId))
+  const c = await dentro((q) => confirmar(q, r.loteId, YO))
+  assert.equal(c.hecho, true, (c as { motivo?: string }).motivo)
+  return r.loteId
+}
+
+test('deshacer una carga REVERSA sus asientos, no los borra', async () => {
+  // Un asiento no se borra: es un hecho que ocurrió. Los dos se quedan en el libro.
+  await limpio()
+  const lote = await traerHasta('confirmado')
+
+  // Los asientos de una carga NO llevan el lote como origen: los crea el generador
+  // de la factura, que los marca con la factura, y eso es lo correcto para el libro.
+  // Se buscan por los documentos que el lote selló. Ese detalle es justo el que hacía
+  // que `revertir_lote` no reversara nada.
+  const cuantos = async () => {
+    const [r] = (await dentro((q) => q`
+      select count(*)::int as n from asiento a
+       where a.organizacion_id = ${G}::uuid
+         and a.origen_id in (select id from documento_fiscal where lote_id = ${lote}::uuid)
+    `)) as unknown as Array<{ n: number }>
+    return Number(r!.n)
+  }
+  const antes = await cuantos()
+  assert.ok(antes > 0, 'la carga tiene que haber dejado asientos')
+
+  const r = await dentro((q) => revertir(q, lote, 'la hoja era del mes que no era', YO, 'es'))
+  assert.equal(r.hecho, true, (r as { motivo?: string }).motivo)
+  assert.equal((r as { asientos: number }).asientos, antes)
+  assert.equal(await cuantos(), antes * 2, 'los originales y sus reversos')
+
+  const [l] = (await dentro((q) => q`
+    select estado::text, nota from lote_importacion where id = ${lote}::uuid
+  `)) as unknown as Array<{ estado: string; nota: string }>
+  assert.equal(l!.estado, 'revertido')
+  assert.match(l!.nota, /mes que no era/)
+})
+
+test('deshacer SIN motivo no pasa, y deshacer dos veces tampoco', async () => {
+  await limpio()
+  const lote = await traerHasta('confirmado')
+  for (const motivo of ['', '  ', 'ya']) {
+    const r = await dentro((q) => revertir(q, lote, motivo, YO, 'es'))
+    assert.equal(r.hecho, false, `«${motivo}» no puede valer como motivo`)
+  }
+  assert.equal((await dentro((q) => revertir(q, lote, 'buen motivo', YO, 'es'))).hecho, true)
+  const otra = await dentro((q) => revertir(q, lote, 'otro motivo', YO, 'es'))
+  assert.equal(otra.hecho, false)
+  assert.match((otra as { motivo: string }).motivo, /ya estaba deshecha/)
+})
+
+test('con el mes cerrado se dice ANTES, no con un error de la base de datos', async () => {
+  // El reverso va al mes del asiento original. Si está cerrado, no entra.
+  await limpio()
+  const lote = await traerHasta('confirmado')
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`update periodo set estado = 'cerrado'
+             where organizacion_id = ${G}::uuid and anio = 2026 and mes = 4`
+  })
+
+  const r = await dentro((q) => revertir(q, lote, 'con el mes cerrado', YO, 'es'))
+  assert.equal(r.hecho, false)
+  assert.match((r as { motivo: string }).motivo, /2026-04/)
+  // El mes lo vuelve a abrir `limpio()`, no esta prueba: si se corta por medio, el
+  // arreglo de aquí abajo no llegaría a ejecutarse nunca.
+})
+
+test('el día 1 se puede instalar el plan de cuentas desde la pantalla', async () => {
+  // El importador decía «esta empresa todavía no tiene plan de cuentas instalado» y
+  // no había forma de instalarlo. Otra instrucción sin camino.
+  const NUEVA = '4b5c6d7e-9999-0000-0000-00000000000a'
+  const YO_N = '4b5c6d7e-9999-0000-0000-00000000000d'
+  await dentro(async (q) => {
+    await q.unsafe(`
+      set local role none;
+      insert into organizacion (id, tipo, nombre, rif)
+        values ('${NUEVA}','gps','GPS Recién Nacida','J-909900000-0')
+        on conflict (id) do nothing;
+      delete from mapa_cuenta where organizacion_id = '${NUEVA}';
+      delete from cuenta where organizacion_id = '${NUEVA}';`)
+    await q`insert into persona (id, organizacion_id, correo, nombre, metodo,
+                                 clave_hash, totp_secreto)
+            values (${YO_N}, ${NUEVA},'nueva@prueba.test','Nueva','clave_2fa','(h)','(s)')
+            on conflict (id) do nothing`
+  })
+
+  const comoNueva = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
+    comoPersona<T>({ id: YO_N }, 'nexus_interno', f)
+
+  assert.equal(await comoNueva((q) => tienePlan(q, NUEVA)), 0)
+  const r = await comoNueva((q) => instalarPlan(q, NUEVA, 'es'))
+  assert.equal(r.hecho, true)
+  assert.ok(await comoNueva((q) => tienePlan(q, NUEVA)) > 50, 'el plan entero')
+
+  // Y no se instala dos veces: dos numeraciones mezcladas no se separan después.
+  const otra = await comoNueva((q) => instalarPlan(q, NUEVA, 'es'))
+  assert.equal(otra.hecho, false)
+  assert.match((otra as { motivo: string }).motivo, /ya tiene cuentas/)
+})
+
+test('la pantalla de meses avisa del plan que falta, y solo cuando falta', async () => {
+  const { pintarPeriodos } = await import('../src/pantallas/periodos.ts')
+  const { meses } = await import('../src/dominio/periodos.ts')
+  // Con los meses de verdad, no con un objeto inventado: un objeto a medias hace que
+  // la pantalla reviente por un campo que falta, y eso no prueba nada de lo que se
+  // quería probar.
+  const m = await dentro((q) => meses(q, G, 'es'))
+
+  const sin = pintarPeriodos(m, 'es', 'af', [], 0)
+  assert.match(sin, /todavía no tiene plan de cuentas/)
+  assert.match(sin, /value="plan"/)
+  assert.equal(sin.includes('‹falta:'), false)
+
+  const con = pintarPeriodos(m, 'es', 'af', [], 84)
+  assert.equal(/todavía no tiene plan de cuentas/.test(con), false)
 })

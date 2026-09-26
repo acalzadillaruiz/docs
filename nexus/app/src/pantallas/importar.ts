@@ -43,7 +43,18 @@ export function pintarSubirHoja(
     t(`importar.estado.${l.estado}` as Clave))}</div>
   ${l.estado === 'confirmado' || l.estado === 'revertido' ? ''
     : `<a class="lt-v" href="/importar/${escapar(l.id)}">→</a>`}
-</div>`).join('')}</div>`
+  ${l.estado !== 'confirmado' ? '' : `
+  <form method="post" action="/importar" class="deshacer">
+    <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
+    <input type="hidden" name="accion" value="revertir">
+    <input type="hidden" name="lote" value="${escapar(l.id)}">
+    <label>${escapar(t('importar.motivo'))}
+      <input type="text" name="motivo" maxlength="160"></label>
+    <button type="submit">${escapar(t('importar.revertir'))}</button>
+  </form>`}
+</div>`).join('')}
+  ${listaLotes.some((l) => l.estado === 'confirmado')
+    ? `<p class="expl">${escapar(t('importar.revertir_explica'))}</p>` : ''}</div>`
 
   return pagina({
     idioma,
@@ -170,6 +181,19 @@ export function pintarMapeo(
 }
 
 export const ESTILOS_IMPORTAR = `
+/* Deshacer una carga se pide con su motivo y sin ceremonia, pero discreto: no es de
+   todos los días, y un botón grande invita a usarlo como si lo fuera. */
+.deshacer{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;width:100%;
+  margin-top:10px;padding-top:10px;border-top:1px dashed var(--ln)}
+.deshacer label{flex:1;min-width:170px;font-family:"JetBrains Mono",monospace;
+  font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--md)}
+.deshacer input{display:block;margin-top:4px;width:100%;font:inherit;font-size:13px;
+  padding:6px 9px;border:1px solid var(--ln2);border-radius:8px;background:var(--cd);
+  color:var(--ik)}
+.deshacer button{font:inherit;font-size:13px;font-weight:650;padding:7px 14px;
+  border:1px solid var(--ln2);border-radius:8px;background:transparent;color:var(--ik2);
+  cursor:pointer}
+.lt{flex-wrap:wrap}
 .pad{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));padding:8px}
 .c{display:block;padding:8px 10px}
 .c span{display:block;font-family:"JetBrains Mono",monospace;font-size:9px;font-weight:700;
