@@ -6,7 +6,7 @@ Dos formas, y hacen cosas distintas.
 
 El recorrido navegable: **https://claude.ai/artifact/613p36bPqXYLT31Tvdrck3**
 
-Las 161 pantallas tal como las genera el servidor, con su portada, y con los enlaces
+Las 164 pantallas tal como las genera el servidor, con su portada, y con los enlaces
 reescritos para que lleven de una a otra. Los enlaces funcionan; **los formularios no envían nada**. Sirve
 para verla y para mostrarla; no sirve para comprobar que guarda.
 
@@ -75,6 +75,6 @@ datos de verdad, y esa decisión no es de programación.
 cd docs/nexus/db && ./probar.sh
 ```
 
-943 comprobaciones contra un PostgreSQL desechable. Tarda unos siete minutos y termina
+946 comprobaciones contra un PostgreSQL desechable. Tarda unos siete minutos y termina
 diciendo `TODAS LAS PRUEBAS PASAN` o qué archivo falló. Es lo que sí ejercita los
 formularios de punta a punta: subir un documento, verificar un hito, cerrar un mes.

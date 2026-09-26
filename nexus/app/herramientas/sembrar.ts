@@ -24,6 +24,60 @@ import {
 
 const PROV = 'c8d9e0f1-0000-0000-0000-00000000000f'
 
+/**
+ * EL CALENDARIO DE LA MUESTRA, anclado a HOY.
+ *
+ * Estaba escrito a mano en marzo de 2027, y eso la rompió por cuatro sitios distintos antes
+ * de que alguien atara los cabos:
+ *
+ *   1. No se podía emitir ni una valuación: todo busca la tasa del BCV con
+ *      `vigente_el <= current_date` y la muestra no tenía ninguna de hoy. Se tapó metiendo
+ *      una tasa de hoy con el valor de 2027.
+ *   2. Un cobro no entraba si no se fechaba dentro de 2027, porque se asienta en el mes de
+ *      su fecha y solo esos meses estaban abiertos.
+ *   3. **El avance de cada renglón salía 0 % en la pantalla del contrato.** `avance_renglon`
+ *      solo cuenta los hitos con `ocurrido_en <= hoy`, y los de la muestra habían «ocurrido»
+ *      en 2027 — o sea, no habían ocurrido. La pantalla del renglón, que suma sus propios
+ *      hitos sin mirar la fecha, decía 10 % verificado y 55 % declarado. **Dos verdades sobre
+ *      la cifra de la que va el producto entero**, y la que salía primero era la falsa.
+ *   4. Y una empresa de muestra fechada año y medio en el futuro se lee como una maqueta.
+ *
+ * Así que la muestra vive AHORA. El mes valuado es el anterior al de hoy —un periodo que ya
+ * terminó, que es lo que se valúa— y todo lo demás cuelga de ahí. Nada ocurre en el futuro
+ * salvo lo que de verdad está por venir: la fecha de entrega pronosticada de un pedido.
+ */
+const HOY = new Date()
+const dia = (a: number, m: number, d: number) =>
+  new Date(Date.UTC(a, m - 1, d)).toISOString().slice(0, 10)
+/** Hoy más (o menos) n días. */
+const masDias = (n: number) =>
+  new Date(HOY.getTime() + n * 86400000).toISOString().slice(0, 10)
+const MES_VAL = new Date(Date.UTC(HOY.getUTCFullYear(), HOY.getUTCMonth() - 1, 1))
+const A = MES_VAL.getUTCFullYear()
+const M = MES_VAL.getUTCMonth() + 1
+/** El mes anterior al valuado, que es donde va el balance de apertura. */
+const ANT = new Date(Date.UTC(A, M - 2, 1))
+
+export const CAL = {
+  /** El mes valuado: el anterior al de hoy. */
+  anio: A,
+  mes: M,
+  /** Su primer día y su último. */
+  desde: dia(A, M, 1),
+  hasta: dia(A, M + 1, 0),
+  /** El mes en curso, donde viven las valuaciones que esperan al cliente y los cobros. */
+  anioHoy: HOY.getUTCFullYear(),
+  mesHoy: HOY.getUTCMonth() + 1,
+  hoy: dia(HOY.getUTCFullYear(), HOY.getUTCMonth() + 1, HOY.getUTCDate()),
+  /** El corte del balance de apertura: el último día del mes de antes del valuado. */
+  corte: dia(A, M, 0),
+  /** Y el primer día de ese mes, para la tasa que necesita la apertura. */
+  antes: dia(ANT.getUTCFullYear(), ANT.getUTCMonth() + 1, 1),
+  /** Un día cualquiera del mes valuado, para fechar cosas dentro de él. */
+  enMes: (d: number) => dia(A, M, Math.min(d, Number(dia(A, M + 1, 0).slice(8)))),
+  masDias,
+} as const
+
 export const MUESTRA = {
   org: 'c8d9e0f1-0000-0000-0000-00000000000a',
   cliente: 'c8d9e0f1-0000-0000-0000-00000000000b',
@@ -42,8 +96,9 @@ export const MUESTRA = {
   personaCliente: 'c8d9e0f1-0000-0000-0000-00000000000e',
   clave: 'una clave razonable',
   secreto: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
-  anio: 2027,
-  mes: 3,
+  /** El mes valuado de la muestra. Sale del calendario, no de un número escrito a mano. */
+  anio: CAL.anio,
+  mes: CAL.mes,
 } as const
 
 export async function sembrar(): Promise<void> {
@@ -74,22 +129,17 @@ export async function sembrar(): Promise<void> {
     // La tasa lleva un índice PARCIAL (solo las no sustituidas), así que la cláusula
     // de conflicto no puede deducirlo: se inserta solo si no hay ninguna ese día.
     await q.unsafe(`
+      -- La del mes valuado, la del mes anterior —que es la que necesita el balance de
+      -- apertura para su columna en divisas— y la de HOY, que es la que busca todo lo que
+      -- se emite: vigente_el menor o igual que current_date.
       insert into tasa_bcv (vigente_el, ves_por_usd, fuente)
-      select '2027-03-01'::date, 70.00,'carga_manual'
+      select '${CAL.desde}'::date, 66.00,'carga_manual'
        where not exists (select 1 from tasa_bcv
-                          where vigente_el = '2027-03-01' and sustituida_por is null);
-      -- Y una de enero, para el balance de apertura: el asiento de apertura lleva su
-      -- columna en divisas y la convierte a la tasa vigente en la fecha de corte. Sin una
-      -- tasa de enero o anterior, la apertura de la muestra no se podía cargar.
+                          where vigente_el = '${CAL.desde}' and sustituida_por is null);
       insert into tasa_bcv (vigente_el, ves_por_usd, fuente)
-      select '2027-01-01'::date, 38.00,'carga_manual'
+      select '${CAL.antes}'::date, 61.00,'carga_manual'
        where not exists (select 1 from tasa_bcv
-                          where vigente_el = '2027-01-01' and sustituida_por is null);
-      -- Y una para HOY. El escenario de la muestra es de marzo de 2027, que es FUTURO, y
-      -- todo lo que se emite busca la tasa con vigente_el <= current_date: sin esta
-      -- fila, en la base de muestra no se podia emitir ni una valuacion —«no hay tasa del
-      -- BCV publicada todavia para hoy»— mientras COMO-CORRERLO.md decia que si se podia.
-      -- Comprobado llamando a emitir antes y despues.
+                          where vigente_el = '${CAL.antes}' and sustituida_por is null);
       insert into tasa_bcv (vigente_el, ves_por_usd, fuente)
       select current_date, 70.00,'carga_manual'
        where not exists (select 1 from tasa_bcv
@@ -111,11 +161,18 @@ export async function sembrar(): Promise<void> {
         on conflict do nothing;
       select instalar_plan_cuentas('${G}');
       select marcar_monetarias('${G}');
+      -- Los meses contables de tres años: el del mes valuado, el anterior y el de hoy. Son
+      -- los mismos casi siempre; se abren los tres porque en enero no lo son, y un mes sin
+      -- abrir no admite ni un asiento.
       insert into periodo (organizacion_id, anio, mes)
-        select '${G}', 2027, m from generate_series(1,12) m on conflict do nothing;`)
+        select '${G}', a, m
+          from generate_series(${CAL.anio} - 1, ${CAL.anioHoy}) a,
+               generate_series(1, 12) m
+        on conflict do nothing;`)
 
     const [t] = (await q`
-      select id from tasa_bcv where vigente_el = '2027-03-01' and sustituida_por is null
+      select id from tasa_bcv where vigente_el = ${CAL.desde}::date
+         and sustituida_por is null
     `) as unknown as Array<{ id: string }>
     const TASA = t!.id
 
@@ -125,7 +182,7 @@ export async function sembrar(): Promise<void> {
     // Si ya hay contratos de la muestra, el resto ya esta hecho y no se repite.
     //
     // Este freno decia `>= 40` y este archivo siembra QUINCE, asi que nunca frenaba:
-    // sembrar dos veces reventaba con «duplicate key ... GPS-2027-001». Pasaba
+    // sembrar dos veces reventaba con «duplicate key ... GPS-001». Pasaba
     // desapercibido porque quien siembra dos veces suele hacerlo con la salida
     // redirigida — yo mismo dí por bueno un `on conflict` mirando una segunda pasada que
     // en realidad se habia caido, con el `2>&1` tapandolo.
@@ -134,7 +191,12 @@ export async function sembrar(): Promise<void> {
     await q.unsafe(`
       insert into contrato (organizacion_id, cliente_id, codigo, tipo, titulo_es, titulo_en,
                             estado, moneda, monto, tasa_id, creado_por)
-      select '${G}'::uuid,'${C}'::uuid,'GPS-2027-'||lpad(i::text,3,'0'),
+      -- Los códigos NO llevan el año. Lo llevaban —GPS-2027-001— y quedó incoherente en
+      -- cuanto la muestra pasó a vivir en el presente: un contrato llamado «2027» con
+      -- valuaciones del mes pasado se lee como una maqueta hecha a medias. Sin año, el
+      -- código vale cualquier año y los nombres de los archivos de la instantánea no
+      -- cambian solos cada enero.
+      select '${G}'::uuid,'${C}'::uuid,'GPS-'||lpad(i::text,3,'0'),
              (array['procura','servicio','transporte','alquiler','reacondicionamiento'])[1+(i%5)]::tipo_contrato,
              (array['Suministro de cabezales','Cuadrilla de mantenimiento','Transporte de crudo',
                     'Alquiler de bomba de lodo','Reacondicionamiento de pozo'])[1+(i%5)]||' · Pozo '||i,
@@ -166,17 +228,17 @@ export async function sembrar(): Promise<void> {
       select crear_hitos_desde_plantilla(rg.id)
         from renglon rg join contrato c on c.id = rg.contrato_id
        where c.organizacion_id = '${G}'
-         and c.codigo <> 'GPS-2027-014';
+         and c.codigo <> 'GPS-014';
 
       -- Los dos primeros hitos de cada renglon, ya ocurridos: el primero CON su papel
       -- verificado y el segundo declarado SIN papel. Es la diferencia que el producto
       -- entero existe para ensenar —la barra verde y la rayada— y con todo pendiente
       -- no se ve en ninguna pantalla.
       update hito h set estado = 'declarado',
-                        ocurrido_en = '2027-03-01'::date + (h.orden * 3)
+                        ocurrido_en = '${CAL.desde}'::date + (h.orden * 3)
         from renglon rg join contrato c on c.id = rg.contrato_id
        where h.renglon_id = rg.id and c.organizacion_id = '${G}'
-         and c.codigo <> 'GPS-2027-014' and h.orden <= 2;
+         and c.codigo <> 'GPS-014' and h.orden <= 2;
 
       -- El papel PRIMERO, y verificado. Poner el hito en 'verificado' sin su evidencia
       -- no se puede: lo impide el disparador 'hito_exige_su_evidencia', y eso es la
@@ -191,20 +253,24 @@ export async function sembrar(): Promise<void> {
         join renglon rg on rg.id = h.renglon_id
         join contrato ct on ct.id = rg.contrato_id
         cross join unnest(h.exige) c
-       where ct.organizacion_id = '${G}' and ct.codigo <> 'GPS-2027-040'
+       -- Decía 'GPS-040', un contrato que no existe desde que la muestra bajó de cuarenta
+       -- a catorce. No hacía nada —el 014 no tiene hitos, así que no hay evidencia que
+       -- sembrarle— pero una condición que nombra algo inexistente hace perder un rato al
+       -- siguiente que la lea.
+       where ct.organizacion_id = '${G}' and ct.codigo <> 'GPS-014'
          and h.orden = 1
       on conflict do nothing;
 
       update hito h set estado = 'verificado'
         from renglon rg join contrato c on c.id = rg.contrato_id
        where h.renglon_id = rg.id and c.organizacion_id = '${G}'
-         and c.codigo <> 'GPS-2027-014' and h.orden = 1;
+         and c.codigo <> 'GPS-014' and h.orden = 1;
 
       insert into valuacion (organizacion_id, contrato_id, numero, periodo_desde,
                              periodo_hasta, obra, moneda, tasa_id, amortiza_pct,
                              garantia_pct, alicuota_iva_id, concepto_islr, ret_iva_pct,
                              estado, aprobada_el, aprobada_por, creada_por)
-      select '${G}'::uuid, c.id, 1,'2027-03-01'::date,'2027-03-31'::date,
+      select '${G}'::uuid, c.id, 1,'${CAL.desde}'::date,'${CAL.hasta}'::date,
              round((c.monto * (0.25 + (row_number() over (order by c.codigo) % 7) * 0.09))::numeric, 2),
              'VES','${TASA}'::uuid, 0, 5,
              (select id from alicuota_iva where clase = 'general' limit 1),
@@ -222,20 +288,24 @@ export async function sembrar(): Promise<void> {
                              periodo_hasta, obra, moneda, tasa_id, amortiza_pct,
                              garantia_pct, alicuota_iva_id, concepto_islr, ret_iva_pct,
                              estado, presentada_el, creada_por)
-      select '${G}'::uuid, c.id, 2,'2027-04-01'::date,'2027-04-30'::date,
+      -- El mes EN CURSO, del día uno a hoy: una valuación a medio camino, que es lo que hay
+      -- en cualquier cartera de verdad. Nada de fechas futuras: un periodo que todavía no ha
+      -- terminado se valúa hasta hoy, no hasta el día 30 que aún no ha llegado.
+      select '${G}'::uuid, c.id, 2,
+             date_trunc('month', current_date)::date, current_date,
              round((c.monto * 0.18)::numeric, 2),
              'VES','${TASA}'::uuid, 0, 5,
              (select id from alicuota_iva where clase = 'general' limit 1),
              'SERV-PJ', 75,
-             (case c.codigo when 'GPS-2027-002' then 'presentada'
+             (case c.codigo when 'GPS-002' then 'presentada'
                             else 'objetada' end)::estado_valuacion,
-             current_date - (case c.codigo when 'GPS-2027-002' then 3
-                                           when 'GPS-2027-005' then 18
+             current_date - (case c.codigo when 'GPS-002' then 3
+                                           when 'GPS-005' then 18
                                            else 26 end),
              '${YO}'::uuid
         from contrato c
        where c.organizacion_id = '${G}'
-         and c.codigo in ('GPS-2027-002','GPS-2027-005','GPS-2027-009');
+         and c.codigo in ('GPS-002','GPS-005','GPS-009');
 
       -- La del 005 lleva una objecion SIN contestar: es lo que GPS le debe al cliente.
       insert into objecion (valuacion_id, persona_id, motivo, objetada_en)
@@ -243,7 +313,7 @@ export async function sembrar(): Promise<void> {
              'El renglon 2 incluye 14 horas de grua que no vimos en locacion el dia 12.',
              now() - interval '16 days'
         from valuacion v join contrato c on c.id = v.contrato_id
-       where c.codigo = 'GPS-2027-005' and v.numero = 2
+       where c.codigo = 'GPS-005' and v.numero = 2
          and not exists (select 1 from objecion o where o.valuacion_id = v.id);
 
       -- Y la del 009 la tiene contestada: la pelota vuelve al campo del cliente.
@@ -254,14 +324,15 @@ export async function sembrar(): Promise<void> {
              'Adjuntada el acta firmada por el supervisor de campo el dia 19.',
              now() - interval '6 days', '${YO}'::uuid
         from valuacion v join contrato c on c.id = v.contrato_id
-       where c.codigo = 'GPS-2027-009' and v.numero = 2
+       where c.codigo = 'GPS-009' and v.numero = 2
          and not exists (select 1 from objecion o where o.valuacion_id = v.id);
 
       insert into asiento (organizacion_id, numero, ocurrido_en, anio, mes, descripcion_es,
                            descripcion_en, origen_tipo, origen_id, creado_por)
       select '${G}'::uuid, siguiente_asiento('${G}') + (row_number() over (order by c.codigo)) - 1,
-             make_date(2027, 3, 1 + ((row_number() over (order by c.codigo))::int % 27)),
-             2027, 3,'Costo de obra · '||c.codigo,'Job cost','factura_proveedor',
+             '${CAL.desde}'::date + ((row_number() over (order by c.codigo))::int % 27),
+             ${CAL.anio}, ${CAL.mes},'Costo de obra · '||c.codigo,'Job cost',
+             'factura_proveedor',
              gen_random_uuid(),'${YO}'::uuid
         from contrato c where c.organizacion_id = '${G}';`)
 
@@ -281,7 +352,7 @@ export async function sembrar(): Promise<void> {
 
       -- AQUÍ ESTABAN CUARENTA ASIENTOS ESCRITOS A MANO, y veintiséis de ellos vacíos.
       --
-      -- Se llamaban «Valuación aprobada · GPS-2027-020» y siguientes: nombres de
+      -- Se llamaban «Valuación aprobada · GPS-020» y siguientes: nombres de
       -- contratos que no existen, porque este archivo pasó de sembrar cuarenta contratos
       -- a sembrar catorce y el generate_series(0, 39) se quedó. Las partidas se metían
       -- aparte, cruzando por el nombre, así que solo catorce las recibieron. Los otros
@@ -332,14 +403,13 @@ export async function sembrar(): Promise<void> {
       // parece a ninguna. Cinco cobradas del todo, dos a medias —que es el caso que hace
       // falta para que «saldo» signifique algo— y el resto facturadas y esperando.
       //
-      // La fecha va en abril de 2027 porque el cobro se asienta en el mes de su fecha y
-      // ese mes tiene que estar ABIERTO. Con la fecha de hoy, `registrarCobro` se niega
-      // —bien— porque el escenario de la muestra vive en 2027 y solo esos meses se abren.
+      // Los cobros van en los últimos días, escalonados: el cobro se asienta en el mes de
+      // su fecha y ese mes tiene que estar abierto, y ninguno puede ser de mañana.
       const cuanto = i < 5 ? Number(v.neto) : i < 7 ? Math.round(Number(v.neto) * 0.4) : 0
       if (cuanto <= 0) continue
       const r = await registrarCobro(q, {
         valuacionId: v.id,
-        fecha: `2027-04-${String(6 + i).padStart(2, '0')}`,
+        fecha: CAL.masDias(-(12 - i)),
         medio: i % 3 === 0 ? 'transferencia' : i % 3 === 1 ? 'cheque' : 'compensacion',
         monto: cuanto,
         referencia: `REF-${v.codigo.slice(-3)}-${i}`,
@@ -377,7 +447,7 @@ export async function sembrar(): Promise<void> {
       '3.1.01;;30000000,00',
     ].join('\n')
     const r = await cargar(q, G, YO, 'apertura-muestra.csv',
-      new TextEncoder().encode(filas), 'saldos_iniciales', '2027-01-31')
+      new TextEncoder().encode(filas), 'saldos_iniciales', CAL.corte)
     await guardarMapeo(q, r.loteId, proponerMapeo(r.cabeceras, r.muestras, 'saldos_iniciales'))
     const v = await validar(q, r.loteId)
     if (v.malas > 0) {
@@ -400,18 +470,21 @@ export async function sembrar(): Promise<void> {
         tsa uuid;
       begin
         if exists (select 1 from contrato
-                    where organizacion_id = '${G}' and codigo = 'GPS-2027-PROC') then
+                    where organizacion_id = '${G}' and codigo = 'GPS-PROC') then
           return;
         end if;
         select id into tsa from tasa_bcv
-         where vigente_el = '2027-03-01' and sustituida_por is null;
+         where vigente_el = '${CAL.desde}' and sustituida_por is null;
 
         insert into contrato (organizacion_id, cliente_id, codigo, tipo, titulo_es,
                               titulo_en, estado, moneda, monto, tasa_id, inicio,
                               fin_previsto, creado_por)
-        values ('${G}','${C}','GPS-2027-PROC','procura',
+        values ('${G}','${C}','GPS-PROC','procura',
                 'Cabezales de pozo 11" 5M','11" 5M wellheads','vigente','USD',
-                420000, tsa,'2027-01-15','2027-06-30','${YO}')
+                -- Firmado hace cinco meses y con entrega prevista dentro de dos: la fecha
+                -- de entrega SÍ está en el futuro, y tiene que estarlo — es lo único que
+                -- aquí se pronostica, no se declara ocurrido.
+                420000, tsa,'${CAL.masDias(-150)}','${CAL.masDias(60)}','${YO}')
         returning id into ctr;
 
         insert into renglon (contrato_id, numero, descripcion_es, descripcion_en,
@@ -425,7 +498,7 @@ export async function sembrar(): Promise<void> {
         insert into hito (renglon_id, orden, clave, nombre_es, nombre_en, peso, exige,
                           planificada)
         select r.id, p.orden, p.clave, p.nombre_es, p.nombre_en, p.peso, p.exige,
-               date '2027-01-15' + (p.orden * 30)
+               date '${CAL.masDias(-150)}' + (p.orden * 30)
           from renglon r join plantilla_hito p on p.tipo = 'procura'
          where r.contrato_id = ctr;
 
@@ -440,12 +513,12 @@ export async function sembrar(): Promise<void> {
           from hito h, unnest(h.exige) c
          where h.renglon_id = rg and h.clave in ('orden','fabricado');
 
-        update hito set estado = 'verificado', ocurrido_en = '2027-02-02'
+        update hito set estado = 'verificado', ocurrido_en = '${CAL.masDias(-120)}'
          where renglon_id = rg and clave = 'orden';
-        update hito set estado = 'verificado', ocurrido_en = '2027-02-24'
+        update hito set estado = 'verificado', ocurrido_en = '${CAL.masDias(-70)}'
          where renglon_id = rg and clave = 'fabricado';
 
-        update hito set estado = 'verificado', ocurrido_en = '2027-02-10'
+        update hito set estado = 'verificado', ocurrido_en = '${CAL.masDias(-95)}'
          where renglon_id in (select id from renglon where contrato_id = ctr and numero = 2)
            and clave = 'orden'
            and exists (select 1 from hito h2 where h2.renglon_id = hito.renglon_id
@@ -471,14 +544,14 @@ export async function sembrar(): Promise<void> {
         if exists (select 1 from caja_chica where organizacion_id = '${G}') then return; end if;
         select id into ctr from contrato where organizacion_id = '${G}' order by codigo limit 1;
         cja := abrir_caja('${G}','Caja de campo · Anaco','VES', 400000,
-                          '${YO}','2027-03-01','${YO}');
-        perform anotar_vale(cja,'2027-03-03','Taxi a la locación', 28000,
+                          '${YO}','${CAL.desde}','${YO}');
+        perform anotar_vale(cja,'${CAL.enMes(3)}','Taxi a la locación', 28000,
                             '5.1.04', ctr,'Transporte Díaz','h-recibo-0031','${YO}');
-        perform anotar_vale(cja,'2027-03-06','Soldadura de urgencia en cabezal', 65000,
+        perform anotar_vale(cja,'${CAL.enMes(6)}','Soldadura de urgencia en cabezal', 65000,
                             '5.1.01', ctr,'Taller Mendoza','h-recibo-0032','${YO}');
-        perform anotar_vale(cja,'2027-03-09','Almuerzo de la cuadrilla', 41000,
+        perform anotar_vale(cja,'${CAL.enMes(9)}','Almuerzo de la cuadrilla', 41000,
                             '5.1.02', ctr,'Doña Rosa', null,'${YO}');
-        perform anotar_vale(cja,'2027-03-12','Fletes menores del taller', 33000,
+        perform anotar_vale(cja,'${CAL.enMes(12)}','Fletes menores del taller', 33000,
                             '5.1.04', null,'Cooperativa Guanipa','h-recibo-0033','${YO}');
       end
       $sembrar$;`)
@@ -494,7 +567,7 @@ export async function sembrar(): Promise<void> {
       begin
         if exists (select 1 from documento_fiscal
                     where organizacion_id = '${G}' and sentido = 'recibido') then return; end if;
-        select id into tsa from tasa_bcv where vigente_el = '2027-03-01' and sustituida_por is null;
+        select id into tsa from tasa_bcv where vigente_el = '${CAL.desde}' and sustituida_por is null;
         select id into alq from alicuota_iva where clase = 'general'
          order by vigente_desde desc limit 1;
         insert into organizacion (id, tipo, nombre, rif)
@@ -503,9 +576,9 @@ export async function sembrar(): Promise<void> {
         insert into documento_fiscal (organizacion_id, sentido, tipo, numero, numero_control,
                                       contraparte_id, fecha, base_ves, base_usd,
                                       alicuota_iva_id, iva_ves, iva_usd, tasa_id, registrado_por)
-        values ('${G}','recibido','factura','00004412','01-00044120', pr,'2027-03-05',
+        values ('${G}','recibido','factura','00004412','01-00044120', pr,'${CAL.enMes(5)}',
                 2400000.00, 34285.71, alq, 384000.00, 5485.71, tsa,'${YO}'),
-               ('${G}','recibido','factura','00004419','01-00044190', pr,'2027-03-21',
+               ('${G}','recibido','factura','00004419','01-00044190', pr,'${CAL.enMes(21)}',
                 860000.00, 12285.71, alq, 137600.00, 1965.71, tsa,'${YO}');
       end
       $prov$;`)

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { ficha, ContratoNoAlcanzable } from '../src/dominio/contrato.ts'
 import { cabeceraDeValuacion, ValuacionNoAlcanzable } from '../src/dominio/valuacion.ts'
+import { avanceDelRenglon } from '../src/dominio/evidencia.ts'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = '2b3c4d5e-0000-0000-0000-00000000000a'
@@ -22,6 +23,9 @@ const CTR_A = '2b3c4d5e-2222-0000-0000-00000000000a'
 const CTR_B = '2b3c4d5e-2222-0000-0000-00000000000b'
 const TASA = '2b3c4d5e-1111-0000-0000-00000000000a'
 const IVA = '2b3c4d5e-1111-0000-0000-00000000000b'
+
+/** El renglón con hitos, que se averigua en el fixture. */
+let RG_A = ''
 
 const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
   comoPersona<T>({ id: YO }, 'nexus_interno', f)
@@ -76,6 +80,30 @@ before(async () => {
          150000.00,'USD','${TASA}', 20.00, 5.00,'${IVA}','SERV-PJ', 75.00,'presentada',
          current_date - 12,'${YO}')
         on conflict do nothing;
+    `)
+    // Hitos en el PRIMER renglón, con fecha ya pasada. Hacen falta para lo que se comprueba
+    // abajo: que la cifra de avance de la ficha del contrato sea la MISMA que la de la
+    // pantalla del renglón a la que enlaza. Sin hitos, las dos daban cero y la comprobación
+    // pasaba sin poder fallar.
+    //
+    // Va con LA MISMA `q` que el resto del fixture, no con otro `dentro`. Lo intenté con
+    // otro y el archivo pasaba solo y fallaba dentro de la suite: `comoPersona` abre su
+    // propia transacción, así que la de dentro no veía el renglón que la de fuera acababa de
+    // insertar y todavía no había confirmado. Pasaba solo porque la fila estaba ahí de la
+    // pasada anterior — o sea, la prueba dependía de su propia historia.
+    const [rg] = (await q`
+      select id from renglon where contrato_id = ${CTR_A}::uuid and numero = 1
+    `) as unknown as Array<{ id: string }>
+    RG_A = rg!.id
+    await q.unsafe(`
+      insert into hito (renglon_id, orden, clave, nombre_es, nombre_en, peso, exige,
+                        estado, ocurrido_en) values
+        ('${RG_A}', 1,'orden','Orden de compra','PO', 15.00,'{}','verificado',
+         current_date - 40),
+        ('${RG_A}', 2,'fabricado','Fabricado','Made', 35.00,'{}','declarado',
+         current_date - 10),
+        ('${RG_A}', 3,'recibido','Recibido','Received', 50.00,'{}','pendiente', null)
+      on conflict do nothing;
     `)
   })
 })
@@ -184,4 +212,49 @@ test('la cabecera de una valuación ajena tampoco se alcanza', () => {
     comoCliente((q) => cabeceraDeValuacion(q, '2b3c4d5e-9999-0000-0000-000000000000')),
     ValuacionNoAlcanzable,
   )
+})
+
+test('LA FICHA Y LA PANTALLA DEL RENGLÓN DICEN LA MISMA CIFRA DE AVANCE', async () => {
+  // Decían dos cifras distintas, y la del producto entero. La ficha del contrato llama a
+  // `avance_renglon`, que solo cuenta los hitos con `ocurrido_en <= hoy`; la pantalla del
+  // renglón suma los pesos de sus propios hitos sin mirar fechas. Las dos reglas son
+  // correctas y se separan cuando hay un hito verificado con fecha futura — que es una
+  // contradicción, y la muestra estaba llena de ellos: la ficha enseñaba 0 % al lado de un
+  // enlace a una pantalla que decía 10 % verificado y 55 % declarado.
+  const f = await dentro((q) => ficha(q, CTR_A, 'es', true))
+  const a = await dentro((q) => avanceDelRenglon(q, RG_A, 'es'))
+  const r = f.renglones.find((x) => x.id === RG_A)!
+  assert.equal(r.avance, a.verificado,
+    `la ficha dice ${r.avance} % verificado y la pantalla del renglón ${a.verificado} %`)
+  assert.equal(r.declarado, a.declarado,
+    `la ficha dice ${r.declarado} % declarado y la pantalla del renglón ${a.declarado} %`)
+  // Y que no sea la igualdad trivial de dos ceros, que es como esta comprobación pasaría
+  // sin comprobar nada.
+  assert.equal(a.verificado, 15, 'el fixture no tiene avance verificado que comparar')
+  assert.equal(a.declarado, 50, 'el fixture no tiene avance declarado que comparar')
+})
+
+test('un hito NO PUEDE haber ocurrido mañana, que es lo que las separaba', async () => {
+  // Es la cerradura que impide que las dos cifras vuelvan a separarse. «Verificado» quiere
+  // decir que hay un papel que prueba que pasó, y no puede haber pasado un día que no ha
+  // llegado. Para una fecha prevista está `planificada`, que sí mira al futuro.
+  await assert.rejects(() => dentro((q) => q`
+    update hito set ocurrido_en = current_date + 1
+     where renglon_id = ${RG_A}::uuid and orden = 1`),
+    /todavía no ha llegado/)
+  // Y tampoco al insertar, que es la otra puerta.
+  await assert.rejects(() => dentro((q) => q`
+    insert into hito (renglon_id, orden, clave, nombre_es, nombre_en, peso, exige,
+                      estado, ocurrido_en)
+    values (${RG_A}::uuid, 9,'entregado','Entregado','Delivered', 0.00,'{}','declarado',
+            current_date + 30)`),
+    /todavía no ha llegado/)
+})
+
+test('pero una fecha PREVISTA sí puede ser futura: para eso está', async () => {
+  const [ok] = (await dentro((q) => q`
+    update hito set planificada = current_date + 45
+     where renglon_id = ${RG_A}::uuid and orden = 3
+    returning planificada`)) as unknown as Array<{ planificada: Date }>
+  assert.ok(ok, 'no se pudo planificar un hito para dentro de mes y medio')
 })

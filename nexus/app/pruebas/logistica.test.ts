@@ -25,6 +25,17 @@ const TASA = '4f5a6b7c-1100-0000-0000-00000000000a'
 const CTR = '4f5a6b7c-2200-0000-0000-00000000000a'
 const SERV = '4f5a6b7c-2200-0000-0000-00000000000b'
 
+/**
+ * Hace n días, en ISO.
+ *
+ * Las fechas de estos hitos estaban escritas en septiembre de 2027 —un año en el futuro— y
+ * la base ya no lo admite: «ocurrió» es para lo que ya pasó, y un hito verificado con fecha
+ * de mañana es lo que hacía que la ficha del contrato y la pantalla del renglón dieran dos
+ * cifras distintas de avance. Relativas a hoy dicen lo mismo y no caducan.
+ */
+const HACE = (n: number) =>
+  new Date(Date.now() - n * 86400000).toISOString().slice(0, 10)
+
 const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
   comoPersona<T>({ id: YO }, 'nexus_interno', f)
 
@@ -152,8 +163,8 @@ test('LA POSICIÓN LA MARCA LO VERIFICADO, no lo que alguien escribió', async (
   // Es la decisión entera. Se marca «embarcado» como declarado —alguien lo dijo— sin
   // que los pasos anteriores estén verificados: el material NO se mueve en el tablero.
   const rg = await renglonDe('RU-PROC')
-  await marcar(rg, 'orden', 'verificado', '2027-09-05')
-  await marcar(rg, 'embarcado', 'declarado', '2027-09-20')
+  await marcar(rg, 'orden', 'verificado', HACE(25))
+  await marcar(rg, 'embarcado', 'declarado', HACE(10))
 
   const [r] = await soloProcura()
   assert.match(r!.paso!, /Orden de compra/, 'sigue donde tenía papel')
@@ -162,7 +173,7 @@ test('LA POSICIÓN LA MARCA LO VERIFICADO, no lo que alguien escribió', async (
 
 test('lo dicho sin papel se señala, en vez de callarlo o creérselo', async () => {
   const rg = await renglonDe('RU-PROC')
-  await marcar(rg, 'fabricado', 'declarado', '2027-09-15')
+  await marcar(rg, 'fabricado', 'declarado', HACE(15))
 
   const [r] = await soloProcura()
   assert.equal(r!.dichoSinPapel, true)
@@ -176,7 +187,7 @@ test('el papel subido y sin mirar se distingue del papel que falta', async () =>
   // No es lo mismo: confundirlos hace que se persiga al proveedor cuando el atasco
   // está en casa.
   const rg = await renglonDe('RU-PROC')
-  await marcar(rg, 'fabricado', 'evidenciado', '2027-09-15')
+  await marcar(rg, 'fabricado', 'evidenciado', HACE(15))
 
   const [r] = await soloProcura()
   assert.equal(r!.papelEsperando, true)
@@ -197,7 +208,7 @@ test('el renglón que ya llegó desaparece del tablero', async () => {
   // tablero: es un listado.
   const rg = await renglonDe('RU-PROC')
   for (const c of ['orden', 'fabricado', 'embarcado', 'nacionalizado', 'recibido']) {
-    await marcar(rg, c, 'verificado', '2027-09-25')
+    await marcar(rg, c, 'verificado', HACE(5))
   }
   assert.equal((await soloProcura()).length, 0)
 })

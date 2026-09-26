@@ -34,7 +34,68 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **con qué saldos empieza una empresa que ya existe.**
+**Lo último terminado:** **la muestra vive AHORA, y el avance de un renglón ya dice una sola
+cifra.**
+
+Salió de un repaso, no de un fallo reportado: **entrar en el recorrido como el cliente y
+preguntarse qué haría ahí y no puede.** Y lo primero que apareció no era del cliente.
+
+La instantánea pedía **todo como GPS** menos dos pantallas, así que de la mitad del producto
+que ve el cliente no se podía comprobar nada. Ahora también se exportan **su contrato, su
+renglón y su valuación**. La buena noticia: el cliente ve su ficha sin costo unitario y sin
+margen, y ahora eso se puede mirar en la instantánea en vez de creerlo.
+
+La mala, y es gorda: **la ficha del contrato enseñaba 0 % de avance en los cuatro renglones de
+cada contrato**, al lado de un enlace que llevaba a una pantalla que decía *10 % verificado,
++55 % sin demostrar*. **Dos cifras distintas para la cifra de la que va el producto entero**, y
+la que salía primero era la falsa. En la instantánea publicada, varias versiones.
+
+La causa, y por qué es la misma de tres agujeros anteriores: **la muestra vivía en marzo de
+2027**, año y medio en el futuro. `avance_renglon` solo cuenta los hitos con
+`ocurrido_en <= hoy` —porque un hito que no ha ocurrido no es avance— y los de la muestra
+habían «ocurrido» en 2027, o sea no habían ocurrido. La pantalla del renglón suma los pesos de
+sus propios hitos sin mirar fechas, y lo hace así a propósito: su comentario explica que si
+pidiera el total por otro lado podría contradecir a la lista que está enseñando. **Las dos
+reglas son correctas.** Se separan solo cuando existe un hito verificado con fecha de mañana,
+que es una contradicción — verificado quiere decir que hay un papel que prueba que pasó.
+
+Esa misma muestra en el futuro ya había costado dos parches antes: una tasa del BCV «de hoy»
+con el valor de 2027 para poder emitir, y cobros fechados en abril de 2027 porque solo esos
+meses estaban abiertos. Tres veces el mismo hilo.
+
+**Así que la muestra vive ahora.** El mes valuado es el anterior al de hoy —un periodo que ya
+terminó, que es lo que se valúa— y todo cuelga de ahí: hitos, valuaciones, facturas, cobros,
+caja chica, apertura, los meses contables y los parámetros del exportador. Lo único que sigue
+en el futuro es lo que de verdad está por venir: la fecha de entrega prevista de un pedido. Y
+los códigos de contrato perdieron el año —`GPS-001` en vez de `GPS-2027-001`—: un contrato
+llamado «2027» con valuaciones del mes pasado se lee como una maqueta, y sin año los nombres
+de los archivos de la instantánea no cambian solos cada enero.
+
+**Y la cerradura que impide que vuelva:** la fecha en que un hito ocurrió no puede ser
+posterior a hoy. Va en un disparador y no en un `check`, porque una restricción de columna no
+puede llamar a `current_date`. Las fechas de previsión —`planificada`, `pronosticada`— no se
+tocan: existen justamente para hablar del futuro. **La cerradura encontró sola un fixture que
+mentía:** el de logística fechaba sus hitos en septiembre de 2027.
+
+De paso, el balance se pide **a hoy** y no al cierre del mes valuado. Al cierre, la tabla de
+antigüedad salía vacía —«no hay nada pendiente de cobro a esa fecha»— al lado de un activo con
+44 millones de clientes dentro: el asiento de la venta va al mes valuado y la deuda empieza a
+envejecer cuando se le presenta al cliente, que es después. Las dos cifras eran correctas y
+juntas se leían como un error.
+
+**946 pruebas, todas pasan.** La que importa compara las dos cifras de avance y **exige que no
+sean dos ceros**, porque la igualdad trivial de dos ceros es exactamente cómo esa comprobación
+pasaría sin comprobar nada. Verificada por los dos lados: quitando el disparador se pone roja
+la del futuro, y haciendo que la ficha use otra fecha de corte se pone roja la de la igualdad.
+Y una prueba mía pasaba sola y fallaba en la suite —abría una segunda transacción que no veía
+lo que la primera no había confirmado, y sola pasaba porque la fila estaba de la pasada
+anterior. Otra vez: **una prueba que depende de su propia historia.**
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **con qué saldos empieza una empresa que ya existe.**
 
 El importador dice de sí mismo que es *«la pantalla que decide si esto se usa o se abandona:
 hay años de histórico en hojas de cálculo y ninguna aplicación sirve si hay que volver a
@@ -89,10 +150,6 @@ tres se ponen rojas al aflojar el cuadre, las cuentas y la apertura única, y ot
 quitar la fecha, el mes y el origen del asiento. Y corriendo el archivo **dos veces**, que es
 lo que enseñó que dependía de su propia historia: la hoja llevaba un contador y la segunda
 pasada rebotaba contra la huella de la primera.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **el balance decía que no balanceaba, y balanceaba.**
 
@@ -1768,6 +1825,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
 | `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
 | `app/src/pantallas/valuacion.ts` | **La primera pantalla.** Una sola función para las dos superficies: en escritorio las líneas son una tabla, en el móvil tarjetas apiladas. No son dos pantallas, es la misma reacomodada por la hoja de estilos. No enseña un total: enseña el camino hasta el total. |
+| `db/schema/44-nada-ocurre-en-el-futuro.sql` | **Un hito no ocurre mañana.** El avance de un renglón se contestaba con DOS cifras: la ficha del contrato llama a `avance_renglon`, que solo cuenta lo ocurrido hasta hoy; la pantalla del renglón suma los pesos de sus propios hitos. Las dos reglas son correctas y se separan solo con un hito verificado con fecha futura — que es una contradicción, y la muestra estaba llena de ellos porque vivía en 2027: la ficha enseñaba 0 %. Ahora la fecha en que algo ocurrió no puede ser posterior a hoy; las de previsión no se tocan. |
 | `db/schema/43-saldos-iniciales.sql` | **Con qué saldos empieza una empresa que ya existe.** El importador traía facturas y extractos pero no el balance de apertura, y este producto no tiene pantalla para teclear un asiento a mano: el capital, el banco y lo que ya te deben no tenían por dónde entrar, así que una empresa que ya existe no podía empezar a usar esto. Es un destino más, con la hoja de «saldos al cierre» que da cualquier sistema contable. Se niega —antes de escribir— un balance que no cuadra, una cuenta que no está en el plan, la falta de fecha de corte o de mes abierto, y una segunda apertura. |
 | `db/schema/42-resultado-en-el-balance.sql` | **El balance decía que no balanceaba, y balanceaba.** Le faltaba el resultado del ejercicio: las cuentas de ingreso y gasto quedaban fuera y su saldo neto no está asentado en patrimonio porque no hay cierre de ejercicio. El activo salía mayor por exactamente la ganancia del periodo, y la pantalla acusaba de un asiento a medias a un libro impecable. Un aviso que salta sin que pase nada deja de leerse el día que pasa algo. La línea es calculada, y la pantalla lo dice. |
 | `db/schema/41-libro-que-se-declara.sql` | **Las dos cifras mal del libro que se declara.** La columna «Total» se calculaba `base + exento`, sin el IVA, y **una nota de crédito sumaba** en vez de restar: se declaraba de más por su importe, al doble, en ventas y en compras. Las pruebas que había contaban FILAS, y contar filas comprueba que la nota aparece, no en qué dirección. El signo va en la vista porque la pantalla no es la única que lee esto: también la hoja que se baja, y mañana la declaración. |
@@ -2134,7 +2192,7 @@ verdad, por orden de lo que más cambia las cosas.)*
    diccionario ya tiene el vocabulario de las dos; las pantallas no existen. El portal del
    cliente ya no está en esta lista: tiene su bandeja, su estado de cuenta y la hoja de cada
    valuación en un archivo.
-6. **Un segundo par de ojos.** 943 comprobaciones automáticas no sustituyen a una
+6. **Un segundo par de ojos.** 946 comprobaciones automáticas no sustituyen a una
    persona usando esto una semana con datos de verdad.
 
 ## Bloqueado

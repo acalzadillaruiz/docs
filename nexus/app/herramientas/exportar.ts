@@ -12,7 +12,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { resolver, type Peticion } from '../src/servidor/rutas.ts'
-import { sembrar, MUESTRA } from './sembrar.ts'
+import { sembrar, MUESTRA, CAL } from './sembrar.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
 import { iconoSvg, iconoPng } from '../src/servidor/icono.ts'
@@ -104,9 +104,12 @@ const mesVentas = (await dentro((q) => q`
    group by 1, 2 order by n desc, anio desc, mes desc limit 1
 `)) as unknown as Array<{ anio: number; mes: number; n: number }>
 const VENTAS = {
-  anio: String(mesVentas[0]?.anio ?? 2027),
-  mes: String(mesVentas[0]?.mes ?? 3),
+  anio: String(mesVentas[0]?.anio ?? CAL.anio),
+  mes: String(mesVentas[0]?.mes ?? CAL.mes),
 }
+
+/** El mes valuado de la muestra, que es donde está toda la contabilidad. */
+const MES = { anio: String(CAL.anio), mes: String(CAL.mes) }
 
 const valuaciones = (await dentro((q) => q`
   select va.id, ct.codigo as contrato, va.numero
@@ -156,13 +159,26 @@ const PAGINAS: Array<Pagina> = [
   // Su estado de cuenta: lo facturado, lo pagado y lo que queda. Es la segunda pregunta de
   // cualquiera que paga, y hasta ahora la contestaba una llamada de telefono.
   { archivo: 'cliente-cuenta', ruta: '/cuenta', comoCliente: true },
-  { archivo: 'gerencia', ruta: '/gerencia', campos: { anio: '2027', mes: '3' } },
+  // El mes y la fecha salen del CALENDARIO de la muestra, no escritos a mano. Estaban
+  // escritos —marzo de 2027— y el día que la muestra pasó a vivir en el presente, estas
+  // cinco pantallas habrían salido todas en blanco: un mes sin nada dentro, un balance sin
+  // asientos y un mayor sin movimientos. Una instantánea con cinco pantallas vacías dice
+  // que el producto no tiene contabilidad.
+  { archivo: 'gerencia', ruta: '/gerencia', campos: { anio: MES.anio, mes: MES.mes } },
   { archivo: 'medidas', ruta: '/medidas' },
-  { archivo: 'estados', ruta: '/estados', campos: { al: '2027-03-31' } },
-  { archivo: 'diario', ruta: '/diario', campos: { anio: '2027', mes: '3' } },
-  { archivo: 'mayor', ruta: '/mayor', campos: { cuenta: '1.1.02.01', desde: '2027-03-01', hasta: '2027-03-31' } },
+  // El balance, a HOY y no al cierre del mes valuado. Un balance general se pide «al día
+  // de hoy», y además al cierre del mes valuado la tabla de antigüedad salía vacía —«no hay
+  // nada pendiente de cobro a esa fecha»— al lado de un activo con 44 millones de clientes
+  // dentro: el asiento de la venta va al mes valuado y la deuda empieza a envejecer cuando
+  // se le presenta al cliente, que es después. Las dos cifras eran correctas y juntas se
+  // leían como un error.
+  { archivo: 'estados', ruta: '/estados', campos: { al: CAL.hoy } },
+  { archivo: 'diario', ruta: '/diario', campos: { anio: MES.anio, mes: MES.mes } },
+  { archivo: 'mayor', ruta: '/mayor',
+    campos: { cuenta: '1.1.02.01', desde: CAL.desde, hasta: CAL.hasta } },
   { archivo: 'libros', ruta: '/libros', campos: { cual: 'ventas', ...VENTAS } },
-  { archivo: 'libros-compras', ruta: '/libros', campos: { cual: 'compras', anio: '2027', mes: '3' } },
+  { archivo: 'libros-compras', ruta: '/libros',
+    campos: { cual: 'compras', anio: MES.anio, mes: MES.mes } },
   { archivo: 'periodos', ruta: '/periodos' },
   { archivo: 'activos', ruta: '/activos' },
   { archivo: 'reexpresion', ruta: '/reexpresion' },
@@ -170,7 +186,7 @@ const PAGINAS: Array<Pagina> = [
   { archivo: 'banco', ruta: '/banco' },
   { archivo: 'caja', ruta: '/caja' },
   { archivo: 'logistica', ruta: '/logistica' },
-  { archivo: 'pagar', ruta: '/pagar', campos: { al: '2027-12-31' } },
+  { archivo: 'pagar', ruta: '/pagar', campos: { al: CAL.masDias(365) } },
   { archivo: 'importar', ruta: '/importar' },
   { archivo: 'contratos-nuevo', ruta: '/contratos/nuevo' },
   { archivo: 'personas', ruta: '/personas' },
@@ -207,6 +223,33 @@ for (const c of contratos) {
 // es una instantanea que se rompe justo donde alguien pincha.
 for (const c of contratos) {
   PAGINAS.push({ archivo: `estado-${c.codigo}`, ruta: `/contratos/${c.id}/estado` })
+}
+
+// LAS MISMAS TRES PANTALLAS, VISTAS POR EL CLIENTE. Una de cada, no quince: el archivo
+// enseña lo mismo y quince copias no dicen nada que no diga una.
+//
+// Esto faltaba, y es el agujero que el propio exportador tenía: todo se pedía como GPS
+// salvo la cartera y el estado de cuenta, así que de la mitad del producto que ve el
+// cliente no se podía comprobar NADA en la instantánea — ni que se le esconde el costo y
+// el margen, ni que llega a lo que tiene que llegar. Una instantánea que solo enseña un
+// lado no sirve para mirar el otro.
+if (contratos[0]) {
+  PAGINAS.push({
+    archivo: `cliente-contrato-${contratos[0].codigo}`,
+    ruta: `/contratos/${contratos[0].id}`, comoCliente: true,
+  })
+}
+if (renglones[0]) {
+  PAGINAS.push({
+    archivo: `cliente-renglon-${renglones[0].contrato}-${renglones[0].numero}`,
+    ruta: `/renglones/${renglones[0].id}`, comoCliente: true,
+  })
+}
+if (valuaciones[0]) {
+  PAGINAS.push({
+    archivo: `cliente-valuacion-${valuaciones[0].contrato}-${valuaciones[0].numero}`,
+    ruta: `/valuaciones/${valuaciones[0].id}`, comoCliente: true,
+  })
 }
 
 /** De una ruta de la aplicacion al archivo que le toca en la instantanea. */
@@ -283,7 +326,7 @@ for (const [archivo, ruta, campos, quien] of [
   // Y las hojas de calculo: son descargas de verdad, no paginas, y que el enlace baje el
   // archivo es la mitad de lo que hay que poder comprobar de un exportador.
   ['libro-ventas.csv', '/libros/hoja', { cual: 'ventas', ...VENTAS }, 'gps'],
-  ['diario.csv', '/diario/hoja', { anio: '2027', mes: '3' }, 'gps'],
+  ['diario.csv', '/diario/hoja', { anio: MES.anio, mes: MES.mes }, 'gps'],
   // La hoja de una valuacion, tal como se la baja EL CLIENTE. Una sola: el archivo es el
   // mismo para todas y quince copias no ensenan nada que no ensene una. Y pedida como el
   // cliente a proposito: es la mitad del producto que no se veia.
