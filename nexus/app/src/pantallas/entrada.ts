@@ -31,7 +31,24 @@ export type PasoEntrada =
       readonly correo?: string
       readonly error?: 'rechazado'
     }
-  | { readonly paso: 'invitacion'; readonly nombre: string; readonly ficha: string }
+  | {
+      readonly paso: 'invitacion'
+      readonly nombre: string
+      readonly ficha: string
+      /** El motivo tal cual, ya traducido: la clave corta y la ficha muerta no son lo mismo. */
+      readonly error?: string
+    }
+  | {
+      /**
+       * La cuenta ya existe. Esta pantalla enseña el secreto del segundo factor y los
+       * diez códigos de recuperación, y es la ÚNICA vez que se ven: después de esta
+       * respuesta no quedan en ninguna parte legible, ni para GPS.
+       */
+      readonly paso: 'creada'
+      readonly correo: string
+      readonly secreto: string
+      readonly codigos: readonly string[]
+    }
 
 const TEXTOS = {
   es: {
@@ -164,6 +181,7 @@ ${p.error !== 'rechazado' ? '' : `<p class="mal">${escapar(x.rechazado)}</p>`}
       return {
         titulo: x.invitacionTitulo,
         html: `<p class="pie">${escapar(x.invitacionPie)}</p>
+${p.error ? err(p.error) : ''}
 <form method="post" action="/invitacion">
   <input type="hidden" name="ficha" value="${escapar(p.ficha)}">
   <label for="nueva">${escapar(x.claveNueva)}</label>
@@ -173,12 +191,31 @@ ${p.error !== 'rechazado' ? '' : `<p class="mal">${escapar(x.rechazado)}</p>`}
   <button type="submit">${escapar(x.crear)}</button>
 </form>`,
       }
+
+    case 'creada':
+      return {
+        titulo: t('alta_cuenta.titulo'),
+        html: `<p class="pie">${escapar(t('alta_cuenta.explica'))}</p>
+<div class="guardar">
+  <h2>${escapar(t('alta_cuenta.secreto'))}</h2>
+  <code class="sec">${escapar(p.secreto)}</code>
+  <p class="nota">${escapar(t('alta_cuenta.secreto_explica'))}</p>
+</div>
+<div class="guardar">
+  <h2>${escapar(t('alta_cuenta.codigos'))}</h2>
+  <ol class="rec">${p.codigos.map((c) => `<li>${escapar(c)}</li>`).join('')}</ol>
+  <p class="nota">${escapar(t('alta_cuenta.codigos_explica'))}</p>
+</div>
+<a class="btn" href="/entrar">${escapar(t('alta_cuenta.entrar'))}</a>`,
+      }
   }
 }
 
 export function pintarEntrada(p: PasoEntrada, idioma: Idioma): string {
   const { titulo, html } = cuerpo(p, idioma)
-  const saludo = p.paso === 'invitacion' ? escapar(p.nombre) : 'GPS Nexus'
+  const saludo = p.paso === 'invitacion'
+    ? escapar(p.nombre)
+    : p.paso === 'creada' ? escapar(p.correo) : 'GPS Nexus'
 
   return pagina({
     idioma,
@@ -211,6 +248,22 @@ button.emp{background:var(--nv3)}
   color:var(--rj);border:1px solid var(--rj)}
 .cuenta{margin-top:22px;text-align:center;font-family:"JetBrains Mono",monospace;
   font-size:46px;font-weight:700;letter-spacing:-.04em;color:var(--nv3)}
+/* Lo que se enseña una sola vez se enseña grande y se puede copiar de un tirón. */
+.guardar{margin-top:22px;padding:15px 16px;border:1px solid var(--am);
+  border-radius:13px;background:var(--amb)}
+.guardar h2{margin:0;font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--am)}
+.guardar .nota{margin:10px 0 0;font-size:12.5px;line-height:1.5;color:var(--ik2)}
+.sec{display:block;margin-top:9px;padding:11px 12px;border-radius:9px;background:var(--cd);
+  border:1px solid var(--ln2);font-family:"JetBrains Mono",monospace;font-size:14px;
+  letter-spacing:.09em;word-break:break-all;color:var(--ik)}
+.rec{margin:9px 0 0;padding:0;list-style:none;display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.rec li{padding:7px 9px;border-radius:8px;background:var(--cd);border:1px solid var(--ln2);
+  font-family:"JetBrains Mono",monospace;font-size:13px;letter-spacing:.06em;
+  text-align:center;color:var(--ik)}
+.btn{display:block;margin-top:22px;text-align:center;text-decoration:none;font-size:16px;
+  font-weight:700;padding:14px;border-radius:11px;background:var(--nv);color:#fff}
 `,
     cabecera: ``,
     cuerpo: `<main class="caja">

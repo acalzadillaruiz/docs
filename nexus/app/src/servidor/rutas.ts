@@ -68,6 +68,11 @@ import { cajas, cuentasDeGasto, contratosAbiertos, porContrato,
 import { pintarCaja } from '../pantallas/caja.ts'
 import { enRuta, porPaso } from '../dominio/logistica.ts'
 import { pintarLogistica } from '../pantallas/logistica.ts'
+import {
+  personas, pendientes as invitacionesPendientes, empresas, invitar, revocar,
+  desactivar, reactivar, abrirInvitacion, aceptar,
+} from '../dominio/personas.ts'
+import { pintarPersonas } from '../pantallas/personas.ts'
 import { iconoPng, iconoSvg } from './icono.ts'
 import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
 import { pintarPagar } from '../pantallas/pagar.ts'
@@ -299,6 +304,40 @@ export async function resolver(
 
   if (p.ruta === '/entrar/recuperacion' && p.metodo === 'GET') {
     return html(200, pintarEntrada({ paso: 'recuperacion' }, p.idioma))
+  }
+
+  // ------------------------------------------------------------ invitación
+  //
+  // Va ANTES de la puerta de sesión porque quien llega aquí todavía no tiene cuenta:
+  // ese es justamente el motivo de venir. La llave es la ficha del enlace y nada más,
+  // así que no lleva testigo antifalsificación: no hay sesión que falsificar, y quien
+  // ya conoce la ficha no necesita engañar a nadie para usarla.
+  if (p.ruta === '/invitacion' && p.metodo === 'GET') {
+    const ficha = (p.campos['f'] ?? '').trim()
+    const i = await dentro((q) => abrirInvitacion(q, ficha))
+    // Una ficha muerta y una ficha inventada contestan lo mismo. Distinguirlas
+    // convierte esta pantalla en una forma de averiguar fichas buenas a tientas.
+    if (!i) return html(404, pintarEntrada({ paso: 'ingreso', error: 'rechazado' }, p.idioma))
+    // Manda el idioma de la invitación, no el del navegador de quien la abre: se
+    // eligió sabiendo quién es la persona.
+    return html(200, pintarEntrada(
+      { paso: 'invitacion', nombre: i.nombre, ficha }, i.idioma))
+  }
+
+  if (p.ruta === '/invitacion' && p.metodo === 'POST') {
+    const ficha = (p.campos['ficha'] ?? '').trim()
+    const i = await dentro((q) => abrirInvitacion(q, ficha))
+    if (!i) return html(404, pintarEntrada({ paso: 'ingreso', error: 'rechazado' }, p.idioma))
+
+    const r = await dentro((q) => aceptar(q, ficha, p.campos['clave'] ?? '', i.idioma))
+    if (!r.hecho) {
+      return html(400, pintarEntrada(
+        { paso: 'invitacion', nombre: i.nombre, ficha, error: r.motivo }, i.idioma))
+    }
+    // Lo que va dentro de esta respuesta no vuelve a existir en ninguna parte legible.
+    return html(200, pintarEntrada(
+      { paso: 'creada', correo: r.correo, secreto: r.secreto, codigos: r.codigos },
+      i.idioma))
   }
 
   if (p.ruta === '/salir' && p.metodo === 'POST') {
@@ -869,6 +908,58 @@ export async function resolver(
     ])
     return html(errores.length === 0 ? 200 : 400,
       pintarCaja({ cajas: lista, cuentas, contratos, porContrato: porCtr, hoy },
+        p.idioma, testigoAnti(testigo), errores))
+  }
+
+  // Personas y accesos. Solo GPS: si el cliente pudiera invitar a su propia gente,
+  // decidiria el quien ve los contratos de su empresa, y eso lo decide quien responde
+  // de ellos. La pantalla que faltaba para que este portal se pudiera usar sin SQL.
+  if (p.ruta === '/personas' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    let errores: readonly string[] = []
+    // El enlace se enseña UNA vez, en la respuesta del POST que lo creo. No se guarda
+    // en ninguna parte de donde se pueda volver a sacar: eso es lo que lo hace una
+    // llave y no una contraseña escrita en una pizarra.
+    let enlace: string | null = null
+
+    if (p.metodo === 'POST') {
+      const accion = p.campos['accion']
+      if (accion === 'invitar') {
+        const r = await comoQuien((q) => invitar(q, {
+          orgId: (p.campos['empresa'] ?? '').trim(),
+          correo: p.campos['correo'] ?? '',
+          nombre: p.campos['nombre'] ?? '',
+          idioma: p.campos['idioma'] === 'en' ? 'en' : 'es',
+        }, personaId, p.idioma))
+        if (r.hecho) enlace = `/invitacion?f=${r.ficha}`
+        else errores = [r.motivo]
+      } else if (accion === 'revocar') {
+        const r = await comoQuien((q) => revocar(
+          q, (p.campos['invitacion'] ?? '').trim(), p.campos['motivo'] ?? '', p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      } else if (accion === 'baja') {
+        const r = await comoQuien((q) => desactivar(
+          q, (p.campos['persona'] ?? '').trim(), personaId,
+          p.campos['motivo'] ?? '', p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      } else if (accion === 'alta') {
+        const r = await comoQuien((q) => reactivar(
+          q, (p.campos['persona'] ?? '').trim(), p.idioma))
+        if (!r.hecho) errores = [r.motivo]
+      }
+    }
+
+    const [gente, invitaciones, lista] = await Promise.all([
+      comoQuien((q) => personas(q)),
+      comoQuien((q) => invitacionesPendientes(q)),
+      comoQuien((q) => empresas(q)),
+    ])
+    return html(errores.length === 0 ? 200 : 400,
+      pintarPersonas({ gente, invitaciones, empresas: lista, enlace },
         p.idioma, testigoAnti(testigo), errores))
   }
 

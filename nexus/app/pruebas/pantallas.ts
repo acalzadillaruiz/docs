@@ -26,6 +26,10 @@ const SIN_PANTALLA = new Set([
   // Devuelven una hoja de cálculo, no una página. Las dos las pilló este mismo
   // barrido el día que se añadieron, que es para lo que está.
   '/libros/hoja', '/diario/hoja',
+  // Es una pantalla, pero no se puede abrir sin la ficha de una invitación viva, y
+  // el barrido entra con una sesión, que es justo lo que aquí todavía no hay. Tiene
+  // sus propias pruebas en personas.test.ts.
+  '/invitacion',
 ])
 
 /** Las pantallas que un interno puede abrir, sacadas de las rutas del servidor. */
@@ -44,4 +48,4 @@ export async function pantallasDelCodigo(): Promise<string[]> {
  * Es la afirmación que falla cuando el barrido deja de mirar. Sube cuando se añaden
  * pantallas; si alguna vez hay que bajarla, la pregunta no es cómo arreglarla.
  */
-export const AL_MENOS = 18
+export const AL_MENOS = 19

@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 05:05 (España)
+**Última actualización:** 2026-09-26, 07:40 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,48 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **deshacer una carga — y al construir el botón salió que
+**Lo último terminado:** **se puede invitar a alguien.** Hasta hoy no se podía: la
+pantalla de «Crea tu clave» existía desde el primer día y mandaba el formulario a
+`/invitacion`, **una ruta que no estaba escrita**, y nada en ninguna parte creaba una
+fila en `persona`. Dar de alta al ingeniero de una operadora era abrir una consola de
+PostgreSQL. Un portal multiempresa en el que no se puede invitar a nadie: la sexta
+vez que aparece el mismo patrón —la máquina montada y sin puerta— y la más grande.
+
+Lo que hay ahora: `/personas` (solo GPS), `/invitacion` (pública, porque quien llega
+todavía no tiene cuenta, que es justo el motivo de venir), y la pantalla que enseña
+**una sola vez** el secreto del segundo factor y los diez códigos de recuperación.
+El enlace de alta se guarda por su huella, caduca a los siete días, y se enseña en
+pantalla en vez de mandarse por correo: una llave enviada a un buzón que nadie ha
+comprobado es una cuenta regalada.
+
+**Dos cosas que salieron de construirlo, y las dos importan más que la pantalla:**
+
+1. **Mi propia prueba de «la baja cierra la sesión» era falsa.** Comprobaba que la
+   cookie dejaba de valer, y eso sale igual con la sesión intacta, porque `quienEs`
+   ya filtra por `persona.activa`. Estaba mirando la segunda cerradura y dando por
+   buena la primera. Ahora mira la fila de `sesion`, y se comprobó desactivando el
+   disparador a propósito para verla fallar. **Tercera vez** que escribo una prueba
+   de seguridad que pasa sin comprobar nada.
+2. **La baja se disparaba con un formulario vacío.** Era un botón solo, con el
+   identificador de la persona ya puesto en un campo escondido. El barrido que manda
+   todos los formularios en blanco lo encontró **dando de baja a la gente de otras
+   pruebas** — y un navegador manda formularios en blanco igual que ese barrido. Ahora
+   pide el motivo escrito, como anular una invitación, y el motivo queda guardado
+   (`persona.baja_motivo`) para quien tenga que revisarlo.
+
+Y una máquina que ya estaba debajo: `desactivar_persona` llamaba a
+`cerrar_sesiones_de` **después** de la baja, cuando el disparador
+`persona_baja_cierra_sesiones` ya las había cerrado. Devolvía cero siempre: decía
+«no tenía ninguna sesión abierta» de alguien que estaba dentro.
+
+758 pruebas, todas pasan, dos pasadas seguidas.
+
+**Lo siguiente:** seguir buscando máquinas sin puerta. Las dos que quedan
+localizadas: `caducar_sesiones()` y `limpiar_peticiones_sso()` no las llama nadie —
+ni el bucle de `avisar.ts --repetir`—, así que las sesiones caducadas y las peticiones
+de SSO se quedan en la tabla para siempre.
+
+**Antes:** **deshacer una carga — y al construir el botón salió que
 `revertir_lote` NO REVERSABA NADA.**
 
 Buscaba los asientos por `origen_tipo = 'importacion_excel'` y `origen_id = <lote>`,

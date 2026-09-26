@@ -37,6 +37,8 @@ IGUALES_A_PROPOSITO = {
     "ger.margen_pct",
     # «Total» se escribe igual en los dos idiomas.
     "est.total",
+    # GPS es el nombre de la empresa, no una palabra que se traduzca.
+    "persona.interna",
 }
 iguales = sorted(k for k in set(es) & set(en)
                  if k not in IGUALES_A_PROPOSITO and es[k] == en[k])
