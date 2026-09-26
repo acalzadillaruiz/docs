@@ -711,5 +711,12 @@
   "exp.haber_usd": "Credit USD",
   "exp.marca": "Flag",
   "exp.bajar": "Download the month for the accountant",
-  "exp.explica": "One row per entry line, with debit and credit in separate columns and unformatted amounts: an accounting system opens this, not a person. It also carries each line's contract, which is what lets the result be split by contract without guessing."
+  "exp.explica": "One row per entry line, with debit and credit in separate columns and unformatted amounts: an accounting system opens this, not a person. It also carries each line's contract, which is what lets the result be split by contract without guessing.",
+  "importar.destino.movimientos_banco": "Bank statement",
+  "campo.monto": "Amount",
+  "campo.descripcion": "Description",
+  "campo.referencia": "Reference",
+  "campo.cuenta": "Account",
+  "campo.moneda": "Currency",
+  "importar.banco_explica": "The statement is NOT posted: a bank line is not an accounting entry, it is a fact to be matched against a collection or payment already in the books. Posting it would count everything twice."
 }

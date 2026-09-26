@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 03:25 (España)
+**Última actualización:** 2026-09-26, 04:10 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,34 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el exportador para el contador**, que estaba entre las
+**Lo último terminado:** **el extracto del banco entra por Excel** — y con eso, **la
+conciliación bancaria deja de ser una pantalla sin nada que conciliar.**
+
+Llevaba días comparando `movimiento_banco` contra los cobros y los pagos, y **no
+había una sola forma de meter un movimiento del banco**. La máquina entera, sin
+puerta. Es el cuarto caso seguido del mismo patrón, y ya es un método: *antes de
+construir una pantalla nueva, mirar si la máquina ya está debajo*.
+
+Entra como tercer destino del importador que ya existía, así que hereda el mapeo de
+columnas, la validación fila a fila y la detección de la hoja repetida.
+
+**Y lo más importante es lo que NO hace: no escribe ni un asiento.** Una línea del
+extracto no es un apunte contable — es un hecho del banco que hay que casar con un
+cobro o un pago que ya está en el libro. Si al importar se asentara, **todo quedaría
+contado dos veces** y el descuadre aparecería en el cierre, a tres semanas de su
+causa. Hay una prueba que solo comprueba eso.
+
+Dos decisiones más que se tomaron mirando el caso real:
+
+- **Dos extractos que se solapan** —del 1 al 31 y del 15 al 15— traen quince días
+  repetidos, y la huella del archivo no lo coge porque son hojas distintas. Se
+  descarta por cuenta + fecha + importe + referencia, **al importar y no con una
+  restricción en la tabla**: una restricción castigaría también a quien escriba
+  «cheque 100» dos veces a mano, donde puede ser legítimo.
+- **Revertir un lote no borra lo que alguien ya concilió.** Borrar un movimiento ya
+  casado dejaría un cobro apuntando al vacío. Se quedan, y el lote lo dice.
+
+**Antes:** **el exportador para el contador**, que estaba entre las
 decisiones **ya tomadas desde el primer día** y no existía. Lo que había era la
 pantalla del diario, y esa está escrita para *leerse*: importes con puntos y comas,
 fechas en el idioma de quien mira. Abierto por una hoja de cálculo en inglés,
@@ -433,7 +460,7 @@ Y **«lo que se ve al abrir»** (`d966fb0`), que salió de sacarle capturas a la
 aplicación para el CEO: en el teléfono la cabecera de la cartera ocupaba el 39% de la
 pantalla, y la cartera decía «Aprobada hace **−184 días**» con una fecha en el futuro.
 
-**981 comprobaciones** (250 de SQL y diccionario + 731 de TypeScript), todas pasando.
+**986 comprobaciones** (250 de SQL y diccionario + 736 de TypeScript), todas pasando.
 
 **Regla que costó tres intentos y hay que respetar:** un umbral en una prueba **sale
 de medir, no de una opinión**. El primero (50% del alto de cabecera) daba por bueno

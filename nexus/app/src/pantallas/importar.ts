@@ -68,6 +68,7 @@ export function pintarSubirHoja(
         <input type="file" name="documento" accept=".csv,text/csv,text/plain" required></label>
     </div>
     <p class="expl">${escapar(t('importar.destino.ventas_explica'))}</p>
+    <p class="expl">${escapar(t('importar.banco_explica'))}</p>
     <button type="submit">${escapar(t('importar.subir'))}</button>
   </form>
   ${lotes}

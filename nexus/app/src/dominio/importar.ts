@@ -21,13 +21,16 @@ import type { Consulta } from '../db/conexion.ts'
 import { leerHoja } from '../servidor/csv.ts'
 import { t, type Clave, type Idioma } from '../i18n/t.ts'
 
-export type Destino = 'facturas_recibidas' | 'facturas_emitidas'
+export type Destino = 'facturas_recibidas' | 'facturas_emitidas' | 'movimientos_banco'
 
-export const DESTINOS: readonly Destino[] = ['facturas_recibidas', 'facturas_emitidas']
+export const DESTINOS: readonly Destino[] = [
+  'facturas_recibidas', 'facturas_emitidas', 'movimientos_banco',
+]
 
 export type Campo =
   | 'fecha' | 'proveedor' | 'proveedor_nombre' | 'cliente' | 'cliente_nombre'
   | 'numero' | 'control' | 'base' | 'iva' | 'contrato'
+  | 'monto' | 'descripcion' | 'referencia' | 'cuenta' | 'moneda'
 
 /** Los campos de cada destino, y cuáles no pueden faltar. */
 export const CAMPOS: Record<Destino, readonly { campo: Campo; tipo: 'texto' | 'fecha' | 'numero'; obligatorio: boolean }[]> = {
@@ -55,6 +58,20 @@ export const CAMPOS: Record<Destino, readonly { campo: Campo; tipo: 'texto' | 'f
     { campo: 'iva', tipo: 'numero', obligatorio: false },
     { campo: 'contrato', tipo: 'texto', obligatorio: false },
   ],
+  // El extracto del banco. Solo hacen falta dos cosas: cuándo y cuánto. El signo lo
+  // trae el importe —positivo entra, negativo sale— porque es como lo da el banco.
+  //
+  // La cuenta y la moneda se pueden mapear, pero lo normal es que no vengan: un
+  // extracto es de UNA cuenta. Sin ellas se usan la cuenta de banco de la empresa y
+  // bolívares.
+  movimientos_banco: [
+    { campo: 'fecha', tipo: 'fecha', obligatorio: true },
+    { campo: 'monto', tipo: 'numero', obligatorio: true },
+    { campo: 'descripcion', tipo: 'texto', obligatorio: false },
+    { campo: 'referencia', tipo: 'texto', obligatorio: false },
+    { campo: 'cuenta', tipo: 'texto', obligatorio: false },
+    { campo: 'moneda', tipo: 'texto', obligatorio: false },
+  ],
 }
 
 /**
@@ -75,6 +92,12 @@ const PISTAS: Record<Campo, readonly string[]> = {
   base: ['base', 'monto', 'subtotal', 'neto', 'importe', 'amount'],
   iva: ['iva', 'impuesto', 'vat', 'tax'],
   contrato: ['contrato', 'contract', 'obra', 'proyecto', 'oc', 'orden'],
+  // Las cabeceras que traen de verdad los extractos de los bancos venezolanos.
+  monto: ['monto', 'importe', 'amount', 'valor', 'credito', 'crédito', 'debito', 'débito'],
+  descripcion: ['descripcion', 'descripción', 'concepto', 'detalle', 'description', 'memo'],
+  referencia: ['referencia', 'ref', 'reference', 'documento', 'nro. operacion', 'operacion'],
+  cuenta: ['cuenta', 'account', 'nro cuenta'],
+  moneda: ['moneda', 'currency', 'divisa'],
 }
 
 export type Propuesta = {

@@ -711,5 +711,12 @@
   "exp.haber_usd": "Haber USD",
   "exp.marca": "Marca",
   "exp.bajar": "Bajar el mes para el contador",
-  "exp.explica": "Una línea por apunte, con el debe y el haber en columnas distintas y los importes sin formatear: lo abre un sistema contable, no una persona. Lleva además el contrato de cada línea, que es lo que permite devolver un resultado por contrato sin adivinar."
+  "exp.explica": "Una línea por apunte, con el debe y el haber en columnas distintas y los importes sin formatear: lo abre un sistema contable, no una persona. Lleva además el contrato de cada línea, que es lo que permite devolver un resultado por contrato sin adivinar.",
+  "importar.destino.movimientos_banco": "Extracto del banco",
+  "campo.monto": "Importe",
+  "campo.descripcion": "Concepto",
+  "campo.referencia": "Referencia",
+  "campo.cuenta": "Cuenta",
+  "campo.moneda": "Moneda",
+  "importar.banco_explica": "El extracto NO se asienta: una línea del banco no es un apunte contable, es un hecho que hay que casar con un cobro o un pago que ya está en el libro. Asentarlo lo contaría todo dos veces."
 }

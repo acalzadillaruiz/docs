@@ -73,6 +73,10 @@ after(async () => { await cerrar() })
 async function limpio(): Promise<void> {
   await dentro(async (q) => {
     await q.unsafe('set local role none')
+    // Los movimientos del banco van PRIMERO: apuntan a su lote, y borrar el lote con
+    // un movimiento colgando falla por clave foránea. Es la clase de cosa que rompe
+    // el archivo entero en la segunda corrida y no en la primera.
+    await q`delete from movimiento_banco where organizacion_id = ${G}::uuid`
     await q`delete from lote_importacion where organizacion_id = ${G}::uuid`
     await q`delete from documento_fiscal where organizacion_id = ${G}::uuid`
   })
@@ -481,4 +485,144 @@ test('la pantalla ofrece los dos destinos, no solo el de compras', async () => {
   const h = pintarSubirHoja('es', 'af', [])
   assert.match(h, /value="facturas_recibidas"/)
   assert.match(h, /value="facturas_emitidas"/)
+})
+
+/**
+ * El extracto del banco, el tercer destino.
+ *
+ * La conciliación bancaria existía desde hacía días y **no tenía puerta**: comparaba
+ * los movimientos del banco contra los cobros y los pagos, y no había una sola forma
+ * de meter un movimiento. Una pantalla que no tiene nada que conciliar.
+ */
+
+const EXTRACTO = [
+  'Fecha;Referencia;Concepto;Monto',
+  '05/04/2026;OP-90001;Abono Petrolera del Lago;"1.500.000,00"',
+  '07/04/2026;OP-90002;Pago Suministros;"-320.000,00"',
+  '09/04/2026;OP-90003;Comisión mantenimiento;"-1.200,00"',
+].join('\n')
+
+async function traerExtracto(hoja = EXTRACTO): Promise<string> {
+  const bytes = new TextEncoder().encode(hoja)
+  const r = await dentro((q) => cargar(q, G, YO, `extracto-${Date.now()}.csv`, bytes,
+    'movimientos_banco'))
+  const id = r.loteId
+  const cabeceras = hoja.split('\n')[0]!.split(';')
+  const propuesta = proponerMapeo(cabeceras,
+    hoja.split('\n')[1]!.split(';'), 'movimientos_banco')
+  await dentro((q) => guardarMapeo(q, id, propuesta.map((p) => ({
+    columna: p.columna, campo: p.campo, tipo: p.tipo, formato: p.formato,
+  }))))
+  await dentro((q) => validar(q, id))
+  return id
+}
+
+test('el extracto del banco entra, y el importe trae su signo', async () => {
+  // Positivo entra y negativo sale, que es como lo da el banco. Inventar el signo a
+  // partir del concepto es como se acaba con un cobro contado como un pago.
+  await limpio()
+  const lote = await traerExtracto()
+  const r = await dentro((q) => confirmar(q, lote, YO, 'es'))
+  assert.equal(r.hecho, true, (r as { motivo?: string }).motivo)
+
+  const movs = (await dentro((q) => q`
+    select monto::text, referencia, descripcion, moneda::text, cuenta
+      from movimiento_banco where organizacion_id = ${G}::uuid
+     order by fecha
+  `)) as unknown as Array<Record<string, string>>
+  assert.equal(movs.length, 3)
+  assert.equal(Number(movs[0]!['monto']), 1500000)
+  assert.equal(Number(movs[1]!['monto']), -320000)
+  assert.equal(movs[0]!['referencia'], 'OP-90001')
+  assert.match(movs[0]!['descripcion']!, /Petrolera/)
+  // Sin columna de cuenta ni de moneda: la del banco de la empresa, en bolívares.
+  assert.equal(movs[0]!['moneda'], 'VES')
+  assert.equal(movs[0]!['cuenta'], '1.1.01.02')
+})
+
+test('IMPORTAR EL EXTRACTO NO ESCRIBE NI UN ASIENTO', async () => {
+  // Es lo más importante de todo esto. Una línea del banco no es un apunte: es un
+  // hecho que hay que casar con un cobro o un pago que YA está en el libro. Si al
+  // importar se asentara, todo quedaría contado dos veces y el descuadre aparecería
+  // en el cierre, a tres semanas de su causa.
+  const [antes] = (await dentro((q) => q`
+    select count(*)::int as n from asiento where organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ n: number }>
+
+  const lote = await traerExtracto(EXTRACTO.replace(/OP-9000/g, 'OP-9100'))
+  assert.equal((await dentro((q) => confirmar(q, lote, YO, 'es'))).hecho, true)
+
+  const [despues] = (await dentro((q) => q`
+    select count(*)::int as n from asiento where organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(despues!.n, antes!.n, 'el extracto escribió en el libro')
+})
+
+test('dos extractos que se solapan no duplican los días repetidos', async () => {
+  // Es el caso de verdad: del 1 al 31 y del 15 al 15 traen quince días dos veces. La
+  // huella del archivo no lo cubre, porque las dos hojas son distintas.
+  const solapado = [
+    'Fecha;Referencia;Concepto;Monto',
+    '09/04/2026;OP-90003;Comisión mantenimiento;"-1.200,00"',
+    '11/04/2026;OP-90004;Abono cliente;"800.000,00"',
+  ].join('\n')
+
+  const [antes] = (await dentro((q) => q`
+    select count(*)::int as n from movimiento_banco where organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ n: number }>
+
+  const lote = await traerExtracto(solapado)
+  assert.equal((await dentro((q) => confirmar(q, lote, YO, 'es'))).hecho, true)
+
+  const [despues] = (await dentro((q) => q`
+    select count(*)::int as n from movimiento_banco where organizacion_id = ${G}::uuid
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(despues!.n, antes!.n + 1, 'el repetido volvió a entrar')
+
+  const [rep] = (await dentro((q) => q`
+    select count(*)::int as n from movimiento_banco
+     where organizacion_id = ${G}::uuid and referencia = 'OP-90003'
+  `)) as unknown as Array<{ n: number }>
+  assert.equal(rep!.n, 1)
+})
+
+test('revertir un lote del banco NO borra lo que alguien ya concilió', async () => {
+  // Borrar un movimiento ya casado dejaría un cobro apuntando al vacío, y eso no se
+  // arregla solo.
+  const hoja = [
+    'Fecha;Referencia;Concepto;Monto',
+    '20/04/2026;OP-95001;Uno;"100,00"',
+    '21/04/2026;OP-95002;Dos;"200,00"',
+  ].join('\n')
+  const lote = await traerExtracto(hoja)
+  assert.equal((await dentro((q) => confirmar(q, lote, YO, 'es'))).hecho, true)
+
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`update movimiento_banco set conciliado_en = now(), conciliado_por = ${YO}::uuid,
+                                        nota = 'casado a mano para la prueba'
+             where referencia = 'OP-95001'`
+  })
+
+  await dentro((q) => q`select revertir_lote(${lote}::uuid, ${YO}::uuid, 'prueba')`)
+
+  const quedan = (await dentro((q) => q`
+    select referencia from movimiento_banco where lote_id = ${lote}::uuid
+  `)) as unknown as Array<{ referencia: string }>
+  assert.equal(quedan.length, 1)
+  assert.equal(quedan[0]!.referencia, 'OP-95001')
+
+  const [l] = (await dentro((q) => q`
+    select nota from lote_importacion where id = ${lote}::uuid
+  `)) as unknown as Array<{ nota: string }>
+  assert.match(l!.nota, /conciliado/)
+})
+
+test('la pantalla ofrece los TRES destinos, y avisa de que el extracto no se asienta', async () => {
+  const { pintarSubirHoja } = await import('../src/pantallas/importar.ts')
+  const h = pintarSubirHoja('es', 'af', [])
+  assert.match(h, /value="movimientos_banco"/)
+  assert.match(h, /Extracto del banco/)
+  assert.match(h, /no es un apunte contable/)
+  assert.equal(h.includes('‹falta:'), false)
 })
