@@ -33,6 +33,7 @@ const TEXTOS = {
     avance: 'Avance',
     nada: 'Todavía no hay ningún contrato aquí.',
     salir: 'Salir',
+    cuenta: 'Estado de cuenta',
   },
   en: {
     titulo: 'Your contracts',
@@ -48,6 +49,7 @@ const TEXTOS = {
     avance: 'Progress',
     nada: 'There are no contracts here yet.',
     salir: 'Sign out',
+    cuenta: 'Statement of account',
   },
 } as const
 
@@ -226,6 +228,7 @@ ${ESTILOS_AVANCE}
   ${esCliente ? '' : `<a class="medidas" href="/plantillas">${escapar(t('plantilla.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/fiscales">${escapar(t('fiscal.titulo'))}</a>`}
   ${esCliente ? '' : `<a class="medidas" href="/personas">${escapar(t('persona.titulo'))}</a>`}
+  ${!esCliente ? '' : `<a class="medidas" href="/cuenta">${escapar(x.cuenta)}</a>`}
   <a class="medidas" href="/perfil">${escapar(t('perfil.titulo'))}</a>
   <form method="post" action="/salir"><button type="submit">${escapar(x.salir)}</button></form>
   </nav>

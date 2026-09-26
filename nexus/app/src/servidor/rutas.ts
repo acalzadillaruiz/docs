@@ -28,6 +28,8 @@ import { pintarCartera } from '../pantallas/cartera.ts'
 import { pintarContrato } from '../pantallas/contrato.ts'
 import { cartera, cuantosContratos } from '../dominio/cartera.ts'
 import { bandeja, bandejaCliente } from '../dominio/bandeja.ts'
+import { estadoDeCuenta } from '../dominio/cuenta.ts'
+import { pintarCuenta } from '../pantallas/cuenta.ts'
 import { ficha, ContratoNoAlcanzable } from '../dominio/contrato.ts'
 import {
   hojaDeValuacion, cabeceraDeValuacion, objecionesDe, ValuacionNoAlcanzable,
@@ -557,6 +559,22 @@ export async function resolver(
 
   // El perfil. Poco, y lo que decide que los avisos sobrevivan: un aviso del que no
   // puedes salir acaba marcado como correo no deseado, y con él todos los demás.
+  // El estado de cuenta: lo facturado, lo pagado y lo que queda. Es del CLIENTE, y es la
+  // segunda pregunta de cualquiera que paga —la primera es cómo va su obra—. A GPS no le sale
+  // porque ya lo tiene mirado desde su lado, en cobrar y en gerencia, y con el margen dentro.
+  //
+  // La suma de lo pagado la hace una función de la base con `security definer`: el cliente no
+  // puede ver la tabla de cobros, donde vive la referencia bancaria de GPS, y no hace falta
+  // que la vea para saber cuánto ha pagado.
+  if (p.ruta === '/cuenta' && p.metodo === 'GET') {
+    if (!esCliente) return noEncontrado(p.idioma)
+    const [quien] = (await dentro((q) => q`
+      select organizacion_id from persona where id = ${personaId}::uuid
+    `)) as unknown as Array<{ organizacion_id: string }>
+    const c = await comoQuien((q) => estadoDeCuenta(q, quien!.organizacion_id, p.idioma))
+    return html(200, pintarCuenta(c, p.idioma))
+  }
+
   if (p.ruta === '/perfil' && p.metodo === 'GET') {
     const datos = await comoQuien((q) => perfil(q, personaId, p.idioma, esCliente))
     return html(200, pintarPerfil(datos, p.idioma, testigoAnti(testigo)))

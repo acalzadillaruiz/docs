@@ -131,6 +131,9 @@ const PAGINAS: Array<Pagina> = [
   // y sin nada de la contabilidad ni del margen. Es la mitad del producto que no se habia
   // podido ver nunca en la instantanea, porque todo se pedia como GPS.
   { archivo: 'cliente-cartera', ruta: '/', comoCliente: true },
+  // Su estado de cuenta: lo facturado, lo pagado y lo que queda. Es la segunda pregunta de
+  // cualquiera que paga, y hasta ahora la contestaba una llamada de telefono.
+  { archivo: 'cliente-cuenta', ruta: '/cuenta', comoCliente: true },
   { archivo: 'gerencia', ruta: '/gerencia', campos: { anio: '2027', mes: '3' } },
   { archivo: 'medidas', ruta: '/medidas' },
   { archivo: 'estados', ruta: '/estados', campos: { al: '2027-03-31' } },

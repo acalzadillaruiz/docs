@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-27, 05:10 (España)
+**Última actualización:** 2026-09-27, 06:00 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -10,8 +10,8 @@
 > avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
 > avance lo que el sistema impide hacer con el de un contrato.
 >
-> Lo que hay construido, contado a mano sobre el código de hoy: **30 módulos de
-> pantalla** y **160 páginas** en el recorrido exportado, sobre las 119 vistas del plan
+> Lo que hay construido, contado a mano sobre el código de hoy: **31 módulos de
+> pantalla** y **161 páginas** en el recorrido exportado, sobre las 119 vistas del plan
 > completo (una vista del plan sale en varias páginas: con datos, vacía, y con error).
 > Las cifras de antes decían «40 direcciones y 26 pantallas» y no salen de ninguna
 > cuenta que sepa repetir, así que se cambian por las que sí. Lo que está **entero y probado
@@ -34,8 +34,66 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **la bandeja del cliente** — y, de paso, que el portal del cliente
-se pueda ver por primera vez.
+**Lo último terminado:** **el estado de cuenta del cliente** — «cuánto me han facturado y
+cuánto debo», que es la segunda pregunta de cualquiera que paga y la contestaba una llamada
+de teléfono.
+
+El cliente veía cada valuación por separado y tenía que sumarlas él. Ahora, en `/cuenta`: lo
+que queda por pagar arriba y grande, y debajo línea por línea qué valuación, de qué periodo,
+en qué estado, cuánto se facturó, cuánto se pagó y cuánto queda — **con el número de control
+de cada factura**, que es el que necesita para declarar su crédito fiscal y el que hoy pide
+por teléfono. Lo que espera su firma va marcado, porque es lo único de esa pantalla sobre lo
+que puede actuar.
+
+La base estaba preparada a medias: la política de fila le concede al cliente **las facturas
+emitidas a su nombre** —un permiso puesto a propósito que ninguna pantalla usaba—, pero **no
+puede ver la tabla de cobros**, y con razón: ahí vive el medio de pago y la referencia
+bancaria de GPS. Sin eso, «cuánto he pagado» no se podía contestar desde su sesión.
+
+**De ahí la pieza delicada, y todo el cuidado de este trozo está en ella:** la suma de lo
+pagado la hace una función con `security definer`, que se salta las políticas de fila. Le
+devuelve el total sin abrirle la tabla. Y como se las salta, **lo único que sujeta el
+aislamiento es la comprobación escrita dentro**: o eres esa operadora, o eres la GPS que
+ejecuta el contrato. Es lo primero del cuerpo de la función, y la prueba que importa pide el
+estado de cuenta de OTRA operadora. Comprobado quitando la condición: se pone roja. Y
+quitando el `security definer`: se ponen rojas seis.
+
+Dos cosas más que decide esta pantalla, y las dos por lo mismo:
+
+- **Con contratos en dos monedas no se totaliza**, y se dice por qué. Sumar bolívares con
+  dólares daría un número que no significa nada; las líneas siguen dando su cifra cada una.
+  Preferible no dar un total a dar uno falso.
+- **Un borrador de GPS no aparece.** Enseñárselo sería contarle una cifra que todavía puede
+  cambiar, y además la vería antes de que GPS decidiera presentarla.
+
+### Y los barridos no miraban ninguna pantalla del cliente
+
+Al añadir la primera pantalla que es **solo** del cliente, el barrido del móvil la abrió como
+GPS, recibió el 404 y dijo, con razón, que salía en blanco. La tentación era apuntarla en la
+lista de «esto no es una pantalla» — y eso la habría dejado **sin barrer nunca**, que es justo
+el agujero por el que ese archivo existe.
+
+Ahora la lista distingue las dos audiencias, sacándolo del código: una pantalla es del cliente
+si su ruta empieza negándose a quien no lo es. El barrido del móvil entra también como la
+operadora y dibuja las suyas en el mismo teléfono de 360 px y con la misma mala cobertura.
+Verificado quitando la cerradura de `/cuenta`: la lista del cliente se queda vacía y el
+barrido lo dice.
+
+Y la barrida de aislamiento de rutas hizo su trabajo: exige 404 al cliente en **toda** ruta
+que no esté en una lista corta donde **hay que justificar cada línea**. `/cuenta` está ahí
+ahora, con su razón escrita.
+
+**906 pruebas, todas pasan.** Una comprobación mía estaba mal escrita: buscaba las palabras
+«costo» y «margen» en la página entera para asegurar que el cliente no las ve, y saltaba con
+cada `margin:` de la hoja de estilos. Ahora mira el texto sin el CSS: una comprobación que
+salta por algo que no es el fallo se acaba relajando hasta que deja de comprobar.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **la bandeja del cliente**, y que el portal del cliente se pudiera ver por
+primera vez.
 
 La bandeja de GPS existía desde hace tiempo, y su propio comentario decía por qué: *«el
 cliente escribe y no pasa nada» es el agujero que hace que un portal de cliente acabe sin
@@ -91,10 +149,6 @@ una respuesta. Con el caso puesto, quitarlo pone tres pruebas en rojo.
 Y dos pruebas viejas se rompieron al crecer el fixture, porque **contaban la lista entera** en
 vez de mirar su propia fila. Arregladas mirando su identificador: una prueba atada a cuántas
 filas tenga el fixture falla un día sin que nada esté mal.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** dos acciones que hacían su trabajo **sin decir qué habían hecho**, y un sexto
 barrido que **probé y descarté**.

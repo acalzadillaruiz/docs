@@ -47,6 +47,11 @@ const PERMITIDAS = new Set([
   '/entrar', '/entrar/codigo', '/entrar/empresa', '/entrar/empresa/vuelta',
   '/entrar/recuperacion', '/salir',
   '/perfil',                  // lo suyo: su idioma y sus avisos
+  // Su estado de cuenta: lo que se le ha facturado, lo que ha pagado y lo que queda. Es
+  // suyo y solo suyo —la función que lo calcula comprueba quién pregunta antes de mirar
+  // nada—, no lleva ni un costo ni un margen, y la suma de lo pagado sale de una tabla que
+  // él no puede leer justamente para que la referencia bancaria de GPS no salga de GPS.
+  '/cuenta',
 ])
 
 /**

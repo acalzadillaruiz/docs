@@ -22,13 +22,18 @@ import { resolver, type Peticion } from '../src/servidor/rutas.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
-import { pantallasDelCodigo, AL_MENOS } from './pantallas.ts'
+import {
+  pantallasDelCodigo, pantallasDeCliente, AL_MENOS, AL_MENOS_CLIENTE,
+} from './pantallas.ts'
 import { readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
 const G = 'b1c2d3e4-0000-0000-0000-00000000000a'
 const YO = 'b1c2d3e4-0000-0000-0000-00000000000d'
+/** Una operadora y alguien suyo: sus pantallas también se dibujan en un teléfono. */
+const OP = 'b1c2d3e4-0000-0000-0000-00000000000b'
+const ING = 'b1c2d3e4-0000-0000-0000-00000000000e'
 const SECRETO = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'
 const CLAVE = 'una clave razonable'
 
@@ -62,6 +67,7 @@ function buscarChrome(): string {
 // cuando la aplicación ya iba por dieciocho, y las siete que faltaban nunca habían
 // pasado por este barrido.
 const PANTALLAS = await pantallasDelCodigo()
+const PANTALLAS_CLIENTE = await pantallasDeCliente()
 
 test('el barrido mira TODAS las pantallas, no las que alguien copió a mano', () => {
   // La afirmación que falla cuando el barrido deja de mirar. La copia a mano tenía
@@ -79,6 +85,7 @@ const pedir = (p: Partial<Peticion>) => resolver({
 
 let nav: Browser
 let gps = ''
+let cliente = ''
 
 before(async () => {
   conectar(DESTINO)
@@ -91,6 +98,14 @@ before(async () => {
     await q`insert into persona (id, organizacion_id, correo, nombre, metodo,
                                  clave_hash, totp_secreto)
             values (${YO}, ${G},'movil@prueba.test','Interno','clave_2fa',
+                    ${hash}, ${SECRETO})
+            on conflict (id) do update set clave_hash = excluded.clave_hash`
+    await q`insert into organizacion (id, tipo, nombre, rif)
+            values (${OP},'operadora','Operadora Móvil','J-903100000-1')
+            on conflict (id) do update set nombre = excluded.nombre`
+    await q`insert into persona (id, organizacion_id, correo, nombre, metodo,
+                                 clave_hash, totp_secreto)
+            values (${ING}, ${OP},'movil-cli@prueba.test','De la operadora','clave_2fa',
                     ${hash}, ${SECRETO})
             on conflict (id) do update set clave_hash = excluded.clave_hash`
     await q`select instalar_plan_cuentas(${G}::uuid)`
@@ -107,6 +122,21 @@ before(async () => {
   }, YO, false)
   gps = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
 
+  // Y la sesión de la operadora. Sus pantallas se dibujan en el mismo teléfono y con la misma
+  // mala cobertura: el estado de cuenta lo abre quien paga, probablemente de pie en una
+  // oficina y con el móvil, igual que todo lo demás.
+  const oc = 'o-movil-cli'
+  const c1 = await resolver({
+    metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es', origen: oc,
+    campos: { correo: 'movil-cli@prueba.test', clave: CLAVE },
+  }, YO, false)
+  const dc = /name="desafio" value="([^"]+)"/.exec(c1.cuerpo!)![1]!
+  const c2 = await resolver({
+    metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen: oc,
+    campos: { desafio: dc, codigo: codigoEnPaso(desdeBase32(SECRETO), pasoDe(new Date())) },
+  }, YO, false)
+  cliente = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(c2.cabeceras!['Set-Cookie']!)![1]!
+
   nav = await chromium.launch({ executablePath: buscarChrome() })
 })
 after(async () => {
@@ -115,13 +145,13 @@ after(async () => {
 })
 
 /** Dibuja una pantalla en el teléfono y devuelve lo medido. */
-async function medir(ruta: string, ancho = TELEFONO.width) {
+async function medir(ruta: string, ancho = TELEFONO.width, quien?: string) {
   const ctx = await nav.newContext({ viewport: { width: ancho, height: TELEFONO.height } })
   // Sin red: en el patio la cobertura es mala y las fuentes no llegan. Lo que hay que
   // comprobar es cómo queda ENTONCES.
   await ctx.route('**://**', (r) => r.abort())
   const page = await ctx.newPage()
-  const r = await pedir({ ruta, cookie: gps })
+  const r = await pedir({ ruta, cookie: quien ?? gps })
   await page.setContent(r.cuerpo ?? '', { waitUntil: 'load' })
   // Esto se ejecuta DENTRO del navegador, no aquí. Va como texto a propósito: si se
   // escribiera como función de TypeScript habría que meterle el `dom` a la
@@ -159,6 +189,24 @@ async function medir(ruta: string, ancho = TELEFONO.width) {
   }
   await ctx.close()
   return m
+}
+
+test('el barrido mira también las pantallas del CLIENTE', () => {
+  // Cuando apareció la primera —el estado de cuenta— este barrido la abrió como GPS, recibió
+  // el 404 y dijo que salía en blanco. Apuntarla como «esto no es una pantalla» la habría
+  // dejado sin barrer nunca. Se abren con la sesión de la operadora, que es quien las ve.
+  assert.ok(PANTALLAS_CLIENTE.length >= AL_MENOS_CLIENTE,
+    `no encontró ninguna pantalla del cliente: ${PANTALLAS_CLIENTE.join(', ')}`)
+})
+
+for (const ruta of PANTALLAS_CLIENTE) {
+  test(`${ruta} cabe en un teléfono de 360 px, entrando como el cliente`, async () => {
+    const m = await medir(ruta, TELEFONO.width, cliente)
+    assert.ok(m.textoVisible > 80, `${ruta} salió prácticamente en blanco`)
+    assert.ok(m.anchoPagina <= m.anchoPantalla + 1,
+      `${ruta} mide ${m.anchoPagina} px sobre una pantalla de ${m.anchoPantalla}`)
+    assert.deepEqual(m.desbordan, [], `${ruta} se sale por la derecha: ${m.desbordan.join(', ')}`)
+  })
 }
 
 for (const ruta of PANTALLAS) {
