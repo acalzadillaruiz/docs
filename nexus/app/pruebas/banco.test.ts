@@ -211,3 +211,69 @@ test('el cliente no llega a la conciliación', async () => {
     /permission denied|no existe/,
   )
 })
+
+// ===========================================================================
+// «Todo cuadra» dicho sobre nada.
+//
+// Sin extracto traído, las dos listas salen vacías y la pantalla decía **«Todo cuadra
+// en este periodo»**. No cuadraba: es que nadie había mirado. Es la misma confusión
+// que este sistema entero existe para no cometer —dar por hallazgo la ausencia de
+// uno—, cometida en su propia pantalla de contabilidad.
+//
+// Y el arreglo tiene dos mitades, porque una sin la otra no sirve: decirlo, y dar el
+// camino para traerlo. El texto del enlace («Traer el extracto») llevaba escrito en
+// los dos idiomas desde el primer día sin que ninguna pantalla lo usara.
+
+/** Un mes en el que no se ha traído nada. Se elige lejos de lo que siembra el resto. */
+const VACIO_DESDE = '2026-09-01'
+const VACIO_HASTA = '2026-09-30'
+
+test('un periodo SIN extracto no dice que cuadra: dice que no se ha mirado', async () => {
+  const c = await dentro((q) => conciliacion(q, G, VACIO_DESDE, VACIO_HASTA, 'es'))
+  assert.equal(c.movimientos, 0, 'el mes de prueba no estaba vacío')
+  assert.equal(c.descuadres.length, 0)
+
+  const h = pintarBanco(c, 'es', 'af')
+  assert.doesNotMatch(h, /Todo cuadra/,
+    'dice que cuadra un periodo del que no se ha traído nada')
+  assert.match(h, /no se ha traído ningún extracto/)
+})
+
+test('y da el camino para traerlo, que sin eso el aviso no sirve de nada', async () => {
+  const c = await dentro((q) => conciliacion(q, G, VACIO_DESDE, VACIO_HASTA, 'es'))
+  const h = pintarBanco(c, 'es', 'af')
+  assert.match(h, /href="\/importar"/,
+    'avisa de que falta el extracto y no dice por dónde se trae')
+  assert.match(h, /Traer el extracto/)
+})
+
+test('en inglés lo dice igual de claro', async () => {
+  const c = await dentro((q) => conciliacion(q, G, VACIO_DESDE, VACIO_HASTA, 'en'))
+  const h = pintarBanco(c, 'en', 'af')
+  assert.match(h, /No statement has been imported/)
+  assert.match(h, /Import the statement/)
+  assert.doesNotMatch(h, /Everything matches/)
+})
+
+test('con extracto traído y todo casado, entonces SÍ dice que cuadra', async () => {
+  // La otra mitad de la afirmación: si la pantalla nunca dijera «cuadra», el aviso
+  // de arriba no distinguiría nada. Lo que se arregló es que diga cada cosa cuando
+  // toca, no que deje de decir una de las dos.
+  const c = await dentro((q) => conciliacion(q, G, DESDE, HASTA, 'es'))
+  assert.ok(c.movimientos > 0, 'el periodo sembrado no tiene movimientos del banco')
+
+  const sinDescuadres = { ...c, descuadres: [], propuestas: [] }
+  const h = pintarBanco(sinDescuadres, 'es', 'af')
+  assert.match(h, /Todo cuadra/)
+  assert.doesNotMatch(h, /no se ha traído ningún extracto/)
+})
+
+test('y dice cuántos movimientos hay y cuántos van conciliados', async () => {
+  // Un número pequeño que cambia la lectura entera: cuatro movimientos y uno casado
+  // no es lo mismo que cuatro y cuatro, y sin el dato las dos pantallas se ven igual.
+  const c = await dentro((q) => conciliacion(q, G, DESDE, HASTA, 'es'))
+  const h = pintarBanco(c, 'es', 'af')
+  assert.match(h, new RegExp(`${c.movimientos} movimiento`))
+  assert.match(h, new RegExp(`${c.conciliados} ya conciliado`))
+  assert.ok(c.conciliados <= c.movimientos)
+})

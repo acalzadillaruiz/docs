@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 09:05 (España)
+**Última actualización:** 2026-09-26, 09:50 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,33 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **crear los hitos que faltan.** `/medidas` tenía un bloque
+**Lo último terminado:** **la conciliación bancaria decía «Todo cuadra en este
+periodo» sobre un periodo del que no se había traído ningún extracto.** No cuadraba:
+es que nadie había mirado. Es exactamente la confusión que este sistema entero existe
+para no cometer —dar por hallazgo la ausencia de uno—, cometida en su propia pantalla
+de contabilidad, y llevaba ahí desde que se escribió la pantalla.
+
+Lo destapó el mismo barrido del diccionario: `banco.subir` («Traer el extracto» /
+«Import the statement») estaba escrito en los dos idiomas y **ninguna pantalla lo
+usaba**. Al ir a ponerlo salió lo de debajo: sin extracto las dos listas salen vacías
+y la pantalla las leía como «cuadra».
+
+Ahora la pantalla sabe cuántos movimientos del banco tiene en el periodo y cuántos
+van conciliados. Sin ninguno, dice que no se ha traído nada, explica que eso no es
+que cuadre, y **da el enlace al importador**: un aviso de que falta un paso, sin el
+camino para darlo, es media pantalla. Con movimientos y todo casado, entonces sí dice
+que cuadra — lo que se arregló es que diga cada cosa cuando toca, no que deje de
+decir una de las dos.
+
+781 pruebas, todas pasan. Verificado quitando el arreglo para ver fallar la prueba.
+
+**Pistas que deja el barrido del diccionario y quedan sin mirar:** `importar.revertida`
+(deshacer una carga no dice cuántos asientos reversó), `periodo.plan_puesto` (instalar
+el plan de cuentas no confirma nada), `nota.lista` (¿hay forma de ver las notas de
+crédito de una factura?), `proveedor.comprobante` y `fiscal.comprobante_retencion`
+(el comprobante de retención que el proveedor necesita).
+
+**Antes:** **crear los hitos que faltan.** `/medidas` tenía un bloque
 entero —«¿a qué renglones se les olvidó crear los hitos?»— que **señalaba el problema
 y no daba forma de arreglarlo**. `crear_hitos_desde_plantilla()` existía desde el
 principio y la llamaba UN sitio: el alta de un contrato. Un renglón llegado por otro

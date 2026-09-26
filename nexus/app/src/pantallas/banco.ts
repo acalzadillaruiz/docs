@@ -49,8 +49,11 @@ export function pintarBanco(
   </form>
 </div>`).join('')}</div>`
 
+  // «Todo cuadra» solo se puede decir si hay contra qué cuadrar. Sin extracto traído
+  // las dos listas salen vacías, y decir que cuadra es dar por hallazgo la ausencia
+  // de uno — justo lo que este sistema existe para no hacer.
   const descuadres = c.descuadres.length === 0
-    ? `<p class="nada">${escapar(t('banco.nada'))}</p>`
+    ? (c.movimientos === 0 ? '' : `<p class="nada">${escapar(t('banco.nada'))}</p>`)
     : c.descuadres.map((d) => `
 <div class="mv ${d.esDelBanco ? 'banco' : 'libro'}">
   <div class="mv-c">
@@ -94,6 +97,16 @@ export function pintarBanco(
     <button type="submit">${escapar(t('banco.ver'))}</button>
   </form>
 
+  ${c.movimientos === 0
+    ? `<div class="sin-ext">
+    <b>${escapar(t('banco.sin_extracto'))}</b>
+    <p>${escapar(t('banco.sin_extracto_explica'))}</p>
+    <a class="traer" href="/importar">${escapar(t('banco.subir'))} →</a>
+  </div>`
+    : `<p class="cuenta">${escapar(t('banco.movimientos')
+        .replace('{n}', String(c.movimientos))
+        .replace('{m}', String(c.conciliados)))}</p>`}
+
   ${propuestas}
 
   <h2>${escapar(t('banco.descuadres'))}</h2>
@@ -104,6 +117,18 @@ export function pintarBanco(
 }
 
 export const ESTILOS_BANCO = `
+/* El aviso de que no hay extracto. En ámbar, no en rojo: no es un error de nadie,
+   es que falta un paso — y con el enlace para darlo, porque una pantalla que manda
+   hacer algo tiene que poder hacerlo. */
+.sin-ext{margin-top:18px;background:var(--amb);border:1px solid var(--am);
+  border-radius:14px;padding:16px 18px}
+.sin-ext b{color:var(--am);font-size:14.5px}
+.sin-ext p{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--ik2);max-width:64ch}
+.sin-ext .traer{display:inline-block;margin-top:12px;font-size:14px;font-weight:650;
+  text-decoration:none;color:var(--ik);border:1px solid var(--ln2);border-radius:9px;
+  padding:8px 15px;background:var(--cd)}
+.cuenta{margin:16px 0 0;font-family:"JetBrains Mono",monospace;font-size:11px;
+  letter-spacing:.06em;color:var(--md)}
 .rango{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:18px}
 .rango label{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;
   letter-spacing:.13em;text-transform:uppercase;color:var(--md)}

@@ -39,6 +39,18 @@ export type Conciliacion = {
   readonly descuadres: readonly Descuadre[]
   readonly desde: string
   readonly hasta: string
+  /**
+   * Cuántos movimientos del banco hay en el periodo, conciliados o no.
+   *
+   * Es el dato que faltaba, y no es un adorno. Sin extracto traído, las dos listas
+   * salen vacías y la pantalla decía **«Todo cuadra en este periodo»**. No cuadraba:
+   * es que nadie había mirado. Es exactamente la confusión que este sistema entero
+   * existe para no cometer — la ausencia de un hallazgo dicha como si fuera un
+   * hallazgo.
+   */
+  readonly movimientos: number
+  /** Y cuántos de ellos ya están casados con su cobro o su pago. */
+  readonly conciliados: number
 }
 
 export async function conciliacion(
@@ -57,9 +69,18 @@ export async function conciliacion(
     lado: string; id: string; fecha: Date; monto: string; detalle: string
   }>
 
+  const [cuenta] = (await q`
+    select count(*)::int as total,
+           count(*) filter (where conciliado_en is not null)::int as casados
+      from movimiento_banco
+     where organizacion_id = ${orgId}::uuid and fecha between ${desde}::date and ${hasta}::date
+  `) as unknown as Array<{ total: number; casados: number }>
+
   return {
     desde,
     hasta,
+    movimientos: Number(cuenta?.total ?? 0),
+    conciliados: Number(cuenta?.casados ?? 0),
     propuestas: props.map((p): Propuesta => ({
       movimiento: p.movimiento,
       fecha: p.fecha.toISOString().slice(0, 10),
