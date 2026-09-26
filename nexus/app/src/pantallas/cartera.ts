@@ -70,6 +70,14 @@ export function pintarCartera(
    * cincuenta contratos creería que ha visto todos los suyos.
    */
   trozo: { readonly desde: number; readonly total: number } = { desde: 0, total: 0 },
+  /**
+   * Lo que espera al CLIENTE. Va en un parámetro aparte y AL FINAL: aparte porque la
+   * cerradura de abajo —que la bandeja de GPS no salga nunca a un cliente— tiene que
+   * seguir siendo cierta sin depender de quién llame; y al final porque meterlo en medio
+   * corrió todos los argumentos posicionales de los sitios que ya llamaban, y la cola de
+   * documentos por revisar acabó pintándose como la bandeja del cliente. Lo vio `tsc`.
+   */
+  pendientesCliente: readonly Pendiente[] = [],
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -224,11 +232,11 @@ ${ESTILOS_AVANCE}
 </div></header>`,
     cuerpo: `<main class="wrap">
 ${/*
-   * La segunda cerradura: la ruta ya no le pasa pendientes a un cliente, pero si
-   * algún día otro sitio llamara a esta función pasándoselos, la bandeja saldría.
-   * Aquí no sale, pase lo que pase. Una prueba lo comprueba llamándola a propósito
-   * con pendientes y esCliente a la vez.
-   */''}${pintarBandeja(esCliente ? [] : pendientes, idioma)}
+   * La segunda cerradura, y sigue intacta: a un cliente NO le sale nunca la bandeja de
+   * GPS, pase lo que pase y la llame quien la llame. Lo que le sale es la suya, que
+   * viene por otro parámetro. Una prueba lo comprueba llamando a esta función a
+   * propósito con los pendientes de GPS y esCliente a la vez.
+   */''}${pintarBandeja(esCliente ? pendientesCliente : pendientes, idioma)}
 ${pintarPorRevisar(esCliente ? [] : porRevisar, idioma)}
 ${tarjetas}
 ${paginas}

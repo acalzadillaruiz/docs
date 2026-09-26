@@ -24,6 +24,17 @@ export const MUESTRA = {
   cliente: 'c8d9e0f1-0000-0000-0000-00000000000b',
   persona: 'c8d9e0f1-0000-0000-0000-00000000000d',
   correo: 'muestra@prueba.test',
+  /**
+   * Y una persona de la OPERADORA, con la misma clave y el mismo segundo factor.
+   *
+   * Sin ella, la mitad del producto no se podia ni ver: el portal del cliente —lo que ve
+   * alguien de la operadora cuando entra— no salia en el recorrido navegable porque no habia
+   * con quien entrar. Lleva las mismas credenciales de muestra a proposito: son las que estan
+   * escritas en el repositorio a la vista, y eso es correcto para una cuenta de muestra y
+   * seria un agujero para una de verdad.
+   */
+  correoCliente: 'muestra-cliente@prueba.test',
+  personaCliente: 'c8d9e0f1-0000-0000-0000-00000000000e',
   clave: 'una clave razonable',
   secreto: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
   anio: 2027,
@@ -48,6 +59,12 @@ export async function sembrar(): Promise<void> {
                     ${hash}, ${MUESTRA.secreto})
             on conflict (id) do update set clave_hash = excluded.clave_hash,
               totp_secreto = excluded.totp_secreto`
+    await q`insert into persona (id, organizacion_id, correo, nombre, metodo,
+                                 clave_hash, totp_secreto)
+            values (${MUESTRA.personaCliente}, ${C}, ${MUESTRA.correoCliente},
+                    'Ing. de la operadora','clave_2fa', ${hash}, ${MUESTRA.secreto})
+            on conflict (id) do update set clave_hash = excluded.clave_hash,
+              totp_secreto = excluded.totp_secreto, activa = true`
 
     // La tasa lleva un índice PARCIAL (solo las no sustituidas), así que la cláusula
     // de conflicto no puede deducirlo: se inserta solo si no hay ninguna ese día.
@@ -182,6 +199,52 @@ export async function sembrar(): Promise<void> {
              'SERV-PJ', 75,'aprobada', current_date - 12,'${YO}'::uuid,'${YO}'::uuid
         from contrato c where c.organizacion_id = '${G}';
 
+      -- Una SEGUNDA valuacion para tres contratos, en los tres estados que le esperan al
+      -- cliente. Sin esto su bandeja salia vacia en la instantanea y lo que se ve del portal
+      -- del cliente es una lista de contratos y nada mas — que es justo lo que hace que un
+      -- portal no se use. Y catorce valuaciones todas aprobadas no se parecen a ninguna
+      -- cartera de verdad: en una de verdad siempre hay una esperando firma y otra discutida.
+      -- No llevan asiento a proposito: una valuacion que el cliente no ha aprobado todavia no
+      -- es un ingreso, y asentarla seria contar por ganado lo que aun se discute.
+      insert into valuacion (organizacion_id, contrato_id, numero, periodo_desde,
+                             periodo_hasta, obra, moneda, tasa_id, amortiza_pct,
+                             garantia_pct, alicuota_iva_id, concepto_islr, ret_iva_pct,
+                             estado, presentada_el, creada_por)
+      select '${G}'::uuid, c.id, 2,'2027-04-01'::date,'2027-04-30'::date,
+             round((c.monto * 0.18)::numeric, 2),
+             'VES','${TASA}'::uuid, 0, 5,
+             (select id from alicuota_iva where clase = 'general' limit 1),
+             'SERV-PJ', 75,
+             (case c.codigo when 'GPS-2027-002' then 'presentada'
+                            else 'objetada' end)::estado_valuacion,
+             current_date - (case c.codigo when 'GPS-2027-002' then 3
+                                           when 'GPS-2027-005' then 18
+                                           else 26 end),
+             '${YO}'::uuid
+        from contrato c
+       where c.organizacion_id = '${G}'
+         and c.codigo in ('GPS-2027-002','GPS-2027-005','GPS-2027-009');
+
+      -- La del 005 lleva una objecion SIN contestar: es lo que GPS le debe al cliente.
+      insert into objecion (valuacion_id, persona_id, motivo, objetada_en)
+      select v.id, '${MUESTRA.personaCliente}'::uuid,
+             'El renglon 2 incluye 14 horas de grua que no vimos en locacion el dia 12.',
+             now() - interval '16 days'
+        from valuacion v join contrato c on c.id = v.contrato_id
+       where c.codigo = 'GPS-2027-005' and v.numero = 2
+         and not exists (select 1 from objecion o where o.valuacion_id = v.id);
+
+      -- Y la del 009 la tiene contestada: la pelota vuelve al campo del cliente.
+      insert into objecion (valuacion_id, persona_id, motivo, objetada_en,
+                            respuesta, respondida_en, respondida_por)
+      select v.id, '${MUESTRA.personaCliente}'::uuid,
+             'Falta el acta de recepcion del tramo 3.', now() - interval '24 days',
+             'Adjuntada el acta firmada por el supervisor de campo el dia 19.',
+             now() - interval '6 days', '${YO}'::uuid
+        from valuacion v join contrato c on c.id = v.contrato_id
+       where c.codigo = 'GPS-2027-009' and v.numero = 2
+         and not exists (select 1 from objecion o where o.valuacion_id = v.id);
+
       insert into asiento (organizacion_id, numero, ocurrido_en, anio, mes, descripcion_es,
                            descripcion_en, origen_tipo, origen_id, creado_por)
       select '${G}'::uuid, siguiente_asiento('${G}') + (row_number() over (order by c.codigo)) - 1,
@@ -217,7 +280,10 @@ export async function sembrar(): Promise<void> {
           from asiento a
           join contrato c on c.organizacion_id = '${G}'
                          and a.descripcion_es = 'Valuación aprobada · '||c.codigo
-          join valuacion vl on vl.contrato_id = c.id
+          -- La numero 1, que es la aprobada. Sin acotarlo, los tres contratos que ahora
+          -- tienen una segunda valuacion esperando al cliente metian DOS partidas con la
+          -- misma linea en el mismo asiento, y el sembrador reventaba contra la clave.
+          join valuacion vl on vl.contrato_id = c.id and vl.numero = 1
          where a.organizacion_id = '${G}' and a.origen_tipo = 'valuacion'
       )
       insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves, monto_usd, tasa_id)

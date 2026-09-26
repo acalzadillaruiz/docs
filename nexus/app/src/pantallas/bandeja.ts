@@ -42,7 +42,7 @@ export function pintarBandeja(pendientes: readonly Pendiente[], idioma: Idioma):
   <div class="pd-c">
     <div class="pd-t">${escapar(p.titulo)}</div>
     <div class="pd-d">${escapar(p.detalle)}</div>
-    <div class="pd-m">${escapar(p.contrato)} · ${escapar(p.cliente)}</div>
+    <div class="pd-m">${escapar(p.contrato)} · ${escapar(p.contexto ?? p.cliente)}</div>
   </div>
   <div class="pd-r">
     <div class="pd-di">${p.dias === 0 ? escapar(x.hoy) : escapar(x.dias(p.dias))}</div>

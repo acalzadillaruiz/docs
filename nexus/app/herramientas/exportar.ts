@@ -12,7 +12,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { resolver, type Peticion } from '../src/servidor/rutas.ts'
-import { sembrar } from './sembrar.ts'
+import { sembrar, MUESTRA } from './sembrar.ts'
 import { codigoEnPaso, desdeBase32, pasoDe } from '../src/dominio/totp.ts'
 import { NOMBRE_COOKIE } from '../src/servidor/cookies.ts'
 import { iconoSvg, iconoPng } from '../src/servidor/icono.ts'
@@ -42,6 +42,25 @@ const desafio = /name="desafio" value="([^"]+)"/.exec(p1.cuerpo!)![1]!
 const p2 = await resolver({ metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es', origen,
   campos: { desafio, codigo: codigoEnPaso(desdeBase32(SECRETO), pasoDe(new Date())) } }, YO, false)
 const gps = new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
+
+/**
+ * Y la sesion de alguien de la OPERADORA.
+ *
+ * Sin esto, la mitad del producto no salia en la instantanea: todas las paginas se pedian
+ * como GPS, asi que el portal del cliente —lo que ve el que paga— no se habia podido ver
+ * nunca. Y es justo la mitad de la que se discute si se usara o no.
+ */
+async function entrarComo(correo: string): Promise<string> {
+  const o = `o-export-${correo}`
+  const a = await resolver({ metodo: 'POST', ruta: '/entrar', cookie: null, idioma: 'es',
+    origen: o, campos: { correo, clave: CLAVE } }, YO, false)
+  const d = /name="desafio" value="([^"]+)"/.exec(a.cuerpo!)![1]!
+  const b = await resolver({ metodo: 'POST', ruta: '/entrar/codigo', cookie: null, idioma: 'es',
+    origen: o, campos: { desafio: d,
+      codigo: codigoEnPaso(desdeBase32(SECRETO), pasoDe(new Date())) } }, YO, false)
+  return new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(b.cabeceras!['Set-Cookie']!)![1]!
+}
+const cliente = await entrarComo(MUESTRA.correoCliente)
 
 // TODOS los contratos: una instantanea con un tercio de los enlaces apagados no es
 // navegable, y hace dudar de lo que si funciona.
@@ -100,12 +119,18 @@ type Pagina = {
   metodo?: 'GET' | 'POST'
   /** Sin sesion: las pantallas de antes de entrar. */
   fuera?: boolean
+  /** Pedida como alguien de la operadora, no como GPS: el portal del cliente. */
+  comoCliente?: boolean
 }
 
 const PAGINAS: Array<Pagina> = [
   // La cartera NO se llama 'index': en el sitio donde se publica la instantanea, ese
   // nombre esta reservado para la portada que explica que es esto y que no es.
   { archivo: 'cartera', ruta: '/' },
+  // La misma cartera vista por la OPERADORA: su bandeja de lo que le espera, sus contratos,
+  // y sin nada de la contabilidad ni del margen. Es la mitad del producto que no se habia
+  // podido ver nunca en la instantanea, porque todo se pedia como GPS.
+  { archivo: 'cliente-cartera', ruta: '/', comoCliente: true },
   { archivo: 'gerencia', ruta: '/gerencia', campos: { anio: '2027', mes: '3' } },
   { archivo: 'medidas', ruta: '/medidas' },
   { archivo: 'estados', ruta: '/estados', campos: { al: '2027-03-31' } },
@@ -209,7 +234,7 @@ for (const p of PAGINAS) {
   const r = await pedir({
     metodo: p.metodo ?? 'GET',
     ruta: p.ruta,
-    cookie: p.fuera ? null : gps,
+    cookie: p.fuera ? null : p.comoCliente ? cliente : gps,
     campos: p.campos ?? {},
   })
   if (r.codigo !== 200 || !r.cuerpo) { console.log('SALTADA', p.ruta, r.codigo); continue }

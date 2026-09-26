@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-27, 04:20 (España)
+**Última actualización:** 2026-09-27, 05:10 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -11,7 +11,7 @@
 > avance lo que el sistema impide hacer con el de un contrato.
 >
 > Lo que hay construido, contado a mano sobre el código de hoy: **30 módulos de
-> pantalla** y **153 páginas** en el recorrido exportado, sobre las 119 vistas del plan
+> pantalla** y **160 páginas** en el recorrido exportado, sobre las 119 vistas del plan
 > completo (una vista del plan sale en varias páginas: con datos, vacía, y con error).
 > Las cifras de antes decían «40 direcciones y 26 pantallas» y no salen de ninguna
 > cuenta que sepa repetir, así que se cambian por las que sí. Lo que está **entero y probado
@@ -34,9 +34,70 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** dos acciones que hacían su trabajo **sin decir qué habían hecho**, y
-un sexto barrido que **probé y descarté** — que es parte del resultado y conviene que quede
-escrito.
+**Lo último terminado:** **la bandeja del cliente** — y, de paso, que el portal del cliente
+se pueda ver por primera vez.
+
+La bandeja de GPS existía desde hace tiempo, y su propio comentario decía por qué: *«el
+cliente escribe y no pasa nada» es el agujero que hace que un portal de cliente acabe sin
+usarse.* **El espejo de ese agujero seguía abierto**, y estaba cerrado por un ternario: la
+ruta pasaba `pendientes: esCliente ? [] : await bandeja(...)`. GPS presentaba una valuación y
+el cliente no sabía que le esperaba nada salvo que leyera el correo — y si el correo se
+perdió, no había ninguna otra forma de enterarse. Entraba, veía su lista de contratos igual
+que ayer, y se iba.
+
+Tres filas, y la tercera es la que hace creíbles a las otras dos:
+
+1. **Esperando tu firma.** Lo que el cliente debe, con los días que lleva.
+2. **GPS contestó tu objeción.** Ya puede volver a mirarla, y la respuesta va en la tarjeta.
+   Desbloquea de verdad: `aprobar` acepta una valuación objetada.
+3. **Esperando a GPS.** Lo que GPS le debe a él. Un portal que solo enseña las deudas de un
+   lado se lee como una máquina de cobrar; éste enseña las dos.
+
+La máquina estaba entera debajo —estados, fechas, objeciones con su respuesta— y lo que
+faltaba era la puerta. Otra vez.
+
+**La cerradura de GPS no se debilitó para abrir ésta.** La bandeja interna sigue sin salirle
+a un cliente pase lo que pase: la del cliente viaja por un parámetro **aparte**, y la prueba
+llama a la pantalla a propósito con las dos listas y `esCliente` a la vez. Y el parámetro va
+**al final** de la firma porque meterlo en medio corrió los argumentos posicionales y la cola
+de documentos por revisar se pintó como la bandeja del cliente. Lo vio `tsc`.
+
+**El filtro por cliente va ESCRITO en la consulta, no delegado en las políticas de fila.** Y
+la prueba que lo mide se hace desde DENTRO de GPS, que bajo RLS lo ve todo, pasando el
+identificador de cada operadora: así lo único que puede dejar fuera lo ajeno es la condición
+escrita. Preguntándolo como el cliente, la prueba pasaría con la condición quitada —la
+salvaría la base— y no mediría nada. Comprobado quitándola: se pone roja.
+
+### Y el portal del cliente no se había podido ver nunca
+
+La empresa de muestra **no tenía ninguna persona de la operadora**, así que el exportador
+pedía las 153 páginas como GPS y la mitad del producto no salía en el recorrido. Ahora hay
+una cuenta de la operadora en la muestra y una página pedida entrando como ella.
+
+Con eso salió que las catorce valuaciones de la muestra estaban **todas aprobadas y sin una
+sola objeción**, que no se parece a ninguna cartera de verdad y dejaba la bandeja nueva
+vacía. Ahora tres contratos tienen una segunda valuación —una esperando firma, una objetada
+sin contestar y una contestada— sin asiento, porque **una valuación que el cliente no ha
+aprobado todavía no es un ingreso**. Al añadirlas, el sembrador reventó: el asiento se unía a
+`valuacion` por contrato, y con dos valuaciones metía dos partidas con la misma línea.
+
+**896 pruebas, todas pasan.** Verificado rompiendo: el filtro por cliente, el guardián de
+«queda alguna objeción sin responder», y la cerradura de la pantalla. Ese guardián **no
+estaba medido al principio** —se podía quitar sin que nada fallara— porque el fixture no
+tenía ninguna valuación con dos objeciones, una contestada y otra no, que es el único caso en
+que importa: sin él, se le dice al cliente que la pelota es suya cuando GPS todavía le debe
+una respuesta. Con el caso puesto, quitarlo pone tres pruebas en rojo.
+
+Y dos pruebas viejas se rompieron al crecer el fixture, porque **contaban la lista entera** en
+vez de mirar su propia fila. Arregladas mirando su identificador: una prueba atada a cuántas
+filas tenga el fixture falla un día sin que nada esté mal.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** dos acciones que hacían su trabajo **sin decir qué habían hecho**, y un sexto
+barrido que **probé y descarté**.
 
 ### El barrido que no merece ser permanente
 
@@ -82,10 +143,6 @@ que el dominio vuelva a tirar la cuenta, y que la pantalla deje de pintarla. Y l
 las sesiones cortadas se corrió **dos veces seguidas** a propósito: la primera versión
 dependía de cuántas veces se hubieran corrido las pruebas antes, porque las sesiones se
 acumulaban. Una prueba que depende de su propio historial falla un día sola.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **un correo que no se manda**, y el quinto barrido —valores de enum que nadie
 escribe— que lo encontró.
