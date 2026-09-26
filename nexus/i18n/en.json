@@ -358,6 +358,7 @@
   "facturar.error.ya": "That progress payment already has an invoice. To correct it you issue a credit note; you do not redo it.",
   "facturar.error.sin_aprobar": "Only a progress payment approved by the client can be invoiced",
   "facturar.error.objecion": "It has an unanswered dispute. Invoicing something the client challenged in writing is how you lose an argument before it starts.",
+  "facturar.error.mes_cerrado": "This progress payment's entry belongs to the month of its period, and that month is closed. Invoicing now would leave the invoice issued and the revenue outside the books. Reopen that month first.",
   "facturar.numero": "Invoice",
   "facturar.control": "Control number",
   "nota.titulo": "Correct the invoice",

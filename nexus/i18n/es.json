@@ -358,6 +358,7 @@
   "facturar.error.ya": "Esa valuación ya tiene factura. Para corregirla se emite una nota de crédito, no se rehace.",
   "facturar.error.sin_aprobar": "Solo se factura una valuación aprobada por el cliente",
   "facturar.error.objecion": "Tiene una objeción sin responder. Facturar algo que el cliente discutió por escrito es como se pierde una discusión antes de empezarla.",
+  "facturar.error.mes_cerrado": "El asiento de esta valuación va al mes de su periodo, y ese mes está cerrado. Facturar ahora dejaría la factura emitida y el ingreso fuera del libro. Hay que reabrir ese mes antes.",
   "facturar.numero": "Factura",
   "facturar.control": "Número de control",
   "nota.titulo": "Corregir la factura",

@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 11:20 (España)
+**Última actualización:** 2026-09-26, 12:05 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,30 +31,42 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-> ## MIRAR ESTO PRIMERO · hueco grande sin tapar
->
-> **`asentar_valuacion()` no la llama la aplicación. Nunca.** Existe en el esquema
-> desde el principio, está probada, y hace el asiento de la venta: debe cuenta por
-> cobrar + retenciones, haber ingresos + IVA débito fiscal. La llaman **solo las
-> pruebas**, que se lo montan a mano en su fixture.
->
-> Consecuencia, si esto se usara hoy: GPS aprueba una valuación, emite la factura, y
-> **el ingreso no entra al libro** — mientras el cobro sí, porque `registrarCobro` sí
-> llama a `asentar_cobro`. La cuenta por cobrar se iría a negativo, el estado de
-> resultados saldría sin ingresos, y el libro de ventas —que se construye desde
-> `documento_fiscal`— enseñaría una factura que el diario no tiene.
->
-> Y el motivo de que ninguna prueba lo pillara es del mismo tipo que ya ha salido
-> cuatro veces: **el fixture hace lo que la aplicación no hace.** Los libros cuadran
-> en las pruebas porque la prueba asienta la venta antes de mirar.
->
-> No se ha tocado: es el trozo siguiente y es de contabilidad, así que se hace con
-> cuidado, comprobando antes de creérselo (no vaya a acabar asentando dos veces la
-> venta importada, que sí tiene su `asentar_lote_ventas`). **El barrido general de
-> funciones del esquema que no llama nadie se añade en ese mismo commit**, para no
-> tener que declarar un hueco real como si estuviera bien.
+**Lo último terminado:** **el ingreso de una valuación facturada ya entra al libro.
+No entraba.**
 
-**Lo último terminado:** **perder el teléfono y volver a entrar — que NO FUNCIONABA.**
+`asentar_valuacion()` existe en el esquema desde el principio, hace el asiento de la
+venta —debe cuentas por cobrar y retenciones, haber ingresos e IVA débito fiscal— y
+está probada. **La aplicación no la llamaba nunca.** La llamaban solo las pruebas,
+que se lo montaban a mano en su fixture antes de mirar.
+
+En uso real: se aprueba la valuación, se emite la factura, el cliente la recibe, el
+libro de ventas la enseña —se construye desde `documento_fiscal`— y el diario no
+tiene nada. Después el cobro **sí** se asienta, así que la cuenta por cobrar se iba a
+negativo y el estado de resultados salía sin ingresos.
+
+Por qué ninguna prueba lo vio, y esto es lo que hay que recordar: **el fixture hacía
+lo que la aplicación no hacía.** Los libros cuadraban porque la prueba asentaba la
+venta. Y al escribir la prueba nueva volvió a pasar en pequeño: «el libro cuadra»
+seguía pasando con el asiento apagado, porque **un libro vacío cuadra**. Ahora
+comprueba primero que haya partidas.
+
+Se comprueba **antes** de emitir que el mes del periodo valuado esté abierto: un
+`try/catch` no habría servido —dentro de una transacción postgres vuelve a lanzar al
+cerrarla— y sobre todo la excepción llegaría después de gastar el número de factura y
+el de control, que son correlativos sin huecos y no se devuelven.
+
+**Y el barrido general ya es permanente:** toda función del esquema que no llame
+nadie desde el código que se ejecuta hace fallar las pruebas. Una prueba NO cuenta
+como llamada — ahí estaban escondidas las dos peores averías del proyecto. La lista
+de excepciones (disparadores, y `previsualizar`) es corta y cada línea está
+justificada. Verificado apagando la llamada para verlo fallar.
+
+Queda anotada como **decisión 13** una pregunta contable que no es mía: con qué fecha
+entra la venta al libro, la del periodo valuado o la de la factura.
+
+803 pruebas, todas pasan.
+
+**Antes:** **perder el teléfono y volver a entrar — que NO FUNCIONABA.**
 
 La pantalla de «Perdí el teléfono» estaba escrita desde el primer día y mandaba el
 formulario a `/entrar/recuperacion`. Esa ruta **solo respondía a GET**: el POST se

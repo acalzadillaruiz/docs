@@ -25,6 +25,25 @@ const G = 'cc000000-0000-0000-0000-0000000000a1'
 const YO = 'cc000000-0000-0000-0000-0000000000a2'
 const SECRETO = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'
 
+/**
+ * Las que la aplicación no llama, y está bien que no las llame.
+ *
+ * Corta a propósito: cada línea hay que justificarla, porque el sitio natural de una
+ * función que no llama nadie es la papelera o una pantalla nueva. Las dos peores
+ * averías del proyecto estaban aquí sin estar declaradas.
+ */
+const CON_PERMISO = new Set([
+  // La usa la propia base de datos desde un disparador, no la aplicación.
+  'liberar_hitos_de_valuacion_anulada', 'persona_desactivada', 'proteger_asiento',
+  'verificar_cuadre', 'capacidad_solo_interna', 'objecion_la_hace_el_cliente',
+  'valuacion_no_factura_con_objecion', 'hito_exige_su_evidencia', 'avisar_objecion',
+  'avisar_objecion_respondida', 'avisar_valuacion',
+  // La aplicación enseña la muestra de cada columna calculada en TypeScript, así que
+  // esta previsualización en SQL quedó sin uso. Se deja porque es la comprobación
+  // que usa la prueba del esquema, y borrarla dejaría esa prueba sin nada que mirar.
+  'previsualizar',
+])
+
 const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
   comoPersona<T>({ id: YO }, 'nexus_interno', f)
 
@@ -179,6 +198,62 @@ test('NINGUNA función de limpieza del esquema se queda sin quien la llame', asy
   assert.deepEqual(huerfanas, [],
     'funciones de limpieza que no llama nadie —la máquina montada y sin puerta—: ' +
     huerfanas.join(', '))
+})
+
+test('NINGUNA función del esquema se queda sin que nadie la llame', async () => {
+  // El barrido de arriba mira solo las de limpieza. Éste mira TODAS, y es el que
+  // encontró las dos peores del proyecto:
+  //
+  //   * `gastar_codigo()` — se entregaban diez códigos de recuperación y no había
+  //     forma de usar uno. Quien perdía el teléfono se quedaba fuera para siempre.
+  //   * `asentar_valuacion()` — se emitía la factura y el ingreso no entraba al
+  //     libro. La llamaban solo las pruebas, en su propio fixture.
+  //
+  // Una función del esquema que no llama nadie es, casi siempre, una pantalla que
+  // falta. Lo que NO vale como llamada es una prueba: ahí estaban las dos.
+  const dir = new URL('../../db/schema/', import.meta.url)
+  const archivos = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()
+
+  const sinComentarios = (t: string) => t
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n').map((l) => l.replace(/(--|\/\/).*$/, '')).join('\n')
+
+  const esquema: string[] = []
+  const definidas = new Map<string, string>()
+  for (const f of archivos) {
+    const limpio = sinComentarios(await readFile(new URL(f, dir), 'utf8'))
+    esquema.push(limpio)
+    for (const m of limpio.matchAll(/create or replace function ([a-z_0-9]+)\s*\(/g)) {
+      if (!definidas.has(m[1]!)) definidas.set(m[1]!, f)
+    }
+  }
+  assert.ok(definidas.size >= 100,
+    `solo se leyeron ${definidas.size} funciones del esquema: el barrido no barrió`)
+
+  const app: string[] = []
+  const recogerApp = async (base: URL) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recogerApp(u)
+      else if (e.name.endsWith('.ts')) app.push(sinComentarios(await readFile(u, 'utf8')))
+    }
+  }
+  await recogerApp(new URL('../src/', import.meta.url))
+  await recogerApp(new URL('../herramientas/', import.meta.url))
+
+  const cuenta = (textos: string[], fn: string) =>
+    textos.reduce((n, t) => n + t.split(fn).length - 1, 0)
+
+  const huerfanas = [...definidas.entries()]
+    .filter(([fn]) => !CON_PERMISO.has(fn))
+    // Una sola aparición en el esquema es su propia definición, y cero en la
+    // aplicación es que nadie la llama desde el código que se ejecuta.
+    .filter(([fn]) => cuenta(app, fn) === 0 && cuenta(esquema, fn) <= 1)
+    .map(([fn, arch]) => `${fn} (${arch})`)
+
+  assert.deepEqual(huerfanas, [],
+    'funciones del esquema que no llama nadie —casi siempre, una pantalla que falta—:\n  ' +
+    huerfanas.join('\n  '))
 })
 
 test('y el bucle que corre siempre es quien las llama', async () => {

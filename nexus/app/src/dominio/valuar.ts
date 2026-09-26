@@ -260,8 +260,14 @@ export async function facturar(
   if (esCliente) return { hecho: false, motivo: 'valuar.error.contrato' }
 
   const [v] = (await q`
-    select estado::text, documento_id from valuacion where id = ${valuacionId}::uuid
-  `) as unknown as Array<{ estado: string; documento_id: string | null }>
+    select estado::text, documento_id, organizacion_id,
+           extract(year  from periodo_hasta)::int as anio,
+           extract(month from periodo_hasta)::int as mes
+      from valuacion where id = ${valuacionId}::uuid
+  `) as unknown as Array<{
+    estado: string; documento_id: string | null
+    organizacion_id: string; anio: number; mes: number
+  }>
   if (!v) return { hecho: false, motivo: 'valuar.error.contrato' }
   if (v.documento_id) return { hecho: false, motivo: 'facturar.error.ya' }
   if (v.estado !== 'aprobada') {
@@ -276,9 +282,36 @@ export async function facturar(
     return { hecho: false, motivo: 'facturar.error.objecion' }
   }
 
+  // El asiento de la venta va al mes del periodo valuado. Si ese mes está cerrado no
+  // entra, y hay que verlo AHORA: un `try/catch` aquí no serviría —esto corre dentro
+  // de una transacción y postgres vuelve a lanzar al cerrarla—, y sobre todo la
+  // excepción llegaría DESPUÉS de haber gastado el número de factura y el número de
+  // control, que son correlativos sin huecos y no se devuelven.
+  const [cerrado] = (await q`
+    select 1 as x from periodo
+     where organizacion_id = ${v.organizacion_id}::uuid
+       and anio = ${v.anio} and mes = ${v.mes} and estado = 'cerrado'
+  `) as unknown as Array<{ x: number }>
+  // El motivo viaja como CLAVE, no como texto —da la vuelta por una redirección—, así
+  // que no puede llevar el mes dentro. No hace falta: el periodo valuado está escrito
+  // en la misma pantalla, encima del botón.
+  if (cerrado) return { hecho: false, motivo: 'facturar.error.mes_cerrado' }
+
   const [doc] = (await q`
     select emitir_factura(${valuacionId}::uuid, ${personaId}::uuid) as id
   `) as unknown as Array<{ id: string }>
+
+  // Y EL ASIENTO. Esto faltaba, y es el agujero más grande que ha salido de los
+  // barridos: `asentar_valuacion()` existía desde el principio, probada, y no la
+  // llamaba la aplicación — solo las pruebas, que se lo montaban a mano en su
+  // fixture. Se emitía la factura, el cliente la recibía, el libro de ventas la
+  // enseñaba… y el ingreso no entraba al libro diario. Después el cobro SÍ se
+  // asentaba, así que la cuenta por cobrar se iba a negativo y el estado de
+  // resultados salía sin ingresos.
+  //
+  // Que los libros cuadraran en las pruebas no decía nada: el fixture hacía lo que la
+  // aplicación no hacía.
+  await q`select asentar_valuacion(${valuacionId}::uuid, ${personaId}::uuid)`
 
   const [f] = (await q`
     select numero, numero_control from documento_fiscal where id = ${doc!.id}::uuid

@@ -1633,6 +1633,7 @@ const PORQUE: Record<string, Clave> = {
   'facturar.error.ya': 'facturar.error.ya',
   'facturar.error.sin_aprobar': 'facturar.error.sin_aprobar',
   'facturar.error.objecion': 'facturar.error.objecion',
+  'facturar.error.mes_cerrado': 'facturar.error.mes_cerrado',
   'nota.error.sin_factura': 'nota.error.sin_factura',
   'nota.error.base': 'nota.error.base',
   'nota.error.motivo': 'nota.error.motivo',
