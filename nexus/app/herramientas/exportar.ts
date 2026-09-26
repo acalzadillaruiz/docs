@@ -86,6 +86,28 @@ const renglones = (await dentro((q) => q`
    order by ct.codigo, rg.numero
 `)) as unknown as Array<{ id: string; contrato: string; numero: number }>
 
+/**
+ * El mes donde estan las facturas EMITIDAS de la muestra.
+ *
+ * Estaba escrito a mano: marzo de 2027, el periodo de las valuaciones. Y las facturas no
+ * estan ahi —`emitir_factura` las fecha el dia en que se emiten, que es lo correcto—, asi
+ * que la pantalla del libro de ventas salia con «No hay ninguna factura de ese mes» y la
+ * hoja de calculo, con la cabecera y ni una fila. Un exportador que pregunta por un mes
+ * fijo acaba ensenando una pantalla vacia, y una pantalla vacia se lee como que el
+ * producto no tiene eso.
+ */
+const mesVentas = (await dentro((q) => q`
+  select extract(year from fecha)::int as anio, extract(month from fecha)::int as mes,
+         count(*)::int as n
+    from documento_fiscal
+   where organizacion_id = ${G}::uuid and sentido = 'emitido' and tipo = 'factura'
+   group by 1, 2 order by n desc, anio desc, mes desc limit 1
+`)) as unknown as Array<{ anio: number; mes: number; n: number }>
+const VENTAS = {
+  anio: String(mesVentas[0]?.anio ?? 2027),
+  mes: String(mesVentas[0]?.mes ?? 3),
+}
+
 const valuaciones = (await dentro((q) => q`
   select va.id, ct.codigo as contrato, va.numero
     from valuacion va join contrato ct on ct.id = va.contrato_id
@@ -139,7 +161,7 @@ const PAGINAS: Array<Pagina> = [
   { archivo: 'estados', ruta: '/estados', campos: { al: '2027-03-31' } },
   { archivo: 'diario', ruta: '/diario', campos: { anio: '2027', mes: '3' } },
   { archivo: 'mayor', ruta: '/mayor', campos: { cuenta: '1.1.02.01', desde: '2027-03-01', hasta: '2027-03-31' } },
-  { archivo: 'libros', ruta: '/libros', campos: { cual: 'ventas', anio: '2027', mes: '3' } },
+  { archivo: 'libros', ruta: '/libros', campos: { cual: 'ventas', ...VENTAS } },
   { archivo: 'libros-compras', ruta: '/libros', campos: { cual: 'compras', anio: '2027', mes: '3' } },
   { archivo: 'periodos', ruta: '/periodos' },
   { archivo: 'activos', ruta: '/activos' },
@@ -260,7 +282,7 @@ for (const [archivo, ruta, campos, quien] of [
   ['manifest.webmanifest', '/manifest.webmanifest', {}, 'gps'],
   // Y las hojas de calculo: son descargas de verdad, no paginas, y que el enlace baje el
   // archivo es la mitad de lo que hay que poder comprobar de un exportador.
-  ['libro-ventas.csv', '/libros/hoja', { cual: 'ventas', anio: '2027', mes: '3' }, 'gps'],
+  ['libro-ventas.csv', '/libros/hoja', { cual: 'ventas', ...VENTAS }, 'gps'],
   ['diario.csv', '/diario/hoja', { anio: '2027', mes: '3' }, 'gps'],
   // La hoja de una valuacion, tal como se la baja EL CLIENTE. Una sola: el archivo es el
   // mismo para todas y quince copias no ensenan nada que no ensene una. Y pedida como el

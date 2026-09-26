@@ -34,7 +34,66 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **la hoja de la valuación, en un archivo que se baja.**
+**Lo último terminado:** **dos formas de cuadrar que no eran cuadrar, y la mitad de la
+contabilidad que nunca se había visto.**
+
+Salió tirando de un hilo pequeño: el libro de ventas de la instantánea decía «no hay ninguna
+factura de ese mes». Debajo había tres cosas.
+
+**Uno. Veintiséis asientos vacíos en el libro diario.** Con nombres de contratos que no
+existen —«Valuación aprobada · GPS-2027-020»—, porque la muestra pasó de sembrar cuarenta
+contratos a sembrar catorce y un `generate_series(0, 39)` se quedó. En la pantalla con la que
+se enseña la fase que va primera.
+
+Y la contabilidad no los rechazó. La regla 1 de este producto, escrita en el primer archivo
+del esquema, dice «no existe asiento descuadrado», y es verdad; lo que no decía nada es de un
+asiento **sin ninguna línea**, por dos razones que se suman: el control del cuadre es un
+disparador sobre las partidas, así que sin partidas no se ejecuta nunca — y si se ejecutara,
+diría que cuadra, porque **la suma de cero líneas es cero**. Un asiento vacío es peor que uno
+descuadrado: el descuadrado se ve; el vacío se cuela con su número correlativo y, en un libro
+donde nada se edita y nada se borra, se queda. Ya no entra.
+
+**Dos, y es el grave: el botón de facturar no funcionaba.** No para algunas: para casi todas.
+`asentar_valuacion` convierte cada línea a dólares y la redondea por separado, y redondear
+seis veces y sumar no da lo mismo que sumar y redondear. Sobraba **un céntimo de dólar**, el
+asiento se rechazaba, y la valuación no se podía facturar nunca — con un error de base de
+datos en la cara. Pasaba las pruebas porque sus cifras salen redondas.
+
+Lo tapaba que la muestra escribía el asiento de la venta **a mano, con dos líneas** iguales y
+de signo contrario, que cuadran siempre. **El fixture hacía lo que la aplicación no hacía**,
+cuarta vez. Y lo que se miraba después en el libro diario no probaba que la aplicación supiera
+asentar una venta: no la sabía asentar.
+
+Se arregla donde la regla vive, que es un sitio: el control del cuadre absorbe el residuo del
+redondeo antes de rechazar. **Y el perdón es estrecho a propósito, porque un control que
+perdona se convierte en un control que no controla**: solo si una de las dos columnas cuadra
+exacta y la otra no —un error de cuentas de verdad descuadra las dos—, solo si no pasa de un
+céntimo por línea, y solo con dos líneas o más. El céntimo cae en la línea más grande, sobre
+una sola, y con desempate por número de línea para que dos bases iguales guarden lo mismo.
+
+**Tres. La muestra se paraba en «aprobada».** Todo lo que viene después existía, probado, y no
+se había visto nunca: el libro de ventas vacío, el estado de cuenta del cliente con su columna
+de número de control en blanco en las diecisiete líneas, y las pantallas de cobrar sin nada
+que cobrar. Ahora el sembrador **llama a `facturar()` y a `registrarCobro()`**, las mismas
+funciones que llaman los botones: catorce facturas emitidas con su número de control, cinco
+valuaciones cobradas del todo y dos a medias —sin una a medias, «queda» no significa nada—, y
+el libro entero cuadra en cero por cero.
+
+Y para que no vuelva a pararse en silencio, el repaso que el sembrador se hace a sí mismo
+ahora también mira eso: ningún asiento sin líneas, alguna facturada, alguna cobrada, algún
+cobro parcial, y el libro de ventas con filas. Una muestra que se queda corta no avisa: deja
+pantallas en blanco que se leen como que el producto no tiene eso.
+
+**923 pruebas, todas pasan.** Las ocho nuevas están verificadas rompiendo las cerraduras en
+los dos sentidos: quitando las dos se ponen rojas cinco, y **ensanchando el perdón** se ponen
+rojas las dos que comprueban que no perdona. Una comprobación mía pasaba sin mirar nada —
+comparaba dos pasadas que las dos fallaban—; ahora el caso tiene un empate de verdad.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **la hoja de la valuación, en un archivo que se baja.**
 
 La pantalla de una valuación enseñaba el cálculo entero —obra del periodo, IVA, amortización
 de anticipo, retención de garantía, retención de IVA, retención de ISLR, IGTF, neto a
@@ -61,10 +120,6 @@ del cliente**, no contra la de GPS, que era lo que la hacía inútil.
 segunda prueba. Y la instantánea navegable ahora **baja el archivo de verdad** al pinchar —una
 descarga vuelve en `bytes`, no en `cuerpo`, y mirar solo `cuerpo` la daba por saltada con un
 código 200 al lado.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **el estado de cuenta del cliente** — «cuánto me han facturado y
 cuánto debo», que es la segunda pregunta de cualquiera que paga y la contestaba una llamada
@@ -1570,6 +1625,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
 | `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
 | `app/src/pantallas/valuacion.ts` | **La primera pantalla.** Una sola función para las dos superficies: en escritorio las líneas son una tabla, en el móvil tarjetas apiladas. No son dos pantallas, es la misma reacomodada por la hoja de estilos. No enseña un total: enseña el camino hasta el total. |
+| `db/schema/39-asiento-sin-lineas.sql` · `40-centimos-de-conversion.sql` | **Dos formas de cuadrar que no son cuadrar.** Un asiento sin ninguna línea no dispara el control del cuadre, y si lo disparara diría que cuadra: la suma de cero líneas es cero. Y la columna en dólares de un asiento en bolívares es una conversión línea a línea, así que redondear seis veces y sumar deja un céntimo — con eso, `asentar_valuacion` no podía asentar casi ninguna valuación de la muestra y **el botón de facturar no funcionaba.** El residuo se absorbe antes de rechazar, y el perdón es estrecho: solo si una columna cuadra exacta y la otra no, solo hasta un céntimo por línea, solo con dos líneas o más. Un control que perdona se convierte en un control que no controla. |
 | `app/src/servidor/rutas.ts` → `/valuaciones/:id/hoja` | **La hoja de la valuación, en un archivo que se baja.** El proceso interno de una operadora pide un documento para autorizar un pago; si el portal no lo produce, alguien pide un Excel por correo, y desde ese momento las cifras viajan fuera del sistema y el portal deja de ser de donde sale la verdad. El archivo lo produce **la misma llamada que pinta la pantalla**: si se calculara por su cuenta, un día diría otra cifra y nadie sabría cuál de las dos creer. |
 | `app/herramientas/pintar.ts` | Genera una pantalla desde la base de datos real, sin desplegar nada. Para revisar diseño y para enseñar avance. |
 | `app/src/dominio/totp.ts` | Segundo factor, los códigos de seis dígitos del Authenticator. Escrito con la criptografía que trae Node, sin dependencias: son cuarenta líneas y el algoritmo está congelado desde 2011. Acepta el código del paso anterior y el siguiente, porque sin esa tolerancia quien tenga el reloj desfasado no entra nunca — y acaba pidiendo que le quiten el doble factor. |
@@ -1923,6 +1979,14 @@ verdad, por orden de lo que más cambia las cosas.)*
 
 **Trabajo con valor propio, sin bloqueo:**
 
+0. **La columna «Total» del libro de ventas no incluye el IVA.** La vista lo calcula como
+   `base + exento`, y la pantalla dice encima «estas son las cifras que se declaran». En el
+   libro de ventas del SENIAT esa columna es *el valor total de las ventas con inclusión del
+   impuesto* (RLIVA art. 76), así que o la etiqueta o la cifra está mal. Salió al ver el
+   libro con facturas de verdad por primera vez: totales del mes 46.977.000 de base,
+   7.516.320 de débito fiscal, y «Total» 46.977.000. Es lo primero que voy a mirar, y va con
+   su prueba contra las columnas que pide la providencia.
+
 4. **El techo de las medidas.** `/medidas` tarda 739 ms con mil contratos, y la mayor
    parte se va en la política de fila de `hito`, que por cada hito comprueba si su
    renglón se ve, y eso mira el contrato. Se puede bajar. Tocar una valla de
@@ -1932,7 +1996,7 @@ verdad, por orden de lo que más cambia las cosas.)*
    diccionario ya tiene el vocabulario de las dos; las pantallas no existen. El portal del
    cliente ya no está en esta lista: tiene su bandeja, su estado de cuenta y la hoja de cada
    valuación en un archivo.
-6. **Un segundo par de ojos.** 915 comprobaciones automáticas no sustituyen a una
+6. **Un segundo par de ojos.** 923 comprobaciones automáticas no sustituyen a una
    persona usando esto una semana con datos de verdad.
 
 ## Bloqueado

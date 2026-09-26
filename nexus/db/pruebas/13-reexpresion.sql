@@ -35,6 +35,11 @@ select case when factor_reexpresion('2026-01-01','2026-12-31') = 2.00000000
 
 -- ============================================================ aporte en enero
 -- Capital de 2.000.000 en efectivo. La mitad se gasta en un equipo el mismo dia.
+-- El asiento y sus partidas van en UNA transaccion, y no es cosmetica: psql confirma
+-- cada sentencia por su cuenta, asi que sin el `begin` el asiento se confirmaria solo,
+-- sin lineas, y la base lo rechaza —db/schema/39-asiento-sin-lineas.sql. La aplicacion
+-- nunca hace eso: todo generador mete el asiento y sus lineas en la misma transaccion.
+begin;
 insert into asiento (id, organizacion_id, numero, ocurrido_en, anio, mes,
                      descripcion_es, descripcion_en, origen_tipo, origen_id, creado_por)
 values ('0f0f0f0f-1111-0000-0000-000000000001', :org, 1,'2026-01-15', 2026, 1,
@@ -42,7 +47,9 @@ values ('0f0f0f0f-1111-0000-0000-000000000001', :org, 1,'2026-01-15', 2026, 1,
 insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves, monto_usd, tasa_id) values
  ('0f0f0f0f-1111-0000-0000-000000000001',1, :org,'1.1.01.02', 2000000.00, 54794.52,'0f0f0f0f-0000-0000-0000-00000000000f'),
  ('0f0f0f0f-1111-0000-0000-000000000001',2, :org,'3.1.01',   -2000000.00,-54794.52,'0f0f0f0f-0000-0000-0000-00000000000f');
+commit;
 
+begin;
 insert into asiento (id, organizacion_id, numero, ocurrido_en, anio, mes,
                      descripcion_es, descripcion_en, origen_tipo, origen_id, creado_por)
 values ('0f0f0f0f-1111-0000-0000-000000000002', :org, 2,'2026-01-15', 2026, 1,
@@ -50,6 +57,7 @@ values ('0f0f0f0f-1111-0000-0000-000000000002', :org, 2,'2026-01-15', 2026, 1,
 insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves, monto_usd, tasa_id) values
  ('0f0f0f0f-1111-0000-0000-000000000002',1, :org,'1.2.01.03', 1000000.00, 27397.26,'0f0f0f0f-0000-0000-0000-00000000000f'),
  ('0f0f0f0f-1111-0000-0000-000000000002',2, :org,'1.1.01.02',-1000000.00,-27397.26,'0f0f0f0f-0000-0000-0000-00000000000f');
+commit;
 
 \echo ''
 \echo '--- reexpresión al 31 de diciembre ---'

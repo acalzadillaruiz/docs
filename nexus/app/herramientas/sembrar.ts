@@ -13,9 +13,11 @@
  *   node --experimental-strip-types herramientas/sembrar.ts
  */
 
-import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
+import { conectar, cerrar, comoPersona, type Consulta } from '../src/db/conexion.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
 import { loQueFalta } from '../src/dominio/fiscales.ts'
+import { facturar } from '../src/dominio/valuar.ts'
+import { registrarCobro } from '../src/dominio/cobrar.ts'
 
 const PROV = 'c8d9e0f1-0000-0000-0000-00000000000f'
 
@@ -267,30 +269,73 @@ export async function sembrar(): Promise<void> {
       union all
       select aid, 2,'${G}'::uuid,'2.1.01.01', -importe, -round(importe/70, 2),'${TASA}'::uuid, null::uuid from pares;
 
-      insert into asiento (organizacion_id, numero, ocurrido_en, anio, mes, descripcion_es,
-                           descripcion_en, origen_tipo, origen_id, creado_por)
-      select '${G}'::uuid, siguiente_asiento('${G}') + i, make_date(2027, 3, 1 + (i % 28)), 2027, 3,
-             'Valuación aprobada · GPS-2027-'||lpad((i+1)::text,3,'0'),'Progress payment',
-             'valuacion', gen_random_uuid(),'${YO}'::uuid
-        from generate_series(0, 39) i;`)
+      -- AQUÍ ESTABAN CUARENTA ASIENTOS ESCRITOS A MANO, y veintiséis de ellos vacíos.
+      --
+      -- Se llamaban «Valuación aprobada · GPS-2027-020» y siguientes: nombres de
+      -- contratos que no existen, porque este archivo pasó de sembrar cuarenta contratos
+      -- a sembrar catorce y el generate_series(0, 39) se quedó. Las partidas se metían
+      -- aparte, cruzando por el nombre, así que solo catorce las recibieron. Los otros
+      -- veintiséis quedaron con su número correlativo, su fecha y ninguna línea dentro,
+      -- **en la pantalla del libro diario** — la pantalla con la que se enseña la fase que
+      -- va primera.
+      --
+      -- Y la contabilidad no los rechazó, porque el cuadre es un disparador sobre la
+      -- tabla de partidas: sin ninguna partida no se ejecuta nunca. Eso ya está cerrado
+      -- en db/schema/39-asiento-sin-lineas.sql, y ese archivo existe por esto.
+      --
+      -- Los catorce que quedan arriba son los de COSTO, porque representan facturas de
+      -- proveedor que en la muestra no se cargan por el importador. Los de la venta no:
+      -- los escribe la aplicación, abajo, al facturar. Un sembrador que escribe el asiento
+      -- de una venta a mano está haciendo lo que la aplicación no hace, y lo que se mira
+      -- después en el libro ya no prueba que la aplicación sepa hacerlo.`)
 
-    await q.unsafe(`
-      with v as (
-        select a.id aid, vl.obra, c.tipo
-          from asiento a
-          join contrato c on c.organizacion_id = '${G}'
-                         and a.descripcion_es = 'Valuación aprobada · '||c.codigo
-          -- La numero 1, que es la aprobada. Sin acotarlo, los tres contratos que ahora
-          -- tienen una segunda valuacion esperando al cliente metian DOS partidas con la
-          -- misma linea en el mismo asiento, y el sembrador reventaba contra la clave.
-          join valuacion vl on vl.contrato_id = c.id and vl.numero = 1
-         where a.organizacion_id = '${G}' and a.origen_tipo = 'valuacion'
-      )
-      insert into partida (asiento_id, linea, organizacion_id, cuenta, monto_ves, monto_usd, tasa_id)
-      select aid, 1,'${G}'::uuid,'1.1.02.01', obra, round(obra/70, 2),'${TASA}'::uuid from v
-      union all
-      select aid, 2,'${G}'::uuid, cuenta_ingreso_de('${G}', tipo), -obra, -round(obra/70, 2),'${TASA}'::uuid from v;`)
+  })
 
+  // FACTURAR Y COBRAR, por el camino de la aplicación.
+  //
+  // La muestra se paraba en «aprobada». Todo lo que viene después existe, está probado y
+  // no se había visto nunca: el libro de ventas salía vacío —«no hay ninguna factura de
+  // ese mes»—, el estado de cuenta del cliente enseñaba su columna de número de control
+  // en blanco en las diecisiete líneas, y las pantallas de cobrar no tenían nunca nada
+  // que cobrar. Media contabilidad sin una sola pantalla que la enseñara.
+  //
+  // Se hace llamando a `facturar()` y a `registrarCobro()`, que son las mismas funciones
+  // que llaman los botones. No a mano: si el sembrador emitiera la factura por su cuenta,
+  // la muestra enseñaría números que la aplicación no sabe producir, y es exactamente el
+  // error que acaba de costar veintiséis asientos vacíos.
+  await comoPersona({ id: YO }, 'nexus_interno', async (q) => {
+    const pendientes = (await q`
+      select v.id, c.codigo, neto_valuacion(v.id)::text as neto
+        from valuacion v join contrato c on c.id = v.contrato_id
+       where v.organizacion_id = ${G}::uuid and v.numero = 1 and v.estado = 'aprobada'
+       order by c.codigo
+    `) as unknown as Array<{ id: string; codigo: string; neto: string }>
+
+    for (const [i, v] of pendientes.entries()) {
+      const f = await facturar(q, v.id, YO, false, 'es')
+      if (!f.hecho) {
+        console.log(`  no se pudo facturar ${v.codigo}: ${f.motivo}`)
+        continue
+      }
+
+      // Y el cobro. No todas, y a propósito: una cartera donde todo está cobrado no se
+      // parece a ninguna. Cinco cobradas del todo, dos a medias —que es el caso que hace
+      // falta para que «saldo» signifique algo— y el resto facturadas y esperando.
+      //
+      // La fecha va en abril de 2027 porque el cobro se asienta en el mes de su fecha y
+      // ese mes tiene que estar ABIERTO. Con la fecha de hoy, `registrarCobro` se niega
+      // —bien— porque el escenario de la muestra vive en 2027 y solo esos meses se abren.
+      const cuanto = i < 5 ? Number(v.neto) : i < 7 ? Math.round(Number(v.neto) * 0.4) : 0
+      if (cuanto <= 0) continue
+      const r = await registrarCobro(q, {
+        valuacionId: v.id,
+        fecha: `2027-04-${String(6 + i).padStart(2, '0')}`,
+        medio: i % 3 === 0 ? 'transferencia' : i % 3 === 1 ? 'cheque' : 'compensacion',
+        monto: cuanto,
+        referencia: `REF-${v.codigo.slice(-3)}-${i}`,
+      }, YO, G, 'es')
+      if (!r.hecho) console.log(`  no se pudo cobrar ${v.codigo}: ${r.errores.join(' · ')}`)
+    }
   })
 
   // Material en ruta: un contrato de procura con sus hitos a medio camino. Sin esto
@@ -417,6 +462,51 @@ export async function sembrar(): Promise<void> {
   })
 }
 
+/**
+ * Lo que la muestra NO llega a enseñar.
+ *
+ * El repaso de valores fiscales de arriba existe porque la muestra no podía emitir nada y
+ * nadie se enteraba hasta que lo intentaba. Esto es el mismo repaso un paso más allá: la
+ * muestra llegaba hasta «aprobada» y se paraba, así que el libro de ventas salía vacío, el
+ * estado de cuenta del cliente no tenía ni un número de control, y las pantallas de cobrar
+ * no tenían nada que cobrar — **y nada se ponía rojo.** Una muestra que se para antes de
+ * tiempo no avisa: deja pantallas en blanco que se leen como que el producto no las tiene.
+ */
+async function loQueNoLlega(q: Consulta): Promise<readonly string[]> {
+  const [n] = (await q`
+    select
+      (select count(*)::int from asiento a
+        where a.organizacion_id = ${MUESTRA.org}::uuid
+          and not exists (select 1 from partida p where p.asiento_id = a.id)) as vacios,
+      (select count(*)::int from valuacion
+        where organizacion_id = ${MUESTRA.org}::uuid
+          and estado in ('facturada','cobrada')) as facturadas,
+      (select count(*)::int from valuacion
+        where organizacion_id = ${MUESTRA.org}::uuid and estado = 'cobrada') as cobradas,
+      (select count(*)::int from valuacion v
+        where v.organizacion_id = ${MUESTRA.org}::uuid
+          and exists (select 1 from cobro co where co.valuacion_id = v.id)
+          and saldo_valuacion(v.id) > 0) as a_medias,
+      (select count(*)::int from libro_ventas
+        where organizacion_id = ${MUESTRA.org}::uuid) as ventas
+  `) as unknown as Array<{
+    vacios: number; facturadas: number; cobradas: number; a_medias: number; ventas: number
+  }>
+  const falta: string[] = []
+  // Este primero ya no debería poder pasar —lo prohíbe la base desde
+  // db/schema/39-asiento-sin-lineas.sql—, y se comprueba igual: la muestra tuvo
+  // veintiséis, y las filas que ya estaban dentro cuando se puso la cerradura siguen
+  // dentro. Una cerradura nueva no limpia lo que entró antes de ponerla.
+  if (n!.vacios > 0) falta.push(`${n!.vacios} asiento(s) sin ninguna línea en el libro`)
+  if (n!.facturadas === 0) falta.push('ninguna valuación facturada: el libro de ventas sale vacío')
+  if (n!.ventas === 0) falta.push('el libro de ventas no tiene ni una factura emitida')
+  if (n!.cobradas === 0) falta.push('ninguna valuación cobrada: no hay nada en el libro de cobros')
+  if (n!.a_medias === 0) {
+    falta.push('ningún cobro parcial: sin uno a medias, «saldo» no significa nada en ninguna pantalla')
+  }
+  return falta
+}
+
 // Ejecutada directamente, siembra y se va.
 if (import.meta.url === `file://${process.argv[1]}`) {
   conectar(process.env['NEXUS_BD']
@@ -428,12 +518,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // aqui, que es donde todavia no cuesta nada.
   const falta = await comoPersona<readonly string[]>(
     { id: MUESTRA.persona }, 'nexus_interno', (q) => loQueFalta(q, 'es'))
+  const corto = await comoPersona<readonly string[]>(
+    { id: MUESTRA.persona }, 'nexus_interno', (q) => loQueNoLlega(q))
   await cerrar()
   console.log('sembrada la empresa de muestra')
   if (falta.length > 0) {
     console.log('\nPERO FALTAN VALORES FISCALES, y sin ellos no se puede emitir nada:')
     for (const f of falta) console.log(`  · ${f}`)
     console.log('\nSe ponen en /fiscales.')
+    process.exitCode = 1
+  }
+  if (corto.length > 0) {
+    console.log('\nY LA MUESTRA SE QUEDA CORTA, así que hay pantallas que saldrán en blanco:')
+    for (const f of corto) console.log(`  · ${f}`)
     process.exitCode = 1
   }
 }
