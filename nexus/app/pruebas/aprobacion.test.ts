@@ -61,7 +61,7 @@ before(async () => {
       insert into unidad_tributaria (vigente_desde, valor_ves) values ('2026-01-01', 9.00) on conflict do nothing;
       insert into alicuota_igtf (vigente_desde, porcentaje) values ('2026-01-01', 3.00) on conflict do nothing;
       insert into alicuota_iva (id, clase, porcentaje, vigente_desde)
-        values ('${IVA}','general', 16.00,'2026-01-01') on conflict do nothing;
+        values ('${IVA}','general', 16.00,'2018-01-03') on conflict do nothing;
       insert into concepto_islr (codigo, nombre_es, nombre_en, sujeto, porcentaje, factor_ut, minimo_ut, vigente_desde)
         values ('SERV-PJ','Servicios','Services','pj_domiciliada', 5.00, 83.3334, 0,'2026-01-01') on conflict do nothing;
       insert into contrato (id, organizacion_id, cliente_id, codigo, tipo, titulo_es, titulo_en,

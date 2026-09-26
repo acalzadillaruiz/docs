@@ -231,10 +231,11 @@ test('NINGUNA función del esquema se queda sin que nadie la llame', async () =>
     `solo se leyeron ${definidas.size} funciones del esquema: el barrido no barrió`)
 
   const app: string[] = []
-  const recogerApp = async (base: URL) => {
+  const recogerApp = async (base: URL, saltar: readonly string[] = []) => {
     for (const e of await readdir(base, { withFileTypes: true })) {
+      if (saltar.includes(e.name)) continue
       const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
-      if (e.isDirectory()) await recogerApp(u)
+      if (e.isDirectory()) await recogerApp(u, saltar)
       else if (e.name.endsWith('.ts')) app.push(sinComentarios(await readFile(u, 'utf8')))
     }
   }
@@ -266,10 +267,26 @@ test('NINGUNA función del esquema se queda sin que nadie la llame', async () =>
  * Las que quedan aquí son las que siguen sin puerta, y están escritas con nombre y
  * apellido en vez de calladas, porque cada una es una pantalla pendiente:
  */
+/**
+ * Lo que NO es la aplicación, aunque viva en `herramientas/`.
+ *
+ * Este barrido leía `herramientas/` entero como si fuera la aplicación, y ahí está el
+ * sembrador de la empresa de muestra. Resultado: cuatro tablas —`tasa_bcv`,
+ * `alicuota_iva`, `unidad_tributaria` y `concepto_islr`— pasaban el barrido porque las
+ * escribía el SEMBRADOR, y en uso real nadie podía tocarlas. El barrido que existe para
+ * encontrar pantallas que faltan lo estaba contentando un fixture, que es exactamente lo
+ * que este barrido existe para no dejar pasar.
+ *
+ * `migrar.ts` e `instalar.ts` sí cuentan: son parte del despliegue y lo que escriben lo
+ * escribe el sistema de verdad.
+ */
+const NO_ES_LA_APP = [
+  'sembrar.ts',   // la empresa de muestra: datos inventados, no un camino de uso
+  'medir.ts',     // el banco de pruebas de rendimiento
+  'exportar.ts',  // el recorrido navegable; siembra para tener qué exportar
+] as const
+
 const NO_ESCRIBE_LA_APP = new Map<string, string>([
-  // La única tabla de referencia que sigue sin pantalla. La alícuota de IGTF cambia por
-  // gaceta, y hoy cambiarla es editar el esquema y volver a desplegar:
-  ['alicuota_igtf', 'sin pantalla para la alícuota de IGTF; hoy la pone el esquema'],
   // El modelo de capacidades por persona está escrito y no se usa: hoy el alcance lo
   // decide ser de GPS o ser cliente. No se borra porque es la base de los permisos
   // finos, pero mientras nada lo escriba ni lo lea, es decoración.
@@ -309,15 +326,16 @@ test('las tablas que la aplicación no escribe están DICHAS, no calladas', asyn
   assert.ok(tablas.size >= 40, `solo se leyeron ${tablas.size} tablas: el barrido no barrió`)
 
   const app: string[] = []
-  const recogerApp = async (base: URL) => {
+  const recogerApp = async (base: URL, saltar: readonly string[] = []) => {
     for (const e of await readdir(base, { withFileTypes: true })) {
+      if (saltar.includes(e.name)) continue
       const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
-      if (e.isDirectory()) await recogerApp(u)
+      if (e.isDirectory()) await recogerApp(u, saltar)
       else if (e.name.endsWith('.ts')) app.push(sinComentarios(await readFile(u, 'utf8')))
     }
   }
   await recogerApp(new URL('../src/', import.meta.url))
-  await recogerApp(new URL('../herramientas/', import.meta.url))
+  await recogerApp(new URL('../herramientas/', import.meta.url), NO_ES_LA_APP)
   const texto = app.join('\n')
 
   const mudas: string[] = []

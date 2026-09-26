@@ -79,6 +79,11 @@ import {
 } from '../dominio/personas.ts'
 import { pintarPersonas } from '../pantallas/personas.ts'
 import { plantillas, guardarPaso, quitarPaso, plantillaUsable } from '../dominio/plantillas.ts'
+import {
+  tasas, unidades, alicuotasIva, alicuotasIgtf, conceptos, loQueFalta,
+  guardarTasa, guardarValor, guardarConcepto,
+} from '../dominio/fiscales.ts'
+import { pintarFiscales } from '../pantallas/fiscales.ts'
 import { pintarPlantillas } from '../pantallas/plantillas.ts'
 import { iconoPng, iconoSvg } from './icono.ts'
 import { porPagar, registrarPago, mediosTraducidos } from '../dominio/pagar.ts'
@@ -1101,6 +1106,74 @@ export async function resolver(
     const lista = await comoQuien((q) => plantillas(q, p.idioma))
     return html(errores.length === 0 ? 200 : 400,
       pintarPlantillas(lista, p.idioma, testigoAnti(testigo), errores, hecho))
+  }
+
+  // Los valores fiscales: la tasa del BCV, la UT, el IVA, el IGTF y los conceptos de
+  // ISLR. Solo GPS, y no por prudencia: la tasa y los porcentajes rigen para todas las
+  // operadoras a la vez, así que quien los toca los toca para todo el mundo.
+  //
+  // Es la pantalla que faltaba más grave de todas las que han faltado: la tasa del BCV
+  // cambia a diario, de ella cuelga cada contrato, cada valuación y cada cobro, y no
+  // había ninguna forma de cargarla. El sistema dejaba de servir al día siguiente de
+  // arrancar, y el barrido que tenía que haberlo dicho lo contentaba el sembrador.
+  if (p.ruta === '/fiscales' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
+    if (esCliente) return noEncontrado(p.idioma)
+
+    let errores: readonly string[] = []
+    let hecho: string | null = null
+
+    if (p.metodo === 'POST') {
+      const accion = p.campos['accion']
+      // Un decimal ilegible llega como NaN y el dominio lo rechaza con su frase. Poner
+      // cero aquí sería inventarse una tasa de cero, que convierte en cero cada importe
+      // del sistema sin que nada avise.
+      const valor = decimal(p.campos['valor']) ?? Number.NaN
+      const desde = (p.campos['desde'] ?? '').trim()
+
+      if (accion === 'tasa') {
+        const dia = (p.campos['vigente_el'] ?? '').trim()
+        const r = await comoQuien((q) => guardarTasa(q, {
+          vigenteEl: dia,
+          vesPorUsd: valor,
+          rectifica: p.campos['rectifica'] === 'si',
+        }, personaId, p.idioma))
+        if (r.hecho) hecho = t(p.idioma, 'fiscal.tasa.guardada').replace('{d}', dia)
+        else errores = r.errores
+      } else if (accion === 'ut' || accion === 'iva' || accion === 'igtf') {
+        const r = await comoQuien((q) => guardarValor(q, {
+          cual: accion, desde, valor, extra: (p.campos['extra'] ?? '').trim(),
+        }, p.idioma))
+        if (r.hecho) hecho = t(p.idioma, 'fiscal.guardado')
+        else errores = r.errores
+      } else if (accion === 'islr') {
+        const r = await comoQuien((q) => guardarConcepto(q, {
+          codigo: p.campos['codigo'] ?? '',
+          nombreEs: p.campos['nombre_es'] ?? '',
+          nombreEn: p.campos['nombre_en'] ?? '',
+          sujeto: (p.campos['sujeto'] ?? '').trim(),
+          porcentaje: valor,
+          factorUt: decimal(p.campos['factor']) ?? Number.NaN,
+          minimoUt: decimal(p.campos['minimo']) ?? Number.NaN,
+          desde,
+        }, p.idioma))
+        if (r.hecho) hecho = t(p.idioma, 'fiscal.guardado')
+        else errores = r.errores
+      }
+    }
+
+    const datos = await comoQuien(async (q) => ({
+      falta: await loQueFalta(q, p.idioma),
+      tasas: await tasas(q, p.idioma),
+      ut: await unidades(q, p.idioma),
+      iva: await alicuotasIva(q, p.idioma),
+      igtf: await alicuotasIgtf(q, p.idioma),
+      conceptos: await conceptos(q, p.idioma),
+    }))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarFiscales(datos, p.idioma, testigoAnti(testigo), errores, hecho))
   }
 
   // Personas y accesos. Solo GPS: si el cliente pudiera invitar a su propia gente,

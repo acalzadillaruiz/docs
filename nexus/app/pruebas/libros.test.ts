@@ -45,7 +45,7 @@ before(async () => {
         values ('${TASA}','2026-07-01', 40.00,'carga_manual')
         on conflict (id) do update set vigente_el = excluded.vigente_el;
       insert into alicuota_iva (id, clase, porcentaje, vigente_desde)
-        values ('${IVA}','general', 16.00,'2026-01-01') on conflict do nothing;
+        values ('${IVA}','general', 16.00,'2018-01-13') on conflict do nothing;
 
       delete from documento_fiscal where organizacion_id = '${G}';
 

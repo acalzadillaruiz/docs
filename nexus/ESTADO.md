@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 19:40 (España)
+**Última actualización:** 2026-09-26, 23:10 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -10,8 +10,8 @@
 > avance salga de lo que se puede demostrar, así que no voy a hacer con mi propio
 > avance lo que el sistema impide hacer con el de un contrato.
 >
-> Lo que hay construido, contado a mano sobre el código de hoy: **28 módulos de
-> pantalla** y **137 páginas** en el recorrido exportado, sobre las 119 vistas del plan
+> Lo que hay construido, contado a mano sobre el código de hoy: **29 módulos de
+> pantalla** y **138 páginas** en el recorrido exportado, sobre las 119 vistas del plan
 > completo (una vista del plan sale en varias páginas: con datos, vacía, y con error).
 > Las cifras de antes decían «40 direcciones y 26 pantallas» y no salen de ninguna
 > cuenta que sepa repetir, así que se cambian por las que sí. Lo que está **entero y probado
@@ -34,7 +34,96 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **las plantillas de hitos, y el guardián de que sumen 100.** Era
+**Lo último terminado:** **los valores fiscales** — y con ellos, el agujero más grave que
+ha aparecido en todo el proyecto.
+
+La tasa del BCV **no se podía cargar.** Cambia todos los días, de ella cuelga cada
+contrato, cada valuación y cada cobro, y no existía ninguna pantalla donde ponerla. El
+sistema dejaba de servir al día siguiente de arrancar. Igual la unidad tributaria, la
+alícuota de IVA, la de IGTF y los conceptos de ISLR: las cinco tablas que el propio
+esquema declara en su primera línea —«ningún porcentaje se escribe dentro del código;
+todos viven aquí como filas con fecha»— no las escribía nada.
+
+**Y esto es lo importante: el barrido que existe justo para encontrar esto lo estaba
+contentando el sembrador.** El barrido leía `herramientas/` entero como si fuera la
+aplicación, y ahí vive `sembrar.ts`. Cuatro de las cinco tablas pasaban porque las
+escribía la empresa de muestra. Tercera vez que aparece lo mismo —el fixture hace lo que
+la aplicación no hace— y la primera dentro del propio barrido. Arreglado: `sembrar.ts`,
+`medir.ts` y `exportar.ts` ya no cuentan como aplicación, y al quitarlos el barrido nombró
+las cuatro.
+
+Lo que hay ahora, en `/fiscales`: las cinco listas con **su fecha de vigencia y cuántos
+papeles hay debajo de cada valor**, y arriba, delante de todo, **lo que falta para poder
+trabajar hoy**. Corregir un valor de ayer es legítimo y es seguro —cada retención congela
+el porcentaje, el sustraendo y la UT que aplicó, y cada factura guarda su alícuota—, pero
+la consecuencia se ve antes de tocarlo.
+
+**Lo que salió de tirar del hilo, que es más que la pantalla:**
+
+1. **Rectificar la tasa del BCV ya se podía, y nadie lo había usado.** El esquema traía
+   `sustituida_por` y un índice único *parcial* —un día, una sola tasa de las no
+   sustituidas—, o sea el mecanismo entero para que el BCV rectifique sin reescribir lo ya
+   asentado. Mi primera versión insertaba la nueva antes de marcar la vieja y chocaba con
+   ese índice; y marcar primero tampoco se podía, porque la clave ajena exige que la fila
+   nueva exista. De ahí el paso de en medio: la vieja se marca sustituida por sí misma,
+   entra la nueva, y al final apunta a ella. Y rectificar hay que **pedirlo**: sin la
+   casilla, una tasa de un día que ya tiene tasa es un error, porque lo normal es haberse
+   equivocado de día.
+2. **`alicuota_iva` no tenía clave natural, y el `on conflict do nothing` del sembrador no
+   hacía nada** — sin restricción que arbitrar, lo único con lo que podía chocar era un
+   uuid nuevo. Diecisiete filas de («general», 16 %, 2026-01-01) en la base de pruebas, y
+   los lectores buscan `order by vigente_desde desc limit 1`: con dos filas del mismo día,
+   **cuál rige lo decidía el orden de lectura.** Nuevo archivo `34-fiscales.sql` con el
+   índice único, precedido de una limpieza que **pregunta al catálogo quién referencia la
+   tabla en vez de recordarlo** —mi primera versión se olvidó de `valuacion` y se estrelló
+   contra la clave ajena— y que se para si quedan duplicados en uso.
+3. **`herramientas/` no se comprobaba con TypeScript.** `tsconfig.json` incluía solo `src/`
+   y `pruebas/`. Ahí viven `migrar.ts` e `instalar.ts`, que son lo que corre un servidor de
+   verdad. Al incluirlo salieron **catorce errores de tipos escondidos**: once en
+   `avisar.ts`, que es uno de los cinco servicios del despliegue, y uno en `entrada.ts`,
+   que construía la pantalla de recuperación sin el campo que necesita, así que ese paso
+   salía con el enlace roto.
+4. **En la base de muestra no se podía emitir una valuación, y `COMO-CORRERLO.md` decía
+   que sí.** El escenario de la muestra es de marzo de 2027 —futuro— y la única tasa
+   sembrada era de entonces, mientras que todo lo que se emite busca la de hoy o anterior.
+   Comprobado llamando a `emitir`: «no hay tasa del BCV publicada todavía para hoy» antes,
+   y una valuación con sus cuatro hitos después. **Y al IGTF no lo sembraba nadie** —ni el
+   esquema ni el sembrador; la única fila de la base de pruebas la había dejado commiteada
+   el fixture de alguna prueba—, así que un cobro en divisa se caía dentro de
+   `calcular_igtf`. Lo encontró el repaso que **el sembrador se hace ahora a sí mismo** al
+   terminar: si falta un valor fiscal, lo dice ahí, que es donde todavía no cuesta nada.
+5. **El sembrador reventaba al sembrar dos veces.** Su freno decía «si ya hay 40 contratos,
+   vuelve» y siembra quince, así que nunca frenaba. Y yo di por bueno un `on conflict`
+   mirando una segunda pasada que en realidad se había caído, con el `2>&1` tapándolo.
+
+**Dos veces me equivoqué al escribir estas pruebas, y las dos por lo mismo: dar por hecho
+el estado del mundo en vez de construirlo.** La prueba del aviso afirmaba que en la base de
+muestra no faltaba nada (faltaban dos, y eso era el fallo de verdad). La siguiente versión
+borraba la tasa de hoy para provocar el aviso, y de la tasa de hoy solo cabe una: lo cazó
+el comprobador de colisiones, porque `alta.test.ts` también la pone. Ahora `loQueFalta`
+recibe la fecha por fuera y la prueba se monta su propio día en 1990, que no usa nadie, y
+comprueba los cinco avisos en vez de dos.
+
+**868 pruebas, todas pasan.** Verificado rompiendo a propósito: el índice único del IVA, el
+aviso de lo que falta, el barrido de tablas sin puerta, y la guardia de variables de
+entorno de `avisar.ts`, que ahora dice **cuál** falta y no las dos.
+
+De la lista de tablas sin puerta quedan **dos, y ninguna es una pantalla que manda algo
+imposible**: `capacidad` y `persona_capacidad`, el modelo de permisos finos que no se usa
+—hoy el alcance lo decide ser de GPS o ser cliente—. Eso no es una pantalla que falta: es
+una decisión sobre si ese modelo hace falta.
+
+**Y una decisión nueva para el CEO, la 14, que es de dinero:** `valuar.ts` elige el
+concepto de ISLR de cada valuación con `order by vigente_desde desc limit 1`, sin mirar de
+qué concepto se trata. Con uno solo sembrado sale el bueno por casualidad; con dos, la
+retención la decide un `order by`. No lo he tocado porque el concepto correcto es una
+clasificación fiscal y depende de qué se factura.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **las plantillas de hitos, y el guardián de que sumen 100.** Era
 el trozo que estaba aparcado a propósito, y con razón: el guardián solo, sin pantalla para
 arreglar una plantilla, bloquearía el alta de contratos sin dar forma de desbloquearla.
 Ahora van los dos juntos. `plantilla_hito` **sale de `NO_ESCRIBE_LA_APP`**: era la última
@@ -96,11 +185,6 @@ una prueba que escriba fuera de ahí lo vea fallar en su archivo y no en el de o
 prueba que llama a la función de la base se pone roja), el barrido de tablas sin puerta (se
 pone rojo si se vuelve a declarar `plantilla_hito`), el guardián del `after` (se pone rojo
 si una prueba deja rastro), y la cerradura de `plantillaUsable`.
-
-Quedan **tres tablas sin puerta** y **ninguna es ya una pantalla mandando algo
-imposible**: `alicuota_igtf` (la alícuota de IGTF cambia por gaceta y hoy cambiarla es
-editar el esquema), y `capacidad` / `persona_capacidad`, que son el modelo de permisos
-finos sin usar — hoy el alcance lo decide ser de GPS o ser cliente.
 
 **Antes:** **todo lo que hace falta para desplegarla de verdad.** El CEO
 probó `localhost:8080` y no funcionaba, con razón: ese servidor corría dentro del

@@ -13,7 +13,7 @@ const idioma = idiomaArg as Idioma
 const pasos: Record<string, PasoEntrada> = {
   ingreso: { paso: 'ingreso' },
   segundo_factor: { paso: 'segundo_factor', desafio: 'ejemplo' },
-  recuperacion: { paso: 'recuperacion' },
+  recuperacion: { paso: 'recuperacion', desafio: 'ejemplo' },
   espera: { paso: 'espera', segundos: Number(extra ?? 16) },
   empresa: { paso: 'empresa', metodo: (extra as 'microsoft' | 'google') ?? 'microsoft' },
   invitacion: { paso: 'invitacion', nombre: extra ?? 'Ana Márquez', ficha: 'ejemplo' },

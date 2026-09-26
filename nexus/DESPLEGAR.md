@@ -84,7 +84,7 @@ docker compose up -d bd
 docker compose run --rm esquema
 ```
 
-Eso carga las 35 piezas del esquema. Después, tu cuenta:
+Eso carga las 36 piezas del esquema. Después, tu cuenta:
 
 ```
 docker compose run --rm --entrypoint sh app -c \
@@ -141,7 +141,7 @@ Conviene que quede claro, porque la diferencia es donde aparecen los problemas.
 
 **Probado de verdad, en esta sesión:**
 
-- El migrador, contra un PostgreSQL con datos: aplica los 35 archivos, la segunda pasada
+- El migrador, contra un PostgreSQL con datos: aplica los 36 archivos, la segunda pasada
   no hace nada, y si un archivo aplicado cambia se para con su explicación.
 - `instalar.ts` sobre una base recién creada, y después el circuito entero por HTTP:
   abrir el enlace de alta sin sesión, crear la cuenta, recibir el secreto del segundo

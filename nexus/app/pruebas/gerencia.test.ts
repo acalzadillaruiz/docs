@@ -49,7 +49,7 @@ before(async () => {
         values ('${TASA}','2026-10-01', 45.00,'carga_manual')
         on conflict (id) do update set vigente_el = excluded.vigente_el;
       insert into alicuota_iva (id, clase, porcentaje, vigente_desde)
-        values ('${IVA}','general', 16.00,'2026-01-01') on conflict do nothing;
+        values ('${IVA}','general', 16.00,'2018-01-12') on conflict do nothing;
       select instalar_plan_cuentas('${G}');
       insert into periodo (organizacion_id, anio, mes) values ('${G}', 2026, 10)
         on conflict do nothing;

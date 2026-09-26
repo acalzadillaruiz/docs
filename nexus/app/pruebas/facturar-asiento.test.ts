@@ -110,7 +110,7 @@ before(async () => {
         values ('${TASA}','2026-06-11', 80.00,'carga_manual')
         on conflict (id) do update set vigente_el = excluded.vigente_el;
       insert into alicuota_iva (id, clase, porcentaje, vigente_desde)
-        values ('${IVA}','general', 16.00,'2026-01-01') on conflict do nothing;
+        values ('${IVA}','general', 16.00,'2018-01-11') on conflict do nothing;
       insert into unidad_tributaria (vigente_desde, valor_ves) values ('2026-01-01', 9.00)
         on conflict do nothing;
       insert into concepto_islr (codigo, nombre_es, nombre_en, sujeto, porcentaje,

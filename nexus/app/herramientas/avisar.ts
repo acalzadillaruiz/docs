@@ -34,17 +34,32 @@
  */
 
 import { conectar, cerrar, comoPersona, type Destino } from '../src/db/conexion.ts'
-import { vaciarCola, encolarLoParado } from '../src/dominio/avisos.ts'
-import { limpiar, tocaLimpiar } from '../src/dominio/mantenimiento.ts'
+import { vaciarCola, encolarLoParado, type Resultado } from '../src/dominio/avisos.ts'
+import { limpiar, tocaLimpiar, type Limpieza } from '../src/dominio/mantenimiento.ts'
 import { CorreoSmtp, CorreoAlRegistro } from '../src/servidor/correo.ts'
 import { repetir } from '../src/servidor/bucle.ts'
 
-const SERVICIO = process.env.NEXUS_PERSONA_SERVICIO
-const BASE = process.env.NEXUS_BASE
-if (!SERVICIO || !BASE) {
-  console.error('faltan NEXUS_PERSONA_SERVICIO y NEXUS_BASE')
-  process.exit(1)
+/**
+ * Una variable de entorno que hace falta, o nos vamos diciendo CUÁL falta.
+ *
+ * Antes eran dos constantes y un `if` que salía nombrando las dos, así que quien se
+ * olvidaba de una leía las dos y las miraba las dos. Y de paso: este archivo nunca se
+ * comprobó con TypeScript —`tsconfig.json` solo incluía `src/` y `pruebas/`— y el
+ * estrechamiento del `if` no llegaba al interior de las funciones, así que había once
+ * errores de tipos escondidos en el servicio de avisos, que es uno de los cinco que
+ * levanta el despliegue.
+ */
+function exigir(nombre: string): string {
+  const v = process.env[nombre]
+  if (!v) {
+    console.error(`falta la variable de entorno ${nombre}`)
+    process.exit(1)
+  }
+  return v
 }
+
+const SERVICIO = exigir('NEXUS_PERSONA_SERVICIO')
+const BASE = exigir('NEXUS_BASE')
 
 const BD: Destino | undefined = process.env.NEXUS_BD_SOCKET
   ? {
@@ -91,9 +106,16 @@ conectar(BD)
  */
 let ultimaLimpieza: number | null = null
 
+/** Lo que devuelve una pasada. Escrito, porque sin el tipo puesto a mano la llamada a
+ *  `comoPersona` no lo dedujo y todo lo de dentro quedaba en `unknown`. */
+type Pasada = Resultado & {
+  readonly parados: number
+  readonly casa: Limpieza | null
+}
+
 /** Una pasada: encolar lo parado si toca, vaciar la cola, y limpiar si toca. */
 async function pasada() {
-  const r = await comoPersona({ id: SERVICIO }, 'nexus_interno', async (q) => {
+  const r = await comoPersona<Pasada>({ id: SERVICIO }, 'nexus_interno', async (q) => {
     // Una vez al día se le pide además que encole lo que lleva parado. Un documento
     // sin revisar no es un suceso: es la ausencia de uno, y nadie encola nada cuando
     // algo NO pasa.

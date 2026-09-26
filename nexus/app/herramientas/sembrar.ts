@@ -15,6 +15,7 @@
 
 import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
 import { cifrarClave } from '../src/dominio/clave.ts'
+import { loQueFalta } from '../src/dominio/fiscales.ts'
 
 const PROV = 'c8d9e0f1-0000-0000-0000-00000000000f'
 
@@ -55,10 +56,26 @@ export async function sembrar(): Promise<void> {
       select '2027-03-01'::date, 70.00,'carga_manual'
        where not exists (select 1 from tasa_bcv
                           where vigente_el = '2027-03-01' and sustituida_por is null);
+      -- Y una para HOY. El escenario de la muestra es de marzo de 2027, que es FUTURO, y
+      -- todo lo que se emite busca la tasa con vigente_el <= current_date: sin esta
+      -- fila, en la base de muestra no se podia emitir ni una valuacion —«no hay tasa del
+      -- BCV publicada todavia para hoy»— mientras COMO-CORRERLO.md decia que si se podia.
+      -- Comprobado llamando a emitir antes y despues.
+      insert into tasa_bcv (vigente_el, ves_por_usd, fuente)
+      select current_date, 70.00,'carga_manual'
+       where not exists (select 1 from tasa_bcv
+                          where vigente_el = current_date and sustituida_por is null);
       insert into alicuota_iva (clase, porcentaje, vigente_desde)
         values ('general', 16.00,'2026-01-01') on conflict do nothing;
       insert into unidad_tributaria (vigente_desde, valor_ves) values ('2026-01-01', 9.00)
         on conflict do nothing;
+      -- El IGTF. No lo sembraba NADIE: ni el esquema ni este archivo, y la unica fila que
+      -- habia en la base de pruebas la habia dejado commiteada el fixture de alguna
+      -- prueba. Sin ella, calcular_igtf levanta excepcion y un cobro en divisa se cae
+      -- con un error de base de datos. Lo encontro el repaso que el propio sembrador se
+      -- hace ahora al terminar.
+      insert into alicuota_igtf (vigente_desde, porcentaje) values ('2026-01-01', 3.00)
+        on conflict (vigente_desde) do nothing;
       insert into concepto_islr (codigo, nombre_es, nombre_en, sujeto, porcentaje,
                                  factor_ut, minimo_ut, vigente_desde)
         values ('SERV-PJ','Servicios','Services','pj_domiciliada', 5.00, 83.3334, 0,'2026-01-01')
@@ -76,7 +93,14 @@ export async function sembrar(): Promise<void> {
     const [n] = (await q`
       select count(*)::int as n from contrato where organizacion_id = ${G}::uuid
     `) as unknown as Array<{ n: number }>
-    if (Number(n.n) >= 40) return
+    // Si ya hay contratos de la muestra, el resto ya esta hecho y no se repite.
+    //
+    // Este freno decia `>= 40` y este archivo siembra QUINCE, asi que nunca frenaba:
+    // sembrar dos veces reventaba con «duplicate key ... GPS-2027-001». Pasaba
+    // desapercibido porque quien siembra dos veces suele hacerlo con la salida
+    // redirigida — yo mismo dí por bueno un `on conflict` mirando una segunda pasada que
+    // en realidad se habia caido, con el `2>&1` tapandolo.
+    if (Number(n?.n ?? 0) > 0) return
 
     await q.unsafe(`
       insert into contrato (organizacion_id, cliente_id, codigo, tipo, titulo_es, titulo_en,
@@ -332,6 +356,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   conectar(process.env['NEXUS_BD']
     ?? { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' })
   await sembrar()
+  // El sembrador se revisa a si mismo, y no es adorno: la empresa de muestra existia sin
+  // tasa del BCV para hoy, y eso no se veia hasta que alguien intentaba emitir una
+  // valuacion y leia un error que no decia donde se arreglaba. Si falta algo, se dice
+  // aqui, que es donde todavia no cuesta nada.
+  const falta = await comoPersona<readonly string[]>(
+    { id: MUESTRA.persona }, 'nexus_interno', (q) => loQueFalta(q, 'es'))
   await cerrar()
   console.log('sembrada la empresa de muestra')
+  if (falta.length > 0) {
+    console.log('\nPERO FALTAN VALORES FISCALES, y sin ellos no se puede emitir nada:')
+    for (const f of falta) console.log(`  · ${f}`)
+    console.log('\nSe ponen en /fiscales.')
+    process.exitCode = 1
+  }
 }

@@ -47,7 +47,7 @@ before(async () => {
       insert into alicuota_igtf (vigente_desde, porcentaje) values ('2026-01-01', 3.00)
         on conflict do nothing;
       insert into alicuota_iva (id, clase, porcentaje, vigente_desde)
-        values ('0a1b2c3d-2222-0000-0000-00000000000b','general', 16.00,'2026-01-01')
+        values ('0a1b2c3d-2222-0000-0000-00000000000b','general', 16.00,'2018-01-02')
         on conflict do nothing;
       insert into concepto_islr (codigo, nombre_es, nombre_en, sujeto, porcentaje, factor_ut, minimo_ut, vigente_desde)
         values ('SERV-PJ','Servicios','Services','pj_domiciliada', 5.00, 83.3334, 0,'2026-01-01')
