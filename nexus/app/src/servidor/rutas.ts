@@ -1752,6 +1752,62 @@ export async function resolver(
     return aOtroSitio(`/valuaciones/${presentarVal[1]!}`)
   }
 
+  // La hoja de valuación en hoja de cálculo. NO la podía bajar nadie —ni GPS ni el
+  // cliente— aunque la máquina estaba entera: `hoja_valuacion()` devuelve la hoja línea a
+  // línea y la pantalla la pinta. Lo que faltaba era poder llevársela.
+  //
+  // Y no es comodidad. El proceso interno de una operadora pide un documento para autorizar
+  // un pago; si el portal no lo produce, alguien pide un Excel por correo, y desde ese
+  // momento las cifras viajan fuera del sistema y el portal deja de ser de donde sale la
+  // verdad. Es el mismo argumento por el que existe la bandeja.
+  //
+  // Se llama a la MISMA función que pinta la pantalla, con el mismo `esCliente`: así el
+  // archivo no puede decir algo distinto de lo que se está viendo, ni enseñarle al cliente
+  // las líneas internas que la pantalla le retira.
+  const hojaVal = /^\/valuaciones\/([0-9a-f-]{36})\/hoja$/.exec(p.ruta)
+  if (hojaVal && p.metodo === 'GET') {
+    try {
+      const d = await comoQuien(async (q) => {
+        const cab = await cabeceraDeValuacion(q, hojaVal[1]!)
+        const lineas = await hojaDeValuacion(q, hojaVal[1]!, p.idioma, cab.moneda, esCliente)
+        return { cab, lineas }
+      })
+      // Las tres primeras filas identifican el papel. Un archivo con solo cifras, separado
+      // de la pantalla de la que salió, no se puede archivar ni comprobar.
+      const filas: string[][] = [
+        [t(p.idioma, 'valuacion.titulo'), `${d.cab.contrato} · ${d.cab.numero}`],
+        [t(p.idioma, 'valuacion.periodo'),
+         `${formatearFecha(p.idioma, d.cab.desde)} — ${formatearFecha(p.idioma, d.cab.hasta)}`],
+        [t(p.idioma, 'hoja.estado'),
+         t(p.idioma, `valuacion.estado.${d.cab.estado}` as Clave)],
+        [],
+        // Las mismas etiquetas que pone la pantalla en sus columnas, para que el archivo y
+        // la página no se puedan llamar distinto a lo mismo.
+        [t(p.idioma, 'hoja.concepto'), t(p.idioma, 'fiscal.base_imponible'),
+         t(p.idioma, 'fiscal.alicuota'), t(p.idioma, 'hoja.monto')],
+      ]
+      for (const l of d.lineas) {
+        filas.push([l.concepto, l.base ?? '', l.porcentaje ?? '', l.monto])
+      }
+      const texto = escribirHoja(filas)
+      const bytes = new TextEncoder().encode(texto)
+      const nombre = `valuacion-${d.cab.contrato}-${d.cab.numero}.csv`
+      return {
+        codigo: 200,
+        bytes,
+        cabeceras: {
+          ...CABECERAS_BASE,
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(nombre)}`,
+          'Content-Length': String(bytes.length),
+        },
+      }
+    } catch (e) {
+      if (e instanceof ValuacionNoAlcanzable) return noEncontrado(p.idioma)
+      throw e
+    }
+  }
+
   const valuacion = /^\/valuaciones\/([0-9a-f-]{36})$/.exec(p.ruta)
   if (valuacion && p.metodo === 'GET') {
     try {

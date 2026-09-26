@@ -34,7 +34,39 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el estado de cuenta del cliente** — «cuánto me han facturado y
+**Lo último terminado:** **la hoja de la valuación, en un archivo que se baja.**
+
+La pantalla de una valuación enseñaba el cálculo entero —obra del periodo, IVA, amortización
+de anticipo, retención de garantía, retención de IVA, retención de ISLR, IGTF, neto a
+cobrar— y no había forma de llevárselo. Y ahí está el agujero, que no es de comodidad:
+**el proceso interno de una operadora pide un documento para autorizar un pago.** Si el
+portal no lo produce, alguien pide un Excel por correo, y desde ese momento las cifras
+viajan fuera del sistema y el portal deja de ser de donde sale la verdad. Es el mismo
+agujero que cierra cada exportador de este producto, visto desde el lado del que paga.
+
+Ahora, en la pantalla de la valuación, **«Bajar la hoja»** — y el archivo lo produce la
+misma llamada que pinta la pantalla, `hojaDeValuacion(...)`, a propósito: **si el archivo se
+calculara por su cuenta, un día diría otra cifra que la pantalla y nadie sabría cuál de las
+dos creer.** Una factura que no cuadra con el portal es una discusión de tres semanas.
+
+Y respeta quién pregunta: el argumento `esCliente` viaja hasta el archivo, así que una línea
+marcada como interna no sale en el suyo. **Aquí hay una cosa honesta que apuntar:** hoy las
+nueve líneas de la hoja son visibles para el cliente, así que ese filtro **no filtra nada
+todavía** y ninguna prueba se pondría roja si lo rompiera. En vez de dejar una cerradura sin
+comprobar, hay una prueba que **avisa el día que deje de ser verdad** y dice qué hay que
+verificar entonces; y la comprobación del archivo del cliente se compara contra **la página
+del cliente**, no contra la de GPS, que era lo que la hacía inútil.
+
+**915 pruebas, todas pasan.** Verificado rompiendo: quitar una línea del archivo pone roja la
+segunda prueba. Y la instantánea navegable ahora **baja el archivo de verdad** al pinchar —una
+descarga vuelve en `bytes`, no en `cuerpo`, y mirar solo `cuerpo` la daba por saltada con un
+código 200 al lado.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **el estado de cuenta del cliente** — «cuánto me han facturado y
 cuánto debo», que es la segunda pregunta de cualquiera que paga y la contestaba una llamada
 de teléfono.
 
@@ -87,10 +119,6 @@ ahora, con su razón escrita.
 «costo» y «margen» en la página entera para asegurar que el cliente no las ve, y saltaba con
 cada `margin:` de la hoja de estilos. Ahora mira el texto sin el CSS: una comprobación que
 salta por algo que no es el fallo se acaba relajando hasta que deja de comprobar.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **la bandeja del cliente**, y que el portal del cliente se pudiera ver por
 primera vez.
@@ -1542,6 +1570,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
 | `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
 | `app/src/pantallas/valuacion.ts` | **La primera pantalla.** Una sola función para las dos superficies: en escritorio las líneas son una tabla, en el móvil tarjetas apiladas. No son dos pantallas, es la misma reacomodada por la hoja de estilos. No enseña un total: enseña el camino hasta el total. |
+| `app/src/servidor/rutas.ts` → `/valuaciones/:id/hoja` | **La hoja de la valuación, en un archivo que se baja.** El proceso interno de una operadora pide un documento para autorizar un pago; si el portal no lo produce, alguien pide un Excel por correo, y desde ese momento las cifras viajan fuera del sistema y el portal deja de ser de donde sale la verdad. El archivo lo produce **la misma llamada que pinta la pantalla**: si se calculara por su cuenta, un día diría otra cifra y nadie sabría cuál de las dos creer. |
 | `app/herramientas/pintar.ts` | Genera una pantalla desde la base de datos real, sin desplegar nada. Para revisar diseño y para enseñar avance. |
 | `app/src/dominio/totp.ts` | Segundo factor, los códigos de seis dígitos del Authenticator. Escrito con la criptografía que trae Node, sin dependencias: son cuarenta líneas y el algoritmo está congelado desde 2011. Acepta el código del paso anterior y el siguiente, porque sin esa tolerancia quien tenga el reloj desfasado no entra nunca — y acaba pidiendo que le quiten el doble factor. |
 | `app/src/dominio/clave.ts` | scrypt con N=32.768, y códigos de recuperación de un solo uso. **GPS nunca ve una clave**: guarda la huella y la sal. Con Microsoft o Google, ni eso. Los códigos no llevan `0 O 1 I L`: se apuntan en papel, y un código mal transcrito en el peor momento es lo que hace que la gente desactive el doble factor. |
@@ -1898,11 +1927,12 @@ verdad, por orden de lo que más cambia las cosas.)*
    parte se va en la política de fila de `hito`, que por cada hito comprueba si su
    renglón se ve, y eso mira el contrato. Se puede bajar. Tocar una valla de
    aislamiento por milisegundos **no se hace de paso**: pide su sesión y su barrido.
-5. **Las fases que no se han empezado:** logística y procura (embarque, aduana,
-   trazabilidad), calidad (MTR, colada, puntos de inspección), y el portal del cliente
-   más allá de aprobar y objetar. El diccionario ya tiene el vocabulario de las tres;
-   las pantallas no existen.
-6. **Un segundo par de ojos.** 927 comprobaciones automáticas no sustituyen a una
+5. **Las fases que no se han empezado:** logística y procura
+   (embarque, aduana, trazabilidad) y calidad (MTR, colada, puntos de inspección). El
+   diccionario ya tiene el vocabulario de las dos; las pantallas no existen. El portal del
+   cliente ya no está en esta lista: tiene su bandeja, su estado de cuenta y la hoja de cada
+   valuación en un archivo.
+6. **Un segundo par de ojos.** 915 comprobaciones automáticas no sustituyen a una
    persona usando esto una semana con datos de verdad.
 
 ## Bloqueado

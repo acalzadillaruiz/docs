@@ -199,6 +199,11 @@ mapa.set('/icono-180.png', 'icono-180.png')
 mapa.set('/manifest.webmanifest', 'manifest.webmanifest')
 mapa.set('/libros/hoja', 'libro-ventas.csv')
 mapa.set('/diario/hoja', 'diario.csv')
+// La hoja de UNA valuacion, la primera: es la que se baja mas abajo. Las demas quedan
+// apagadas a proposito —el archivo es el mismo y quince copias no ensenan nada—, pero si
+// esta no se mapeara, el enlace «Bajar la hoja» de la pantalla saldria gris en todas, y
+// entonces la instantanea diria que esa descarga no existe cuando si existe.
+if (valuaciones[0]) mapa.set(`/valuaciones/${valuaciones[0].id}/hoja`, 'cliente-hoja-valuacion.csv')
 
 const AVISO = `
 <div style="position:sticky;top:0;z-index:99;background:#946307;color:#fff;
@@ -251,14 +256,21 @@ console.log(`${escritas} paginas de ${PAGINAS.length}`)
 // en la pestana todo el rato.
 writeFileSync(`${SALIDA}/icono.svg`, iconoSvg())
 writeFileSync(`${SALIDA}/icono-180.png`, iconoPng(180))
-for (const [archivo, ruta, campos] of [
-  ['manifest.webmanifest', '/manifest.webmanifest', {}],
-  // Y las dos hojas de calculo: son descargas de verdad, no paginas, y que el enlace
-  // baje el archivo es la mitad de lo que hay que poder comprobar de un exportador.
-  ['libro-ventas.csv', '/libros/hoja', { cual: 'ventas', anio: '2027', mes: '3' }],
-  ['diario.csv', '/diario/hoja', { anio: '2027', mes: '3' }],
+for (const [archivo, ruta, campos, quien] of [
+  ['manifest.webmanifest', '/manifest.webmanifest', {}, 'gps'],
+  // Y las hojas de calculo: son descargas de verdad, no paginas, y que el enlace baje el
+  // archivo es la mitad de lo que hay que poder comprobar de un exportador.
+  ['libro-ventas.csv', '/libros/hoja', { cual: 'ventas', anio: '2027', mes: '3' }, 'gps'],
+  ['diario.csv', '/diario/hoja', { anio: '2027', mes: '3' }, 'gps'],
+  // La hoja de una valuacion, tal como se la baja EL CLIENTE. Una sola: el archivo es el
+  // mismo para todas y quince copias no ensenan nada que no ensene una. Y pedida como el
+  // cliente a proposito: es la mitad del producto que no se veia.
+  ['cliente-hoja-valuacion.csv', `/valuaciones/${valuaciones[0]?.id ?? ''}/hoja`, {}, 'cliente'],
 ] as const) {
-  const r = await pedir({ ruta, cookie: gps, campos: campos as Record<string, string> })
+  const r = await pedir({
+    ruta, cookie: quien === 'cliente' ? cliente : gps,
+    campos: campos as Record<string, string>,
+  })
   // Una hoja de calculo vuelve en `bytes`, no en `cuerpo`: es una descarga, no una
   // pagina. Mirar solo `cuerpo` las daba por saltadas con un codigo 200 al lado, que
   // es la clase de mensaje que hace perder media hora.

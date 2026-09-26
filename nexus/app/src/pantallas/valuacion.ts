@@ -75,6 +75,7 @@ const ACCIONES = {
         ayuda: 'Al aprobarla queda constancia de quién y cuándo. Esto no se deshace.',
         objecionTitulo: 'Objeciones', sinRespuesta: 'Sin responder todavía',
         respondida: 'Respondida', volver: 'Volver al contrato',
+        bajar: 'Bajar esta hoja en hoja de cálculo ↓',
         responder: 'Responder', tuRespuesta: 'Tu respuesta',
         avisoResponder: 'Mientras no se responda, esta valuación no se puede facturar.',
         placeholderR: 'Por ejemplo: se retiran las 12 horas de grúa y se corrige la valuación a la baja.',
@@ -83,6 +84,7 @@ const ACCIONES = {
         ayuda: 'Approving records who and when. This cannot be undone.',
         objecionTitulo: 'Disputes', sinRespuesta: 'Not answered yet',
         respondida: 'Answered', volver: 'Back to the contract',
+        bajar: 'Download this sheet as a spreadsheet ↓',
         responder: 'Answer', tuRespuesta: 'Your answer',
         avisoResponder: 'Until this is answered, the progress payment cannot be invoiced.',
         placeholderR: 'For example: the 12 crane hours are withdrawn and the sheet is corrected.',
@@ -204,6 +206,9 @@ h2.sec{margin:30px 0 10px;font-family:"JetBrains Mono",monospace;font-size:10.5p
 .obj-nueva textarea{width:100%;margin-top:7px;font:inherit;font-size:15px;padding:12px;
   border:1px solid var(--ln2);border-radius:11px;background:transparent;color:var(--ik);
   resize:vertical}
+.bajar{margin:14px 0 0;text-align:right}
+.bajar a{color:var(--enl);text-decoration:none;font-size:13.5px;font-weight:600}
+.bajar a:hover{text-decoration:underline}
 .volver{margin-top:28px;text-align:center}
 .volver a{color:var(--ik2);text-decoration:none;font-size:14px}
 @media(max-width:620px){
@@ -242,6 +247,7 @@ ${filas}
       <div class="mt">${escapar(neto?.monto ?? '')}</div>
     </div>
   </section>
+  <p class="bajar"><a href="/valuaciones/${escapar(d.id)}/hoja">${escapar(a.bajar)}</a></p>
   <p class="nota">${
     idioma === 'es'
       ? 'Cada cifra sale del contrato y de la evidencia registrada. Ninguna se escribe a mano. Si algo no cuadra, se señala la línea.'
