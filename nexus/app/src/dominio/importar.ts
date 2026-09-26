@@ -21,16 +21,21 @@ import type { Consulta } from '../db/conexion.ts'
 import { leerHoja } from '../servidor/csv.ts'
 import { t, type Clave, type Idioma } from '../i18n/t.ts'
 
-export type Destino = 'facturas_recibidas' | 'facturas_emitidas' | 'movimientos_banco'
+export type Destino =
+  | 'facturas_recibidas' | 'facturas_emitidas' | 'movimientos_banco' | 'saldos_iniciales'
 
 export const DESTINOS: readonly Destino[] = [
-  'facturas_recibidas', 'facturas_emitidas', 'movimientos_banco',
+  'facturas_recibidas', 'facturas_emitidas', 'movimientos_banco', 'saldos_iniciales',
 ]
+
+/** Los destinos que necesitan la fecha de corte del formulario, no de la hoja. */
+export const PIDEN_FECHA: readonly Destino[] = ['saldos_iniciales']
 
 export type Campo =
   | 'fecha' | 'proveedor' | 'proveedor_nombre' | 'cliente' | 'cliente_nombre'
   | 'numero' | 'control' | 'base' | 'iva' | 'contrato'
   | 'monto' | 'descripcion' | 'referencia' | 'cuenta' | 'moneda'
+  | 'debe' | 'haber'
 
 /** Los campos de cada destino, y cuáles no pueden faltar. */
 export const CAMPOS: Record<Destino, readonly { campo: Campo; tipo: 'texto' | 'fecha' | 'numero'; obligatorio: boolean }[]> = {
@@ -72,6 +77,25 @@ export const CAMPOS: Record<Destino, readonly { campo: Campo; tipo: 'texto' | 'f
     { campo: 'cuenta', tipo: 'texto', obligatorio: false },
     { campo: 'moneda', tipo: 'texto', obligatorio: false },
   ],
+  // Con qué saldos empieza una empresa que ya existe. Sin esto no había ninguna puerta
+  // —este producto no tiene pantalla para teclear un asiento a mano, a propósito—, así que
+  // el capital, el banco y lo que ya te deben no tenían por dónde entrar, y el balance
+  // salía como si la empresa hubiera nacido el día de la instalación.
+  //
+  // El DEBE y el HABER van en dos columnas y ninguna es obligatoria, porque cada línea de
+  // un balance de comprobación trae una de las dos y la otra viene vacía. Lo que sí se
+  // exige —y se comprueba antes de escribir— es que esté mapeada al menos una, y que el
+  // debe menos el haber sume cero: un balance que no suma cero no es un balance.
+  //
+  // El importe no va en una sola columna con signo. Podría, y sería menos trabajo aquí;
+  // pero ningún sistema contable exporta así, y la hoja que hay que pedirle a la gente es
+  // la que ya tiene.
+  saldos_iniciales: [
+    { campo: 'cuenta', tipo: 'texto', obligatorio: true },
+    { campo: 'debe', tipo: 'numero', obligatorio: false },
+    { campo: 'haber', tipo: 'numero', obligatorio: false },
+    { campo: 'descripcion', tipo: 'texto', obligatorio: false },
+  ],
 }
 
 /**
@@ -96,8 +120,12 @@ const PISTAS: Record<Campo, readonly string[]> = {
   monto: ['monto', 'importe', 'amount', 'valor', 'credito', 'crédito', 'debito', 'débito'],
   descripcion: ['descripcion', 'descripción', 'concepto', 'detalle', 'description', 'memo'],
   referencia: ['referencia', 'ref', 'reference', 'documento', 'nro. operacion', 'operacion'],
-  cuenta: ['cuenta', 'account', 'nro cuenta'],
+  cuenta: ['cuenta', 'account', 'nro cuenta', 'codigo', 'código', 'code'],
   moneda: ['moneda', 'currency', 'divisa'],
+  // Las cabeceras de un balance de comprobación, que es lo que trae cualquier sistema
+  // contable cuando se le pide «saldos al cierre».
+  debe: ['debe', 'debito', 'débito', 'debit', 'cargo'],
+  haber: ['haber', 'credito', 'crédito', 'credit', 'abono'],
 }
 
 export type Propuesta = {
@@ -208,6 +236,12 @@ export class HojaRepetida extends Error {
 export async function cargar(
   q: Consulta, orgId: string, personaId: string,
   archivo: string, contenido: Uint8Array, destino: Destino,
+  // La fecha de corte de un balance de apertura. Va aquí y no en la hoja: un balance de
+  // apertura tiene UNA fecha para todas sus líneas, y pedirla repetida en cada fila obliga
+  // a quien exporta del sistema viejo a añadir una columna que su sistema no tiene. Se
+  // añade al final a propósito: es un parámetro más en una función que ya se llama desde
+  // varios sitios, y meterlo en medio corre los posicionales de todos.
+  fechaCorte: string | null = null,
 ): Promise<{ loteId: string; cabeceras: string[]; muestras: string[]; filas: number }> {
   const texto = new TextDecoder('utf-8').decode(contenido)
   const hoja = leerHoja(texto)
@@ -226,9 +260,10 @@ export async function cargar(
 
   const [lote] = (await q`
     insert into lote_importacion (organizacion_id, archivo, destino, estado, filas,
-                                  huella, cabeceras, cargado_por)
+                                  huella, cabeceras, cargado_por, fecha_corte)
     values (${orgId}::uuid, ${archivo}, ${destino}, 'cargado', ${datos.length},
-            ${huella}, ${cabeceras ?? []}, ${personaId}::uuid)
+            ${huella}, ${cabeceras ?? []}, ${personaId}::uuid,
+            ${fechaCorte && fechaCorte !== '' ? fechaCorte : null})
     returning id
   `) as unknown as Array<{ id: string }>
 

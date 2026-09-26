@@ -86,9 +86,17 @@ export function pintarSubirHoja(
         </select></label>
       <label class="c"><span>${escapar(t('importar.subir'))}</span>
         <input type="file" name="documento" accept=".csv,text/csv,text/plain" required></label>
+      <!-- La fecha de corte. Va en el formulario y no en la hoja porque un balance de
+           apertura tiene UNA fecha, y pedirla repetida en cada fila obliga a añadir al
+           export del sistema viejo una columna que no tiene. Sin JavaScript no se puede
+           esconder cuando el destino es otro, así que se dice al lado para qué es: una
+           casilla que aparece y desaparece es peor que una casilla explicada. -->
+      <label class="c"><span>${escapar(t('importar.fecha_corte'))}</span>
+        <input type="date" name="fecha_corte"></label>
     </div>
     <p class="expl">${escapar(t('importar.destino.ventas_explica'))}</p>
     <p class="expl">${escapar(t('importar.banco_explica'))}</p>
+    <p class="expl">${escapar(t('importar.destino.apertura_explica'))}</p>
     <button type="submit">${escapar(t('importar.subir'))}</button>
   </form>
   ${lotes}

@@ -18,6 +18,9 @@ import { cifrarClave } from '../src/dominio/clave.ts'
 import { loQueFalta } from '../src/dominio/fiscales.ts'
 import { facturar } from '../src/dominio/valuar.ts'
 import { registrarCobro } from '../src/dominio/cobrar.ts'
+import {
+  cargar, guardarMapeo, validar, confirmar, proponerMapeo,
+} from '../src/dominio/importar.ts'
 
 const PROV = 'c8d9e0f1-0000-0000-0000-00000000000f'
 
@@ -75,6 +78,13 @@ export async function sembrar(): Promise<void> {
       select '2027-03-01'::date, 70.00,'carga_manual'
        where not exists (select 1 from tasa_bcv
                           where vigente_el = '2027-03-01' and sustituida_por is null);
+      -- Y una de enero, para el balance de apertura: el asiento de apertura lleva su
+      -- columna en divisas y la convierte a la tasa vigente en la fecha de corte. Sin una
+      -- tasa de enero o anterior, la apertura de la muestra no se podía cargar.
+      insert into tasa_bcv (vigente_el, ves_por_usd, fuente)
+      select '2027-01-01'::date, 38.00,'carga_manual'
+       where not exists (select 1 from tasa_bcv
+                          where vigente_el = '2027-01-01' and sustituida_por is null);
       -- Y una para HOY. El escenario de la muestra es de marzo de 2027, que es FUTURO, y
       -- todo lo que se emite busca la tasa con vigente_el <= current_date: sin esta
       -- fila, en la base de muestra no se podia emitir ni una valuacion —«no hay tasa del
@@ -336,6 +346,46 @@ export async function sembrar(): Promise<void> {
       }, YO, G, 'es')
       if (!r.hecho) console.log(`  no se pudo cobrar ${v.codigo}: ${r.errores.join(' · ')}`)
     }
+  })
+
+  // EL BALANCE DE APERTURA, por la misma puerta que lo haría una empresa de verdad.
+  //
+  // La muestra empezaba de cero: sin capital, y con el banco en NEGATIVO en cuanto se abría
+  // la caja chica. Se veía en la instantánea: «Capital social» no aparecía en ninguna parte
+  // del balance, y el banco salía en −400.000. Una empresa así no existe, y un balance así
+  // no se le enseña a nadie.
+  //
+  // Se carga con `cargar`/`validar`/`confirmar`, que es lo que llama la pantalla, y no
+  // insertando el asiento a mano. Dos razones: la primera es que escribirlo a mano volvería
+  // a ser el sembrador haciendo lo que la aplicación no hace —y esta noche eso ha costado
+  // veintiséis asientos vacíos y un botón de facturar que no funcionaba—; la segunda es que
+  // así la muestra PRUEBA que el camino del importador funciona de punta a punta.
+  await comoPersona({ id: YO }, 'nexus_interno', async (q) => {
+    const [ya] = (await q`
+      select count(*)::int as n from lote_importacion
+       where organizacion_id = ${G}::uuid and destino = 'saldos_iniciales'
+         and estado = 'confirmado'
+    `) as unknown as Array<{ n: number }>
+    if (Number(ya?.n ?? 0) > 0) return
+
+    // Una hoja como la que da cualquier sistema contable: cuenta, debe, haber. Cuadra
+    // —30.000.000 en el banco contra 30.000.000 de capital—, y si no cuadrara el propio
+    // importador se negaría diciendo por cuánto.
+    const filas = [
+      'Codigo;Debe;Haber',
+      '1.1.01.02;30000000,00;',
+      '3.1.01;;30000000,00',
+    ].join('\n')
+    const r = await cargar(q, G, YO, 'apertura-muestra.csv',
+      new TextEncoder().encode(filas), 'saldos_iniciales', '2027-01-31')
+    await guardarMapeo(q, r.loteId, proponerMapeo(r.cabeceras, r.muestras, 'saldos_iniciales'))
+    const v = await validar(q, r.loteId)
+    if (v.malas > 0) {
+      console.log(`  la apertura de la muestra no validó: ${JSON.stringify(v.errores)}`)
+      return
+    }
+    const c = await confirmar(q, r.loteId, YO, 'es')
+    if (!c.hecho) console.log(`  no se pudo cargar la apertura: ${c.motivo}`)
   })
 
   // Material en ruta: un contrato de procura con sus hitos a medio camino. Sin esto

@@ -52,7 +52,7 @@ import {
 } from '../dominio/valuar.ts'
 import {
   cargar, proponerMapeo, guardarMapeo, validar, confirmar, lotes, revertir, mapeoGuardado,
-  CAMPOS, DESTINOS, HojaRepetida, type Campo, type Destino,
+  CAMPOS, DESTINOS, PIDEN_FECHA, HojaRepetida, type Campo, type Destino,
 } from '../dominio/importar.ts'
 import { pintarSubirHoja, pintarMapeo } from '../pantallas/importar.ts'
 import { estadoDeCobro, registrarCobro, NoCobrable, type Medio } from '../dominio/cobrar.ts'
@@ -687,7 +687,11 @@ export async function resolver(
 
     try {
       const r = await comoQuien((q) => cargar(q, org!.organizacion_id, personaId,
-        a.archivo, a.contenido, destino))
+        a.archivo, a.contenido, destino,
+        // La fecha de corte solo la pide el balance de apertura. Si el destino es otro se
+        // manda null en vez de lo que hubiera en la casilla: guardar una fecha que nadie
+        // va a leer es como se acaba usando para otra cosa dentro de un año.
+        PIDEN_FECHA.includes(destino) ? (p.campos['fecha_corte'] ?? null) : null))
       // El mapeo propuesto se guarda de una vez: así la pantalla siguiente enseña
       // lo mismo que se va a usar, y no una sugerencia que todavía no existe.
       const propuestas = proponerMapeo(r.cabeceras, r.muestras, destino)

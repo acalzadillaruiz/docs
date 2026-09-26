@@ -75,6 +75,6 @@ datos de verdad, y esa decisión no es de programación.
 cd docs/nexus/db && ./probar.sh
 ```
 
-933 comprobaciones contra un PostgreSQL desechable. Tarda unos siete minutos y termina
+943 comprobaciones contra un PostgreSQL desechable. Tarda unos siete minutos y termina
 diciendo `TODAS LAS PRUEBAS PASAN` o qué archivo falló. Es lo que sí ejercita los
 formularios de punta a punta: subir un documento, verificar un hito, cerrar un mes.

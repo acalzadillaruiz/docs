@@ -34,7 +34,67 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el balance decía que no balanceaba, y balanceaba.**
+**Lo último terminado:** **con qué saldos empieza una empresa que ya existe.**
+
+El importador dice de sí mismo que es *«la pantalla que decide si esto se usa o se abandona:
+hay años de histórico en hojas de cálculo y ninguna aplicación sirve si hay que volver a
+teclearlo»*. Traía tres cosas: facturas de proveedor, histórico de facturas emitidas y
+extracto del banco. **No traía con qué saldos empieza la empresa.** Y no había ninguna otra
+puerta: este producto no tiene —a propósito— una pantalla para teclear un asiento a mano, así
+que el capital, el banco, lo que ya te deben y lo que ya debes no tenían por dónde entrar.
+
+**Una empresa que ya existe no podía empezar a usar esto.** Cargaba su histórico de facturas y
+el balance le salía como si hubiera nacido el día de la instalación. Le pasaba a la propia
+empresa de muestra y se veía en la instantánea publicada: «Capital social» no aparecía en
+ninguna parte del balance, y el banco salía en **−400.000** en cuanto se abría la caja chica.
+Una empresa así no existe, y un balance así no se le enseña a nadie.
+
+Ahora es un destino más del importador, con los mismos cuatro pasos. La hoja es la de «saldos
+al cierre» que da cualquier sistema contable: una columna de cuenta, una de debe y una de
+haber. **El debe y el haber son dos columnas y ninguna es obligatoria**, porque cada línea
+trae una de las dos y la otra viene vacía — exigir las dos daría por mala cada fila, que es la
+forma más rápida de que alguien decida que el importador no funciona.
+
+**Y la fecha de corte no va en la hoja**, va en el formulario: un balance de apertura tiene una
+sola fecha, y pedirla repetida en cada fila obliga a añadirle al export del sistema viejo una
+columna que ese sistema no tiene.
+
+Cuatro cosas se niegan, y las cuatro **antes de escribir nada** — un balance de apertura mal
+cargado no se nota el día que entra, se nota el mes siguiente, y para entonces hay cien
+asientos encima:
+
+1. **Un balance que no cuadra**, diciendo por cuánto. Si entrara, el aviso de «el balance no
+   balancea» saldría para siempre y nadie sabría de dónde viene.
+2. **Una cuenta que no está en el plan**, y se dicen TODAS, no la primera: quien corrige una
+   hoja quiere la lista entera, no una vuelta por cada línea.
+3. **Sin fecha de corte**, y **sin el mes contable abierto** — esta última salió de una prueba
+   mía: un asiento tiene clave ajena contra el mes contable, así que el fallo llegaba como
+   «violates foreign key constraint asiento_organizacion_id_anio_mes_fkey», que no dice nada
+   de meses. Ahora dice cuál hay que abrir y dónde.
+4. **Una segunda apertura.** Dos duplican todo lo que hay debajo y la segunda vez nadie se
+   acuerda de la primera. Si estaba mal, se deshace el lote — y deshacerlo **reversa su
+   asiento**, porque el asiento de apertura se marca con el lote como origen, que es justo lo
+   que `revertir_lote` ya sabía buscar. Esa puerta ya estaba y no hubo que tocar nada.
+
+Y la muestra se carga su apertura **por esa misma puerta**, llamando a
+`cargar`/`validar`/`confirmar` como lo hace la pantalla, no insertando el asiento a mano. Dos
+razones: escribirlo a mano volvería a ser el sembrador haciendo lo que la aplicación no hace
+—que esta noche ha costado veintiséis asientos vacíos y un botón de facturar roto— y así la
+muestra **prueba** que el camino del importador funciona de punta a punta. El balance de la
+muestra ya tiene capital de 30.000.000, el banco en 29.600.000 y cuadra: 84.493.320 de activo
+contra 22.688.820 de pasivo y 61.804.500 de patrimonio.
+
+**943 pruebas, todas pasan.** Las diez nuevas están verificadas rompiendo las seis cerraduras:
+tres se ponen rojas al aflojar el cuadre, las cuentas y la apertura única, y otras tres al
+quitar la fecha, el mes y el origen del asiento. Y corriendo el archivo **dos veces**, que es
+lo que enseñó que dependía de su propia historia: la hoja llevaba un contador y la segunda
+pasada rebotaba contra la huella de la primera.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **el balance decía que no balanceaba, y balanceaba.**
 
 La pantalla de estados contables llevaba arriba, en ámbar, el aviso más grave que hay en este
 producto: *«el balance no balancea por Bs.S 31.804.500,00 — el activo tiene que ser igual al
@@ -70,10 +130,6 @@ vista vieja: se ponen rojas las dos nuevas **y la vieja sigue verde**, que es la
 que nunca podía haberlo cogido.
 
 **933 pruebas, todas pasan.**
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **las dos cifras mal del libro que se declara.**
 
@@ -1712,6 +1768,7 @@ que toque el esquema. Si algo deja de fallar cuando debería fallar, la regla se
 | `app/src/i18n/t.ts` | Traducción con la clave comprobada por el tipo, y formato de número, moneda y fecha según el idioma. |
 | `app/src/dominio/valuacion.ts` | La hoja lista para pintar. **El cálculo no se repite aquí**: vive en la base de datos y ya tiene su prueba. Repetirlo sería tener dos verdades. |
 | `app/src/pantallas/valuacion.ts` | **La primera pantalla.** Una sola función para las dos superficies: en escritorio las líneas son una tabla, en el móvil tarjetas apiladas. No son dos pantallas, es la misma reacomodada por la hoja de estilos. No enseña un total: enseña el camino hasta el total. |
+| `db/schema/43-saldos-iniciales.sql` | **Con qué saldos empieza una empresa que ya existe.** El importador traía facturas y extractos pero no el balance de apertura, y este producto no tiene pantalla para teclear un asiento a mano: el capital, el banco y lo que ya te deben no tenían por dónde entrar, así que una empresa que ya existe no podía empezar a usar esto. Es un destino más, con la hoja de «saldos al cierre» que da cualquier sistema contable. Se niega —antes de escribir— un balance que no cuadra, una cuenta que no está en el plan, la falta de fecha de corte o de mes abierto, y una segunda apertura. |
 | `db/schema/42-resultado-en-el-balance.sql` | **El balance decía que no balanceaba, y balanceaba.** Le faltaba el resultado del ejercicio: las cuentas de ingreso y gasto quedaban fuera y su saldo neto no está asentado en patrimonio porque no hay cierre de ejercicio. El activo salía mayor por exactamente la ganancia del periodo, y la pantalla acusaba de un asiento a medias a un libro impecable. Un aviso que salta sin que pase nada deja de leerse el día que pasa algo. La línea es calculada, y la pantalla lo dice. |
 | `db/schema/41-libro-que-se-declara.sql` | **Las dos cifras mal del libro que se declara.** La columna «Total» se calculaba `base + exento`, sin el IVA, y **una nota de crédito sumaba** en vez de restar: se declaraba de más por su importe, al doble, en ventas y en compras. Las pruebas que había contaban FILAS, y contar filas comprueba que la nota aparece, no en qué dirección. El signo va en la vista porque la pantalla no es la única que lee esto: también la hoja que se baja, y mañana la declaración. |
 | `db/schema/39-asiento-sin-lineas.sql` · `40-centimos-de-conversion.sql` | **Dos formas de cuadrar que no son cuadrar.** Un asiento sin ninguna línea no dispara el control del cuadre, y si lo disparara diría que cuadra: la suma de cero líneas es cero. Y la columna en dólares de un asiento en bolívares es una conversión línea a línea, así que redondear seis veces y sumar deja un céntimo — con eso, `asentar_valuacion` no podía asentar casi ninguna valuación de la muestra y **el botón de facturar no funcionaba.** El residuo se absorbe antes de rechazar, y el perdón es estrecho: solo si una columna cuadra exacta y la otra no, solo hasta un céntimo por línea, solo con dos líneas o más. Un control que perdona se convierte en un control que no controla. |
@@ -2077,7 +2134,7 @@ verdad, por orden de lo que más cambia las cosas.)*
    diccionario ya tiene el vocabulario de las dos; las pantallas no existen. El portal del
    cliente ya no está en esta lista: tiene su bandeja, su estado de cuenta y la hoja de cada
    valuación en un archivo.
-6. **Un segundo par de ojos.** 933 comprobaciones automáticas no sustituyen a una
+6. **Un segundo par de ojos.** 943 comprobaciones automáticas no sustituyen a una
    persona usando esto una semana con datos de verdad.
 
 ## Bloqueado
