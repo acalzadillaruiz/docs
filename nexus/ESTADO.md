@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 14:30 (España)
+**Última actualización:** 2026-09-26, 15:15 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,36 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el recorrido navegable, al día y con portada.** El CEO pidió
+**Lo último terminado:** **registrar el régimen de IVA de la empresa.** La pantalla de
+proveedores decía, con estas palabras: «Esta empresa no consta como agente de retención
+de IVA en esta fecha, así que no corresponde retener. **Si lo es, hay que registrarlo en
+su régimen de IVA.»** Y no había forma de registrarlo: `regimen_iva` la escribían solo
+las pruebas, cada una en su fixture.
+
+En uso real eso significaba que **la retención de IVA a proveedores no se podía hacer
+nunca**, y para un contribuyente especial no es una opción, es una obligación. Una
+pantalla que manda hacer algo tiene que poder hacerlo.
+
+Tres cosas del diseño:
+
+1. **Es un histórico con fecha, no un interruptor.** Una empresa pasa a contribuyente
+   especial el día que el SENIAT la designa, y lo que se le retuvo antes se rigió por lo
+   de antes.
+2. **La lista dice cuántas retenciones se emitieron bajo cada tramo.** Es lo que hace
+   visible la consecuencia de cambiar uno, antes de cambiarlo. No se prohíbe corregir
+   —el porcentaje queda congelado en cada retención, así que el pasado se explica solo—
+   pero el número está delante.
+3. **La retención por factura defectuosa no puede ser menor que la normal.** Es la
+   comprobación que nadie piensa en escribir: al revés significaría que al proveedor le
+   sale mejor entregar la factura mal. Eso no lo dice ninguna ley; lo diría un dedo
+   gordo al teclear los dos porcentajes. Verificado apagándola para ver fallar la prueba.
+
+833 pruebas, todas pasan. `regimen_iva` sale de la lista de tablas sin puerta — quedan
+tres, y la única que es una pantalla que manda algo imposible es **`plantilla_hito`**:
+`/medidas` dice «ese tipo de contrato todavía no tiene plantilla de hitos» y no hay
+forma de crear una. Es el trozo siguiente.
+
+**Antes:** **el recorrido navegable, al día y con portada.** El CEO pidió
 poder entrar a ver la aplicación, y el recorrido publicado era de ocho trozos atrás.
 
 Publicado en https://claude.ai/artifact/613p36bPqXYLT31Tvdrck3 (versión 7), **138

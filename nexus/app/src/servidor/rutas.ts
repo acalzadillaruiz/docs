@@ -58,6 +58,7 @@ import { pintarCobrar } from '../pantallas/cobrar.ts'
 import { meses, instalarPlan, tienePlan, abrirMes, cerrarMes } from '../dominio/periodos.ts'
 import {
   facturasDeProveedor, conceptosIslr, retener, esAgenteDeRetencion,
+  regimenes, registrarRegimen,
 } from '../dominio/proveedores.ts'
 import { pintarProveedores } from '../pantallas/proveedores.ts'
 import { conciliacion, casar, aceptarConNota } from '../dominio/banco.ts'
@@ -772,7 +773,26 @@ export async function resolver(
     `)) as unknown as Array<{ organizacion_id: string }>
 
     let errores: readonly string[] = []
-    if (p.metodo === 'POST') {
+    let hecho: string | null = null
+    if (p.metodo === 'POST' && p.campos['accion'] === 'regimen') {
+      // Registrar el régimen de IVA. La pantalla decía «hay que registrarlo en su
+      // régimen de IVA» y no había forma: la tabla la escribían solo las pruebas, así
+      // que la retención de IVA a proveedores no se podía hacer nunca.
+      const desde = (p.campos['r_desde'] ?? '').trim()
+      const normal = decimal(p.campos['r_normal'])
+      const falla = decimal(p.campos['r_falla'])
+      const r = await comoQuien((q) => registrarRegimen(q, org!.organizacion_id, {
+        desde,
+        esEspecial: p.campos['r_especial'] !== 'no',
+        // Un porcentaje ilegible llega como NaN y el dominio lo rechaza. Convertirlo a
+        // cero guardaría una retención del 0 %, que es lo mismo que no retener pero
+        // pareciendo que sí.
+        normal: normal ?? Number.NaN,
+        falla: falla ?? Number.NaN,
+      }, p.idioma))
+      if (r.hecho) hecho = t(p.idioma, 'regimen.guardado').replace('{d}', desde)
+      else errores = r.errores
+    } else if (p.metodo === 'POST') {
       const doc = p.campos['documento'] ?? ''
       if (!/^[0-9a-f-]{36}$/.test(doc)) return noEncontrado(p.idioma)
       const r = await comoQuien((q) => retener(q, doc,
@@ -785,9 +805,11 @@ export async function resolver(
       lista: await facturasDeProveedor(q, org!.organizacion_id, p.idioma),
       conceptos: await conceptosIslr(q, p.idioma),
       esAgente: await esAgenteDeRetencion(q, org!.organizacion_id),
+      regimen: await regimenes(q, org!.organizacion_id, p.idioma),
     }))
     return html(errores.length === 0 ? 200 : 400, pintarProveedores(
-      datos.lista, datos.conceptos, p.idioma, testigoAnti(testigo), errores, datos.esAgente))
+      datos.lista, datos.conceptos, p.idioma, testigoAnti(testigo), errores, datos.esAgente,
+      datos.regimen, new Date().toISOString().slice(0, 10), hecho))
   }
 
   // Conciliación bancaria. La máquina propone; casar lo hace una persona.
