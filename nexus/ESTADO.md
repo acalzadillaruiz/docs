@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 09:50 (España)
+**Última actualización:** 2026-09-26, 10:35 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,36 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **la conciliación bancaria decía «Todo cuadra en este
+**Lo último terminado:** **dos acciones que salían bien y contestaban sin decir
+nada — y el barrido que las encontró, ya permanente.**
+
+Deshacer una carga volvía a la misma pantalla con la misma caja vacía: la única señal
+de que había pasado algo era que el lote cambiaba de estado en una lista de más
+abajo. Instalar el plan de cuentas, igual: la pantalla volvía sin el aviso de antes y
+había que **deducir de esa ausencia** que había funcionado — que es justo lo que este
+sistema no deja hacer en ninguna otra parte. Y una acción que contesta sin decir nada
+se vuelve a pulsar.
+
+Los dos textos llevaban escritos en los dos idiomas sin que nada los pintara.
+
+**El barrido del diccionario ya no es a mano: es `i18n/sin_pantalla.py` y corre en
+cada pasada.** En un solo día encontró cuatro huecos —el botón de crear hitos, el
+enlace al extracto del banco, y estos dos mensajes—, así que se queda.
+
+Cómo está trazada la raya, porque importa: **no exige que no haya claves sin usar**
+—174 de las 785 no las pinta nadie, y casi todas son vocabulario del sector declarado
+a propósito para fases que no existen: calidad, logística, tesorería, contabilidad
+general—. Exige que **no haya ninguna nueva**. La lista de las de hoy vive en
+`i18n/sin_pantalla.txt`, solo puede encoger, y encogerla se ve en el diff. Se verificó
+añadiendo una clave sin cablear para verlo fallar.
+
+**Una pista que resultó no serlo:** `proveedor.comprobante` está sin usar, pero el
+número del comprobante de retención **sí se enseña** en `/proveedores`, con otra
+clave. Mirado y descartado.
+
+784 pruebas, todas pasan.
+
+**Antes:** **la conciliación bancaria decía «Todo cuadra en este
 periodo» sobre un periodo del que no se había traído ningún extracto.** No cuadraba:
 es que nadie había mirado. Es exactamente la confusión que este sistema entero existe
 para no cometer —dar por hallazgo la ausencia de uno—, cometida en su propia pantalla
@@ -50,12 +79,6 @@ que cuadra — lo que se arregló es que diga cada cosa cuando toca, no que deje
 decir una de las dos.
 
 781 pruebas, todas pasan. Verificado quitando el arreglo para ver fallar la prueba.
-
-**Pistas que deja el barrido del diccionario y quedan sin mirar:** `importar.revertida`
-(deshacer una carga no dice cuántos asientos reversó), `periodo.plan_puesto` (instalar
-el plan de cuentas no confirma nada), `nota.lista` (¿hay forma de ver las notas de
-crédito de una factura?), `proveedor.comprobante` y `fiscal.comprobante_retencion`
-(el comprobante de retención que el proveedor necesita).
 
 **Antes:** **crear los hitos que faltan.** `/medidas` tenía un bloque
 entero —«¿a qué renglones se les olvidó crear los hitos?»— que **señalaba el problema

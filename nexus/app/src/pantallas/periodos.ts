@@ -26,6 +26,8 @@ export function pintarPeriodos(
   m: Meses, idioma: Idioma, antifalsificacion: string, errores: readonly string[] = [],
   /** Cuántas cuentas tiene la empresa. Cero es el día 1, y el día 1 hay que actuar. */
   cuentas = 1,
+  /** Lo que salió bien. Una acción que contesta sin decir nada se vuelve a pulsar. */
+  hecho: string | null = null,
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -61,6 +63,7 @@ export function pintarPeriodos(
   ${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
     errores.map((e) => `<li>${escapar(e)}</li>`).join('')
   }</ul></div>`}
+  ${hecho === null ? '' : `<div class="bien-caja">${escapar(hecho)}</div>`}
 
   ${cuentas > 0 ? '' : `
   <div class="plan">
@@ -93,6 +96,9 @@ export function pintarPeriodos(
 }
 
 export const ESTILOS_PERIODOS = `
+/* Lo que salió bien se dice igual de claro que lo que salió mal. */
+.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
+  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* El aviso del día 1. Sale en ámbar y con su botón dentro porque es lo único que hay
    que hacer antes de nada: sin plan de cuentas no se importa una factura, no se
    asienta un cobro y no sirve de nada abrir un mes. */

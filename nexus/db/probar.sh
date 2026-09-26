@@ -76,6 +76,10 @@ done
 echo
 echo "== diccionario bilingüe =="
 if python3 "$AQUI/../i18n/comprobar.py"; then :; else fallos=$((fallos+1)); fi
+# Y el otro lado del diccionario: texto escrito para una pantalla que nunca se
+# escribio. En un solo dia este barrido destapo cuatro, y dos de ellos eran acciones
+# que salian bien y contestaban sin decir nada.
+if python3 "$AQUI/../i18n/sin_pantalla.py"; then :; else fallos=$((fallos+1)); fi
 
 # Y la capa de aplicacion contra la base de datos de verdad. Deja el esquema recien
 # cargado para que las pruebas de integracion encuentren una base limpia.

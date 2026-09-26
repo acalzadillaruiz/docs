@@ -27,6 +27,14 @@ const FORMATOS_NUMERO = ['ven', 'ang'] as const
 export function pintarSubirHoja(
   idioma: Idioma, antifalsificacion: string, listaLotes: readonly Lote[],
   error = '',
+  /**
+   * Lo que salió BIEN, dicho.
+   *
+   * Deshacer una carga contestaba con esta misma pantalla y sin una línea: la única
+   * señal de que había pasado algo era que el lote cambiaba de estado en una lista
+   * de abajo. Una acción que contesta sin decir nada se vuelve a pulsar.
+   */
+  hecho = '',
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -67,6 +75,7 @@ export function pintarSubirHoja(
 </div></header>`,
     cuerpo: `<main class="wrap">
   ${error === '' ? '' : `<div class="mal-caja">${escapar(error)}</div>`}
+  ${hecho === '' ? '' : `<div class="bien-caja">${escapar(hecho)}</div>`}
   <form method="post" action="/importar" enctype="multipart/form-data">
     <input type="hidden" name="af" value="${escapar(antifalsificacion)}">
     <div class="caja pad">
@@ -181,6 +190,9 @@ export function pintarMapeo(
 }
 
 export const ESTILOS_IMPORTAR = `
+/* Lo que salió bien se dice igual de claro que lo que salió mal. */
+.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
+  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* Deshacer una carga se pide con su motivo y sin ceremonia, pero discreto: no es de
    todos los días, y un botón grande invita a usarlo como si lo fuera. */
 .deshacer{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;width:100%;

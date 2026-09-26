@@ -580,8 +580,14 @@ export async function resolver(
     if (p.campos['accion'] === 'revertir') {
       const r = await comoQuien((q) => revertir(q, (p.campos['lote'] ?? '').trim(),
         p.campos['motivo'] ?? '', personaId, p.idioma))
+      // Deshacer contestaba con esta misma pantalla y SIN UNA LÍNEA: la única señal
+      // era que el lote cambiaba de estado en una lista de más abajo. El texto para
+      // decirlo llevaba escrito en los dos idiomas desde que se hizo el reverso.
       return html(r.hecho ? 200 : 400, pintarSubirHoja(p.idioma, testigoAnti(testigo),
-        await listaDe(), r.hecho ? '' : r.motivo))
+        await listaDe(), r.hecho ? '' : r.motivo,
+        r.hecho
+          ? t(p.idioma, 'importar.revertida').replace('{n}', String(r.asientos))
+          : ''))
     }
 
     if (!a) {
@@ -677,12 +683,18 @@ export async function resolver(
     `)) as unknown as Array<{ organizacion_id: string }>
 
     let errores: readonly string[] = []
+    let hecho: string | null = null
     if (p.metodo === 'POST' && p.campos['accion'] === 'plan') {
       // Instalar el plan de cuentas. Va aqui porque es lo PRIMERO de una empresa
       // nueva, y porque el error que lo pedia —«esta empresa todavia no tiene plan de
       // cuentas»— no tenia ninguna pantalla desde donde arreglarlo.
       const r = await comoQuien((q) => instalarPlan(q, org!.organizacion_id, p.idioma))
       if (!r.hecho) errores = [r.motivo]
+      // Instalar el plan es lo PRIMERO que hace una empresa, y contestaba sin decir
+      // nada: la pantalla volvía sin el aviso de antes y había que deducir de su
+      // ausencia que había funcionado. Deducir de una ausencia es justo lo que este
+      // sistema no deja hacer en ninguna otra parte.
+      else hecho = t(p.idioma, 'periodo.plan_puesto')
     } else if (p.metodo === 'POST') {
       const cuando = anioMes(p)
       if (cuando === null) {
@@ -701,7 +713,7 @@ export async function resolver(
       comoQuien((q) => tienePlan(q, org!.organizacion_id)),
     ])
     return html(errores.length === 0 ? 200 : 400,
-      pintarPeriodos(m, p.idioma, testigoAnti(testigo), errores, cuentas))
+      pintarPeriodos(m, p.idioma, testigoAnti(testigo), errores, cuentas, hecho))
   }
 
   // Las retenciones a proveedores. GPS es agente de retención: no retener cuando

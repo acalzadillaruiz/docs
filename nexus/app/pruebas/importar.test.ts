@@ -768,3 +768,63 @@ test('la pantalla de meses avisa del plan que falta, y solo cuando falta', async
   const con = pintarPeriodos(m, 'es', 'af', [], 84)
   assert.equal(/todavía no tiene plan de cuentas/.test(con), false)
 })
+
+// ===========================================================================
+// Y las dos acciones contestaban SIN DECIR NADA.
+//
+// Deshacer una carga volvía a la misma pantalla con la misma caja vacía: la única
+// señal de que había pasado algo era que el lote cambiaba de estado en una lista de
+// más abajo. Instalar el plan de cuentas, igual: la pantalla volvía sin el aviso de
+// antes, y había que deducir de su ausencia que había funcionado.
+//
+// Deducir de una ausencia es exactamente lo que este sistema no deja hacer en
+// ninguna otra parte. Y una acción que contesta sin decir nada se vuelve a pulsar.
+//
+// Los dos textos —«Carga deshecha: {n} asiento(s) reversado(s)» y «Plan de cuentas
+// instalado»— llevaban escritos en los dos idiomas sin que nada los pintara. Los
+// destapó el barrido de claves del diccionario sin pantalla.
+
+test('deshacer una carga DICE cuántos asientos reversó', async () => {
+  const { pintarSubirHoja } = await import('../src/pantallas/importar.ts')
+  const { t } = await import('../src/i18n/t.ts')
+  await limpio()
+  const lote = await traerHasta('confirmado')
+  const r = await dentro((q) => revertir(q, lote, 'la hoja estaba mal', YO, 'es'))
+  assert.equal(r.hecho, true)
+  const cuantos = (r as { asientos: number }).asientos
+  assert.ok(cuantos > 0)
+
+  const h = pintarSubirHoja('es', 'af', await dentro((q) => lotes(q, G)), '',
+    t('es', 'importar.revertida').replace('{n}', String(cuantos)))
+  assert.match(h, /Carga deshecha/, 'deshacer contesta sin decir nada')
+  assert.match(h, new RegExp(`${cuantos} asiento`))
+  // Y sin mensaje la caja no sale: un recuadro vacío es peor que ninguno.
+  const sin = pintarSubirHoja('es', 'af', await dentro((q) => lotes(q, G)), '')
+  assert.doesNotMatch(sin, /<div class="bien-caja">/)
+})
+
+test('instalar el plan de cuentas lo DICE, no lo deja deducir de una ausencia', async () => {
+  const { pintarPeriodos } = await import('../src/pantallas/periodos.ts')
+  const { meses } = await import('../src/dominio/periodos.ts')
+  const { t } = await import('../src/i18n/t.ts')
+  const m = await dentro((q) => meses(q, G, 'es'))
+
+  const con = pintarPeriodos(m, 'es', 'af', [], 84, t('es', 'periodo.plan_puesto'))
+  assert.match(con, /Plan de cuentas instalado/)
+  const sin = pintarPeriodos(m, 'es', 'af', [], 84)
+  assert.doesNotMatch(sin, /<div class="bien-caja">/)
+})
+
+test('y en inglés las dos dicen lo mismo', async () => {
+  const { pintarPeriodos } = await import('../src/pantallas/periodos.ts')
+  const { pintarSubirHoja } = await import('../src/pantallas/importar.ts')
+  const { meses } = await import('../src/dominio/periodos.ts')
+  const { t } = await import('../src/i18n/t.ts')
+  const m = await dentro((q) => meses(q, G, 'en'))
+  assert.match(pintarPeriodos(m, 'en', 'af', [], 84, t('en', 'periodo.plan_puesto')),
+    /Chart of accounts installed/)
+  assert.match(
+    pintarSubirHoja('en', 'af', await dentro((q) => lotes(q, G)), '',
+      t('en', 'importar.revertida').replace('{n}', '3')),
+    /Import undone/)
+})
