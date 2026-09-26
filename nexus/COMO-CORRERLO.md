@@ -45,7 +45,7 @@ subir el avance, emitir una valuación, facturarla y encontrar su asiento en el 
   desechable en `/var/tmp`, aparte de cualquier base que ya tengas.
 
 El script, en orden: comprueba las dos cosas de arriba, instala las dependencias si
-faltan, crea la base, carga las 38 piezas del esquema, siembra la empresa de muestra
+faltan, crea la base, carga las 39 piezas del esquema, siembra la empresa de muestra
 —quince contratos, tres de cada uno de los cinco tipos— y enciende el servidor.
 
 Para empezar de cero otra vez: `rm -rf /var/tmp/nexuspg` y volver a arrancar.
@@ -75,6 +75,6 @@ datos de verdad, y esa decisión no es de programación.
 cd docs/nexus/db && ./probar.sh
 ```
 
-884 comprobaciones contra un PostgreSQL desechable. Tarda unos siete minutos y termina
+887 comprobaciones contra un PostgreSQL desechable. Tarda unos siete minutos y termina
 diciendo `TODAS LAS PRUEBAS PASAN` o qué archivo falló. Es lo que sí ejercita los
 formularios de punta a punta: subir un documento, verificar un hito, cerrar un mes.

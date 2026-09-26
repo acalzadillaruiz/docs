@@ -189,6 +189,72 @@ test('el correo sale en el idioma de cada destinatario, no en el del sistema', a
   assert.match(suyo.asunto, /Progress payment/)
 })
 
+test('anular una valuación DESCARTA el aviso que ya estaba en la cola', async () => {
+  // El circuito completo, que es donde estaba el fallo: se presenta, el disparador encola
+  // «hay algo esperando tu firma», y antes de que el bucle haga su pasada —cada tres
+  // minutos— alguien anula la valuación porque la presentó por error. Los hitos se
+  // liberaban, eso estaba pensado; el correo salía igual, y el cliente entraba al portal a
+  // buscar una valuación que ya no existe.
+  //
+  // `estado_aviso` tenía un valor `descartado` que no ponía nadie. Lo encontró el barrido
+  // de valores de enum que la aplicación nunca escribe.
+  const v = await presentada(905)
+
+  const [antes] = (await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    return q`select estado::text from aviso
+              where sobre_id = ${v}::uuid and tipo = 'valuacion_presentada'`
+  })) as unknown as Array<{ estado: string }>
+  assert.equal(antes!.estado, 'pendiente', 'no se encoló el aviso, así que no hay qué probar')
+
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`update valuacion set estado = 'anulada' where id = ${v}::uuid`
+  })
+
+  const [despues] = (await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    return q`select estado::text, ultimo_error from aviso
+              where sobre_id = ${v}::uuid and tipo = 'valuacion_presentada'`
+  })) as unknown as Array<{ estado: string; ultimo_error: string | null }>
+  assert.equal(despues!.estado, 'descartado',
+    'el aviso de una valuación anulada sigue esperando para salir')
+  assert.match(despues!.ultimo_error ?? '', /anul/i, 'descartado sin decir por qué')
+
+  // Y lo que de verdad importa: que el correo NO sale.
+  const papelera = new Papelera()
+  const r = await dentro((q) => vaciarCola(q, papelera, 'https://nexus.gps'))
+  assert.equal(r.fallidos, 0)
+  assert.equal(
+    papelera.mandados.some((m) => JSON.stringify(m).includes('905')), false,
+    'mandó el correo de una valuación anulada')
+})
+
+test('y aprobarla descarta el «esperando tu firma», pero no el aviso nuevo', async () => {
+  // La otra mitad: descartar no puede llevarse por delante el aviso del estado NUEVO. Los
+  // dos disparadores tocan la misma cola y el orden entre ellos es el nombre que tienen.
+  const v = await presentada(906)
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`update valuacion set estado = 'aprobada', aprobada_el = current_date,
+                                 aprobada_por = ${ING}::uuid
+             where id = ${v}::uuid`
+  })
+
+  const filas = (await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    return q`select tipo::text, estado::text from aviso
+              where sobre_id = ${v}::uuid order by tipo`
+  })) as unknown as Array<{ tipo: string; estado: string }>
+
+  const presentado = filas.find((f) => f.tipo === 'valuacion_presentada')
+  const aprobado = filas.find((f) => f.tipo === 'valuacion_aprobada')
+  assert.equal(presentado?.estado, 'descartado',
+    'siguió pendiente el aviso de firmar algo que ya está firmado')
+  assert.equal(aprobado?.estado, 'pendiente',
+    'se descartó también el aviso de que el cliente aprobó, que sí hay que mandar')
+})
+
 test('vaciar dos veces no manda el mismo correo dos veces', async () => {
   const v = await presentada(903)
   const uno = new Papelera()

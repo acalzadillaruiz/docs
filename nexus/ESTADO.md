@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-27, 02:40 (España)
+**Última actualización:** 2026-09-27, 03:30 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -34,8 +34,54 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **un contrato que termina ya puede terminarse** — y un barrido
-nuevo que es el que lo encontró.
+**Lo último terminado:** **un correo que no se manda** — y el quinto barrido, del último
+nivel que quedaba.
+
+El barrido nuevo busca **valores de enum que la aplicación nunca escribe**. Es la misma
+forma del agujero grande de ayer: `estado_contrato` declaraba cinco estados y se llegaba a
+dos. Un valor de enum que nadie escribe es una posibilidad que el esquema promete y el
+producto no tiene. De 71 valores salieron **dos**.
+
+Y uno tapaba un fallo con consecuencia para el cliente. El circuito, tal como estaba:
+
+1. Se presenta una valuación. Un disparador encola el aviso «hay algo esperando tu firma».
+2. El bucle de avisos lo manda en la siguiente pasada, unos minutos después.
+3. Si entre una cosa y otra la valuación **se anula** —una presentación equivocada que se
+   corrige en el momento, que es justo cuando pasa—, se liberan sus hitos y **el aviso no se
+   toca**.
+4. El correo sale igual. El cliente recibe «hay algo esperando tu firma» de una valuación que
+   ya no existe, y entra al portal a buscarla.
+
+Anular ya liberaba los hitos: eso estaba pensado. Lo que no estaba era que el aviso ya
+encolado dejara de tener sentido — y `estado_aviso` tenía desde el primer día un valor
+`descartado` que no ponía nadie. Ahora una valuación que deja de estar presentada descarta
+ese aviso, una anulada descarta todos los suyos, y queda escrito por qué.
+
+**Lo delicado era no descartar de más:** los dos disparadores tocan la misma cola, y el
+orden entre ellos lo decide su nombre. Si el de descartar corriera antes, se llevaría por
+delante el aviso del estado nuevo que el otro acaba de encolar — o sea que aprobar una
+valuación no avisaría a GPS. Comprobado de las dos maneras: sin el disparador (las dos
+pruebas rojas) y descartando de más (roja la que vigila justo eso).
+
+El otro valor, `estado_periodo.en_cierre`, queda **declarado y no construido**: un periodo va
+de abierto a cerrado, y el paso intermedio serviría para congelar las operaciones mientras se
+hacen los asientos de ajuste. Eso es una decisión sobre el proceso de cierre —quién puede
+asentar durante él— no un arreglo de programación.
+
+**Los cinco barridos permanentes, ahora:** funciones del esquema que nadie llama, términos
+del diccionario que ninguna pantalla pinta, tablas que la aplicación no escribe, columnas que
+nadie nombra, y valores de enum que nadie escribe. Los cinco tienen su lista declarada con
+motivos y su afirmación de que **fallan cuando dejan de mirar** — al de enums le hizo falta
+el primer día: contestó «0 valores» tan contento porque la base de datos se había caído.
+
+**887 pruebas, todas pasan.**
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **un contrato que termina ya puede terminarse**, y el barrido de columnas que
+lo encontró.
 
 `estado_contrato` declara cinco estados desde el primer día —borrador, vigente, suspendido,
 cerrado, liquidado— y la aplicación sabía llegar a **dos**. `alta.ts` pasa de borrador a
@@ -107,10 +153,6 @@ escritura de `sesion.cerrada_por`.
   que es del CEO y no mía.
 - **La decisión 14**, que es de dinero: `valuar.ts` elige el concepto de ISLR de cada
   valuación con `order by vigente_desde desc limit 1`, sin mirar de qué concepto se trata.
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **los valores fiscales** — y con ellos, el agujero más grave que ha aparecido en
 todo el proyecto.

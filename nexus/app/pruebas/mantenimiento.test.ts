@@ -500,3 +500,73 @@ test('y la lista de columnas sin uso solo puede encoger', async () => {
   assert.deepEqual(sobran, [],
     'entradas que ya no hacen falta en COLUMNAS_SIN_USO:\n  ' + sobran.join('\n  '))
 })
+
+/**
+ * Valores de enum que nadie escribe: el barrido del nivel que faltaba.
+ *
+ * Es la misma forma del agujero más grande de esta semana. `estado_contrato` declaraba
+ * cinco estados y la aplicación sabía llegar a dos, así que un contrato terminado se
+ * quedaba vigente para siempre. Un valor de enum que nadie escribe es una posibilidad que
+ * el esquema promete y el producto no tiene.
+ *
+ * Se busca el valor como literal entrecomillado, que es como se escribe de verdad, y se
+ * quita la declaración del propio tipo: nombrarlo al crear el enum no es usarlo.
+ */
+const ENUMS_SIN_USO = new Map<string, string>([
+  // Un periodo va de abierto a cerrado y ya. El estado de en medio serviría para congelar
+  // las operaciones mientras se hacen los asientos de ajuste, y eso es una decisión sobre
+  // el proceso de cierre —quién puede asentar durante él— no un arreglo de programación.
+  ['estado_periodo.en_cierre', 'el cierre va de abierto a cerrado; el paso intermedio es una decisión de proceso'],
+])
+
+test('los valores de enum que nadie escribe están DICHOS, no callados', async () => {
+  const valores = (await dentro((q) => q`
+    select t.typname || '.' || e.enumlabel as v
+      from pg_type t
+      join pg_enum e on e.enumtypid = t.oid
+      join pg_namespace n on n.oid = t.typnamespace
+     where n.nspname = 'public'
+     order by t.typname, e.enumsortorder
+  `)) as unknown as Array<{ v: string }>
+
+  // Si el barrido deja de mirar, tiene que fallar. La primera vez que lo lancé contestó
+  // «0 valores de enum» tan contento: la base de datos se había caído, y un barrido que no
+  // encuentra nada porque no puede mirar se parece mucho a uno que no encuentra nada.
+  assert.ok(valores.length > 60,
+    `solo se leyeron ${valores.length} valores de enum: el barrido no barrió`)
+
+  const dir = new URL('../../db/schema/', import.meta.url)
+  const sqls = await Promise.all(
+    (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()
+      .map(async (f) => sinComentarios(await readFile(new URL(f, dir), 'utf8'))))
+
+  const fuentes: string[] = []
+  const recoger = async (base: URL, saltar: readonly string[] = []) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      if (saltar.includes(e.name)) continue
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recoger(u, saltar)
+      else if (e.name.endsWith('.ts')) fuentes.push(sinComentarios(await readFile(u, 'utf8')))
+    }
+  }
+  await recoger(new URL('../src/', import.meta.url))
+  await recoger(new URL('../herramientas/', import.meta.url), NO_ES_LA_APP)
+  assert.ok(fuentes.length > 40, `solo se leyeron ${fuentes.length} archivos de código`)
+  const codigo = fuentes.join('\n')
+
+  const inalcanzables: string[] = []
+  for (const { v } of valores) {
+    if (ENUMS_SIN_USO.has(v)) continue
+    const [tipo, etiqueta] = v.split('.') as [string, string]
+    const literal = new RegExp(`['"]${etiqueta}['"]`)
+    if (literal.test(codigo)) continue
+    const sinDeclarar = new RegExp(`create type ${tipo}\\s+as enum\\s*\\([^)]*\\)`, 'is')
+    if (sqls.some((t) => literal.test(t.replace(sinDeclarar, ' ')))) continue
+    inalcanzables.push(v)
+  }
+
+  assert.deepEqual(inalcanzables, [],
+    'valores de enum que la aplicación nunca escribe, y no están declarados arriba con su ' +
+    'motivo. Cada uno es una posibilidad que el esquema promete y el producto no tiene:\n  ' +
+    inalcanzables.join('\n  '))
+})
