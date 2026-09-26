@@ -1,0 +1,193 @@
+/**
+ * El mantenimiento periódico, y el barrido que impide que vuelva a pasar.
+ *
+ * `caducar_sesiones()` y `limpiar_peticiones_sso()` estaban escritas, probadas y
+ * comentadas con «se llama desde una tarea periódica». **No había ninguna tarea
+ * periódica que las llamara.** No rompían nada, y por eso llevaban meses ahí: tres
+ * tablas creciendo para siempre en un sistema pensado para correr años.
+ *
+ * Así que aquí hay dos cosas. Las pruebas de que limpian lo que tienen que limpiar y
+ * **no lo que no**, y un barrido que lee el esquema y exige que toda función de
+ * limpieza que exista esté llamada desde algún sitio. Una función de mantenimiento
+ * que nadie llama es peor que no tenerla: da por resuelto lo que no lo está.
+ */
+
+import { test, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFile, readdir } from 'node:fs/promises'
+import { conectar, cerrar, comoPersona } from '../src/db/conexion.ts'
+import {
+  limpiar, tocaLimpiar, CADA_CUANTO, DIAS_INTENTOS, DIAS_SSO,
+} from '../src/dominio/mantenimiento.ts'
+
+const DESTINO = { host: '/var/tmp', port: 55432, database: 'nexus', username: 'nexus' }
+const G = 'cc000000-0000-0000-0000-0000000000a1'
+const YO = 'cc000000-0000-0000-0000-0000000000a2'
+const SECRETO = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'
+
+const dentro = <T>(f: Parameters<typeof comoPersona<T>>[2]) =>
+  comoPersona<T>({ id: YO }, 'nexus_interno', f)
+
+before(async () => {
+  conectar(DESTINO)
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`insert into organizacion (id, tipo, nombre, rif)
+            values (${G},'gps','GPS Mantenimiento','J-906300000-0')
+            on conflict (id) do update set nombre = excluded.nombre`
+    await q`insert into persona (id, organizacion_id, correo, nombre, metodo,
+                                 clave_hash, totp_secreto)
+            values (${YO}, ${G},'mant@prueba.test','Interno','clave_2fa',
+                    'x', ${SECRETO})
+            on conflict (id) do update set activa = true`
+    // La mesa limpia al empezar, no al terminar: una prueba que se muere a mitad no
+    // llega nunca a su limpieza del final y la siguiente se encuentra lo de ayer.
+    await q`delete from sesion where origen like 'mant-%'`
+    await q`delete from peticion_sso where origen like 'mant-%'`
+    await q`delete from intento_acceso where correo like 'mant-%@prueba.test'`
+  })
+})
+after(async () => { await cerrar() })
+
+test('cierra la sesión vencida, y NO toca la que sigue viva', async () => {
+  await dentro((q) => q`
+    insert into sesion (persona_id, huella, origen, expira_en) values
+      (${YO},'mant-h-vieja','mant-v', now() - interval '1 hour'),
+      (${YO},'mant-h-viva','mant-w', now() + interval '8 hours')`)
+  const r = await dentro((q) => limpiar(q))
+  assert.ok(r.sesiones >= 1, 'no cerró la sesión vencida')
+
+  const [v] = (await dentro((q) => q`
+    select cerrada_en, motivo_cierre from sesion where huella = 'mant-h-vieja'
+  `)) as unknown as Array<{ cerrada_en: Date | null; motivo_cierre: string }>
+  assert.notEqual(v!.cerrada_en, null)
+  assert.equal(v!.motivo_cierre, 'caducada')
+
+  const [w] = (await dentro((q) => q`
+    select cerrada_en from sesion where huella = 'mant-h-viva'
+  `)) as unknown as Array<{ cerrada_en: Date | null }>
+  assert.equal(w!.cerrada_en, null, 'cerró de más: echó a alguien que estaba dentro')
+})
+
+test('borra la petición de SSO olvidada, y NO la de hace un minuto', async () => {
+  await dentro((q) => q`
+    insert into peticion_sso (estado, nonce, metodo, organizacion_id, origen, creada_en)
+    values ('mant-vieja','n1','microsoft', ${G},'mant-v', now() - interval '9 days'),
+           ('mant-nueva','n2','microsoft', ${G},'mant-w', now() - interval '1 minute')`)
+  await dentro((q) => limpiar(q))
+  const [n] = (await dentro((q) => q`
+    select count(*) filter (where estado = 'mant-vieja')::int as vieja,
+           count(*) filter (where estado = 'mant-nueva')::int as nueva
+      from peticion_sso
+  `)) as unknown as Array<{ vieja: number; nueva: number }>
+  assert.equal(n!.vieja, 0, 'la petición olvidada se quedó ahí')
+  assert.equal(n!.nueva, 1, 'se llevó por delante una petición en curso')
+})
+
+test('tira los intentos viejos, y deja INTACTA la hora que mira el freno', async () => {
+  // Es la prueba que importa de las tres: si la limpieza se llevara la última hora,
+  // el freno contra probar claves a ciegas dejaría de frenar sin que nadie lo note.
+  await dentro((q) => q`
+    insert into intento_acceso (correo, origen, exito, fase, ocurrido_en) values
+      ('mant-viejo@prueba.test','mant-v', false,'clave', now() - interval '90 days'),
+      ('mant-hoy@prueba.test','mant-w', false,'clave', now() - interval '5 minutes')`)
+  const r = await dentro((q) => limpiar(q))
+  assert.ok(r.intentos >= 1)
+  const [n] = (await dentro((q) => q`
+    select count(*) filter (where correo = 'mant-viejo@prueba.test')::int as viejo,
+           count(*) filter (where correo = 'mant-hoy@prueba.test')::int as hoy
+      from intento_acceso
+  `)) as unknown as Array<{ viejo: number; hoy: number }>
+  assert.equal(n!.viejo, 0, 'sigue guardando correos de hace tres meses')
+  assert.equal(n!.hoy, 1, 'se llevó lo que el freno necesita para frenar')
+})
+
+test('una segunda pasada no vuelve a contar lo mismo', async () => {
+  // Una limpieza que dice «cerré cuatro sesiones» cada hora sin haber cerrado
+  // ninguna hace que el registro deje de significar algo.
+  await dentro((q) => limpiar(q))
+  const r = await dentro((q) => limpiar(q))
+  assert.equal(r.sesiones, 0)
+  assert.equal(r.peticiones, 0)
+  assert.equal(r.intentos, 0)
+})
+
+test('los plazos son los que dicen ser', async () => {
+  assert.equal(DIAS_SSO, 2)
+  assert.equal(DIAS_INTENTOS, 30)
+  // Y el de intentos es holgadamente mayor que la hora del freno: si algún día
+  // alguien lo bajara a cero, el freno se quedaría sin con qué frenar.
+  assert.ok(DIAS_INTENTOS * 24 > 1)
+})
+
+test('se limpia una vez por hora: ni cada vuelta, ni nunca', () => {
+  assert.equal(tocaLimpiar(null, 1_000_000), true, 'la primera vuelta no limpió')
+  assert.equal(tocaLimpiar(1_000_000, 1_000_000 + CADA_CUANTO - 1), false,
+    'limpia en cada vuelta: trabajo constante contra la base de datos a cambio de nada')
+  assert.equal(tocaLimpiar(1_000_000, 1_000_000 + CADA_CUANTO), true)
+})
+
+test('NINGUNA función de limpieza del esquema se queda sin quien la llame', async () => {
+  // El barrido que habría encontrado esto solo. Lee el esquema, saca las funciones
+  // que limpian o caducan algo, y exige que cada una esté nombrada desde el código
+  // que se ejecuta —no desde otra prueba, que es donde estaban las dos huérfanas.
+  const dir = new URL('../../db/schema/', import.meta.url)
+  const archivos = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort()
+  const funciones = new Set<string>()
+  for (const f of archivos) {
+    const texto = await readFile(new URL(f, dir), 'utf8')
+    for (const m of texto.matchAll(
+      /create or replace function ((?:limpiar|caducar|purgar)_[a-z_]+)\s*\(/g)) {
+      funciones.add(m[1]!)
+    }
+  }
+  assert.ok(funciones.size >= 3,
+    `solo se leyeron ${funciones.size} funciones de limpieza del esquema`)
+
+  // Dónde se puede llamar a una: el código de la aplicación y las herramientas.
+  //
+  // Se quitan los comentarios antes de contar, y no es un detalle: la primera
+  // versión de este barrido daba por llamada a `caducar_sesiones` porque el
+  // comentario de cabecera de este mismo archivo la nombraba. Un barrido que se
+  // conforma con que alguien la mencione es exactamente el barrido que no habría
+  // encontrado el fallo que viene a impedir.
+  const sinComentarios = (t: string) => t
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .split('\n').map((l) => l.replace(/(--|\/\/).*$/, '')).join('\n')
+
+  const fuentes: string[] = []
+  const recoger = async (base: URL) => {
+    for (const e of await readdir(base, { withFileTypes: true })) {
+      const u = new URL(e.name + (e.isDirectory() ? '/' : ''), base)
+      if (e.isDirectory()) await recoger(u)
+      else if (e.name.endsWith('.ts')) fuentes.push(sinComentarios(await readFile(u, 'utf8')))
+    }
+  }
+  await recoger(new URL('../src/', import.meta.url))
+  await recoger(new URL('../herramientas/', import.meta.url))
+  // Y el propio esquema: una función puede llamar a otra, como hace mantenimiento().
+  for (const f of archivos) fuentes.push(sinComentarios(await readFile(new URL(f, dir), 'utf8')))
+
+  const huerfanas = [...funciones].filter((fn) => {
+    // Se cuentan las APARICIONES, no los archivos: una función puede definirse y
+    // llamarse en el mismo archivo, como `limpiar_intentos_acceso` dentro de
+    // `mantenimiento()`, y contar archivos la daba por huérfana estando llamada.
+    const usos = fuentes.reduce((n, t) => n + t.split(fn).length - 1, 0)
+    // Una sola aparición es su propia definición: nadie más la nombra.
+    return usos <= 1
+  })
+  assert.deepEqual(huerfanas, [],
+    'funciones de limpieza que no llama nadie —la máquina montada y sin puerta—: ' +
+    huerfanas.join(', '))
+})
+
+test('y el bucle que corre siempre es quien las llama', async () => {
+  // Que existan llamadas no basta: tienen que estar en lo que se queda corriendo.
+  // Antes estaban llamadas desde las pruebas del esquema y desde ningún sitio más.
+  const avisar = await readFile(new URL('../herramientas/avisar.ts', import.meta.url), 'utf8')
+  assert.match(avisar, /from '\.\.\/src\/dominio\/mantenimiento\.ts'/,
+    'el único proceso que corre siempre no sabe nada del mantenimiento')
+  assert.match(avisar, /await limpiar\(q\)/)
+  assert.match(avisar, /tocaLimpiar\(/,
+    'limpia en cada vuelta en vez de una vez por hora')
+})

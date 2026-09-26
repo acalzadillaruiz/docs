@@ -1,5 +1,13 @@
 /**
- * Vacía la cola de avisos. Se llama desde fuera, una vez cada pocos minutos.
+ * Vacía la cola de avisos, y hace la limpieza de la casa. Se llama desde fuera, una
+ * vez cada pocos minutos.
+ *
+ * Lo segundo va aquí y no en un segundo servicio por lo mismo que existe `bucle.ts`:
+ * dos cosas que instalar son dos cosas que se pueden olvidar de instalar, y el
+ * mantenimiento llegó aquí precisamente porque se olvidó. `caducar_sesiones()` y
+ * `limpiar_peticiones_sso()` llevaban meses escritas y **sin que nadie las llamara**.
+ * Se hace una vez por hora, no cada vuelta: una sesión vencida que se cierra una hora
+ * tarde no la nota nadie.
  *
  * Va aparte del servidor web a propósito. Mandar correo dentro del proceso que
  * atiende peticiones significa que un servidor de correo lento hace lenta la
@@ -27,6 +35,7 @@
 
 import { conectar, cerrar, comoPersona, type Destino } from '../src/db/conexion.ts'
 import { vaciarCola, encolarLoParado } from '../src/dominio/avisos.ts'
+import { limpiar, tocaLimpiar } from '../src/dominio/mantenimiento.ts'
 import { CorreoSmtp, CorreoAlRegistro } from '../src/servidor/correo.ts'
 import { repetir } from '../src/servidor/bucle.ts'
 
@@ -75,7 +84,14 @@ if (bandera) {
 
 conectar(BD)
 
-/** Una pasada: encolar lo parado si toca, y vaciar la cola. */
+/**
+ * Cuándo se limpió por última vez. Vive en memoria a propósito: si el proceso se
+ * reinicia, limpiar una vez de más no cuesta nada, y guardarlo en la base de datos
+ * sería una tabla más que mantener para ahorrar un borrado que no borra nada.
+ */
+let ultimaLimpieza: number | null = null
+
+/** Una pasada: encolar lo parado si toca, vaciar la cola, y limpiar si toca. */
 async function pasada() {
   const r = await comoPersona({ id: SERVICIO }, 'nexus_interno', async (q) => {
     // Una vez al día se le pide además que encole lo que lleva parado. Un documento
@@ -85,7 +101,16 @@ async function pasada() {
       ? await encolarLoParado(q, Number(process.env.NEXUS_DIAS_PARADO ?? 3))
       : 0
     const cola = await vaciarCola(q, transporte, BASE)
-    return { parados, ...cola }
+
+    // El mantenimiento va aquí y no en un segundo servicio porque dos cosas que
+    // instalar son dos cosas que se pueden olvidar de instalar — y este trozo existe
+    // justamente porque se olvidaron. Una vez por hora, no cada vuelta: una sesión
+    // vencida que se cierra una hora tarde no la nota nadie.
+    const ahora = Date.now()
+    const casa = tocaLimpiar(ultimaLimpieza, ahora) ? await limpiar(q) : null
+    if (casa) ultimaLimpieza = ahora
+
+    return { parados, ...cola, casa }
   })
   // En marcha continua no se escribe una línea cada tres minutos por no decir nada:
   // un registro lleno de ceros es un registro que nadie lee, y entonces tampoco se
@@ -93,6 +118,11 @@ async function pasada() {
   if (!repetirCada || r.enviados > 0 || r.fallidos > 0 || r.parados > 0) {
     console.log(`avisos: ${r.enviados} enviados, ${r.fallidos} fallidos` +
       (r.parados ? `, ${r.parados} encolados por llevar días parados` : ''))
+  }
+  const c = r.casa
+  if (c && (c.sesiones > 0 || c.peticiones > 0 || c.intentos > 0)) {
+    console.log(`mantenimiento: ${c.sesiones} sesiones caducadas, ` +
+      `${c.peticiones} peticiones de SSO, ${c.intentos} intentos de entrada`)
   }
   return r
 }

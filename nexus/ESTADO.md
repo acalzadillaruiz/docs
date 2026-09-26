@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 07:40 (España)
+**Última actualización:** 2026-09-26, 08:20 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,31 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **se puede invitar a alguien.** Hasta hoy no se podía: la
+**Lo último terminado:** **el mantenimiento que nadie llamaba.**
+`caducar_sesiones()` y `limpiar_peticiones_sso()` estaban escritas, probadas y
+comentadas con «se llama desde una tarea periódica». **No había ninguna tarea
+periódica que las llamara.** Séptima vez que aparece la misma forma, y la más
+silenciosa: no rompía nada, solo dejaba tablas creciendo para siempre.
+
+Al ir a poner la puerta salió una tercera: `intento_acceso` guarda un correo por cada
+intento de entrada y no la limpiaba nadie. El freno contra probar claves a ciegas
+solo mira la última hora; lo demás, pasado un mes, es una lista de correos que crece
+sola y que nadie abre. Ahora se tira a los 30 días.
+
+Todo junto en `mantenimiento()`, llamada desde el bucle de `avisar.ts --repetir`
+**una vez por hora**, no cada vuelta. Va ahí y no en un segundo servicio porque dos
+cosas que instalar son dos cosas que se pueden olvidar de instalar — y este trozo
+existe justamente porque se olvidaron dos.
+
+Y, más importante que las funciones: **un barrido que lee el esquema y exige que toda
+función de limpieza que exista esté llamada desde el código que se ejecuta.** La
+primera versión daba por llamada a `caducar_sesiones` porque un comentario la
+nombraba; ahora quita los comentarios antes de contar. Se comprobó quitando la
+llamada a propósito para verlo fallar.
+
+766 pruebas, todas pasan.
+
+**Antes:** **se puede invitar a alguien.** Hasta hoy no se podía: la
 pantalla de «Crea tu clave» existía desde el primer día y mandaba el formulario a
 `/invitacion`, **una ruta que no estaba escrita**, y nada en ninguna parte creaba una
 fila en `persona`. Dar de alta al ingeniero de una operadora era abrir una consola de
@@ -66,11 +90,6 @@ Y una máquina que ya estaba debajo: `desactivar_persona` llamaba a
 «no tenía ninguna sesión abierta» de alguien que estaba dentro.
 
 758 pruebas, todas pasan, dos pasadas seguidas.
-
-**Lo siguiente:** seguir buscando máquinas sin puerta. Las dos que quedan
-localizadas: `caducar_sesiones()` y `limpiar_peticiones_sso()` no las llama nadie —
-ni el bucle de `avisar.ts --repetir`—, así que las sesiones caducadas y las peticiones
-de SSO se quedan en la tabla para siempre.
 
 **Antes:** **deshacer una carga — y al construir el botón salió que
 `revertir_lote` NO REVERSABA NADA.**
