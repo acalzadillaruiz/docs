@@ -26,7 +26,7 @@
  */
 
 import type { Consulta } from '../db/conexion.ts'
-import { moneda, numero, type Idioma } from '../i18n/t.ts'
+import { moneda, numero, t, type Idioma } from '../i18n/t.ts'
 
 export type FilaBrecha = {
   readonly contrato: string
@@ -181,4 +181,66 @@ export function dias(idioma: Idioma, n: number): string {
   const texto = numero(idioma, n, n % 1 === 0 ? 0 : 1)
   if (idioma === 'en') return `${texto} ${n === 1 ? 'day' : 'days'}`
   return `${texto} ${n === 1 ? 'día' : 'días'}`
+}
+
+// ---------------------------------------------------------------------------
+// Crear los hitos que faltan.
+//
+// La pantalla señalaba los renglones sin hitos —«a estos se les olvidó»— y no había
+// forma de crearlos. `crear_hitos_desde_plantilla()` existía desde el principio y la
+// llamaba UN sitio: el alta de un contrato. Un renglón que llegó por otro camino —de
+// una hoja de Excel, de un contrato anterior a la plantilla— se quedaba sin hitos
+// para siempre, con avance cero, indistinguible de uno que no ha empezado. Octava vez
+// que aparece la misma forma: la máquina ya estaba debajo y faltaba la puerta.
+//
+// Y el texto del botón llevaba escrito en el diccionario desde el primer día, en los
+// dos idiomas, sin que ninguna pantalla lo usara. Eso es lo que lo destapó.
+
+export type Creados =
+  | { readonly hecho: true; readonly cuantos: number }
+  | { readonly hecho: false; readonly motivo: string }
+
+/**
+ * Crea los hitos de un renglón a partir de la plantilla de su tipo de contrato.
+ *
+ * **La comprobación de a quién pertenece el renglón se hace AQUÍ y no se puede
+ * quitar.** `crear_hitos_desde_plantilla()` es `security definer`: se salta las
+ * políticas de fila. Llamarla con un identificador que llegue de un formulario sin
+ * haber comprobado antes de quién es sería dejar escribir en el contrato de otro.
+ *
+ * Todas las condiciones se comprueban ANTES de llamarla. Un `try/catch` alrededor no
+ * serviría: esto corre dentro de una transacción, y postgres vuelve a lanzar el error
+ * al cerrarla aunque aquí se hubiera atrapado.
+ */
+export async function crearHitos(
+  q: Consulta, renglonId: string, orgId: string, idioma: Idioma,
+): Promise<Creados> {
+  if (!/^[0-9a-f-]{36}$/i.test(renglonId)) {
+    return { hecho: false, motivo: t(idioma, 'medida.error.no_existe') }
+  }
+
+  const [r] = (await q`
+    select ct.tipo::text as tipo,
+           (select count(*)::int from hito h where h.renglon_id = rg.id) as hitos,
+           (select count(*)::int from plantilla_hito pl where pl.tipo = ct.tipo) as pasos
+      from renglon rg join contrato ct on ct.id = rg.contrato_id
+     where rg.id = ${renglonId}::uuid
+       and ct.organizacion_id = ${orgId}::uuid
+       and ct.estado = 'vigente'
+  `) as unknown as Array<{ tipo: string; hitos: number; pasos: number }>
+
+  // No existe, no es de esta organización, o su contrato no está vigente: las tres
+  // contestan lo mismo. Distinguirlas diría si existe un renglón que no es tuyo.
+  if (!r) return { hecho: false, motivo: t(idioma, 'medida.error.no_existe') }
+  if (r.hitos > 0) return { hecho: false, motivo: t(idioma, 'medida.error.ya_tiene') }
+  if (r.pasos === 0) {
+    // Sin plantilla la función devolvería 0 y la pantalla se quedaría igual, sin
+    // decir nada. Ninguna acción contesta con el cuerpo vacío.
+    return { hecho: false, motivo: t(idioma, 'medida.error.sin_plantilla') }
+  }
+
+  const [n] = (await q`
+    select crear_hitos_desde_plantilla(${renglonId}::uuid) as n
+  `) as unknown as Array<{ n: number }>
+  return { hecho: true, cuantos: Number(n?.n ?? 0) }
 }

@@ -114,21 +114,43 @@ function bloqueCobertura(filas: readonly FilaCobertura[], idioma: Idioma, t: Ret
 </div>`).join('')
 }
 
-function bloqueSinHitos(filas: readonly FilaSinHitos[], idioma: Idioma, t: ReturnType<typeof traductor>): string {
+/**
+ * Los renglones sin hitos, cada uno con el botón que los crea.
+ *
+ * Antes era una lista de enlaces y nada más: la pantalla señalaba el problema y no
+ * daba forma de arreglarlo. La fila deja de ser un enlace entero y pasa a ser una
+ * caja con el enlace dentro, porque un formulario dentro de un `<a>` no es HTML
+ * válido y el navegador lo desarma por su cuenta.
+ */
+function bloqueSinHitos(
+  filas: readonly FilaSinHitos[], idioma: Idioma, t: ReturnType<typeof traductor>,
+  af: string,
+): string {
   if (filas.length === 0) return vacio(t('medida.nada'))
   return filas.map((f) => `
-<a class="fila" href="/contratos/${escapar(f.contratoId)}">
+<div class="fila">
   <div class="fi-c">
-    <div class="fi-t">${escapar(f.renglon)}</div>
+    <a class="fi-t enl" href="/contratos/${escapar(f.contratoId)}">${escapar(f.renglon)}</a>
     <div class="fi-s">${escapar(f.contrato)}</div>
   </div>
-  <div class="fi-n">${escapar(f.valor)}</div>
-</a>`).join('')
+  <div class="fi-a">
+    <div class="fi-n">${escapar(f.valor)}</div>
+    <form method="post" action="/medidas">
+      <input type="hidden" name="af" value="${escapar(af)}">
+      <input type="hidden" name="renglon" value="${escapar(f.renglonId)}">
+      <button type="submit">${escapar(t('medida.crear_hitos'))}</button>
+    </form>
+  </div>
+</div>`).join('')
 }
 
-export function pintarMedidas(m: Medidas, idioma: Idioma): string {
+export function pintarMedidas(
+  m: Medidas, idioma: Idioma, antifalsificacion = '',
+  errores: readonly string[] = [], hecho: string | null = null,
+): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
+  const af = antifalsificacion
 
   const seccion = (titulo: string, pregunta: string, explica: string, cuerpo: string) => `
 <section class="med">
@@ -153,14 +175,18 @@ export function pintarMedidas(m: Medidas, idioma: Idioma): string {
   </div></div>`}
 </div></header>`,
     cuerpo: `<main class="wrap">
+${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
+  errores.map((e) => `<li>${escapar(e)}</li>`).join('')}</ul></div>`}
+${hecho === null ? '' : `<p class="bien-caja">${escapar(hecho)}</p>`}
 ${seccion(t('medida.brecha'), x.preguntaBrecha, t('medida.brecha_explicacion'),
   bloqueBrecha(m.brecha, idioma, t) + yQuedan(m.ocultas.brecha, t))}
 ${seccion(t('medida.tiempo_verdad'), x.preguntaVerdad, x.avisoVerdad,
   bloqueVerdad(m.verdad, idioma, t) + yQuedan(m.ocultas.verdad, t))}
 ${seccion(t('medida.cobertura'), x.preguntaCobertura, x.avisoCobertura,
   bloqueCobertura(m.cobertura, idioma, t) + yQuedan(m.ocultas.cobertura, t))}
-${seccion(t('medida.sin_hitos'), x.preguntaSinHitos, t('medida.sin_hitos_explica'),
-  bloqueSinHitos(m.sinHitos, idioma, t) + yQuedan(m.ocultas.sinHitos, t))}
+${seccion(t('medida.sin_hitos'), x.preguntaSinHitos,
+  `${t('medida.sin_hitos_explica')} ${t('medida.crear_explica')}`,
+  bloqueSinHitos(m.sinHitos, idioma, t, af) + yQuedan(m.ocultas.sinHitos, t))}
 ${m.ocultas.brecha + m.ocultas.verdad + m.ocultas.cobertura + m.ocultas.sinHitos === 0
   ? '' : `<p class="expl">${escapar(t('medida.ocultas_explica'))}</p>`}
 </main>`,
@@ -185,6 +211,17 @@ export const ESTILOS_MEDIDAS = `
 .expl{margin:0 0 11px;font-size:13.5px;color:var(--ik2);line-height:1.45;max-width:64ch}
 .fila{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
   padding:14px 17px;border-top:1px solid var(--ln);text-decoration:none;color:inherit}
+/* Lo que salió bien se dice igual de claro que lo que salió mal. Una acción que
+   contesta con la misma pantalla y sin una línea parece que no hizo nada. */
+.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
+  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
+/* La columna de la derecha: el importe y, debajo, el botón que arregla la fila. */
+.fi-a{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.fi-a form{margin:0}
+.fi-a button{font:inherit;font-size:12.5px;font-weight:650;padding:6px 13px;border:0;
+  border-radius:8px;background:var(--nv);color:#E9F0F6;cursor:pointer;white-space:nowrap}
+a.enl{display:block;text-decoration:none;color:inherit}
+a.enl:hover{text-decoration:underline}
 .fila:first-child{border-top:0}
 a.fila:hover{background:var(--cd2)}
 .fi-c{min-width:0;flex:1}

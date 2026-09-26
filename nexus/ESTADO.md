@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 08:20 (España)
+**Última actualización:** 2026-09-26, 09:05 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,33 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **el mantenimiento que nadie llamaba.**
+**Lo último terminado:** **crear los hitos que faltan.** `/medidas` tenía un bloque
+entero —«¿a qué renglones se les olvidó crear los hitos?»— que **señalaba el problema
+y no daba forma de arreglarlo**. `crear_hitos_desde_plantilla()` existía desde el
+principio y la llamaba UN sitio: el alta de un contrato. Un renglón llegado por otro
+camino —de una hoja de Excel, de un contrato anterior a la plantilla— se quedaba sin
+hitos para siempre, con avance cero, indistinguible de uno que no ha empezado.
+**Octava** vez que aparece la misma forma.
+
+Lo destapó un barrido nuevo: **claves del diccionario que no usa ninguna pantalla**.
+El texto del botón (`medida.crear_hitos`, «Crear sus hitos» / «Create its
+milestones») llevaba escrito en los dos idiomas desde el primer día sin que nada lo
+pintara. De las 178 claves sin usar, la mayoría es vocabulario declarado a propósito
+—calidad, logística, tesorería, para fases que aún no existen—; ésta no lo era.
+
+**Y otra vez una prueba de aislamiento falsa, la cuarta.** `crear_hitos_desde_plantilla()`
+es `security definer`: **escribe saltándose las políticas de fila**, y el
+identificador del renglón llega de un formulario. Escribí la comprobación de a quién
+pertenece y una prueba de que funciona… que pasaba igual con la comprobación quitada,
+porque preguntaba como alguien de esta GPS y la política de fila ya tapaba la fila
+antes de llegar al dominio. Ahora son dos pruebas, una por cerradura: la segunda
+pregunta como la persona de la otra GPS —que sí ve esa fila— y comprueba que la
+comparación con la organización la para igual. Se verificó quitando la valla para
+verla fallar.
+
+776 pruebas, todas pasan.
+
+**Antes:** **el mantenimiento que nadie llamaba.**
 `caducar_sesiones()` y `limpiar_peticiones_sso()` estaban escritas, probadas y
 comentadas con «se llama desde una tarea periódica». **No había ninguna tarea
 periódica que las llamara.** Séptima vez que aparece la misma forma, y la más

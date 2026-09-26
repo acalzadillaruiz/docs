@@ -36,7 +36,7 @@ import {
   HitoNoAlcanzable, DocumentoVacio, type Clase, CLASES,
 } from '../dominio/evidencia.ts'
 import { pintarPaginaAvance } from '../pantallas/evidencia.ts'
-import { medidas } from '../dominio/medidas.ts'
+import { medidas, crearHitos } from '../dominio/medidas.ts'
 import { perfil, guardarPerfil } from '../dominio/perfil.ts'
 import {
   crearContrato, clientes, activar, TIPOS,
@@ -462,13 +462,32 @@ export async function resolver(
   // Las tres cifras. Solo de dentro, y no por pudor: son el margen de GPS mirado
   // desde otro ángulo. Un cliente que llegara aquí vería 404, igual que a un
   // contrato que no es suyo.
-  if (p.ruta === '/medidas' && p.metodo === 'GET') {
+  if (p.ruta === '/medidas' && (p.metodo === 'GET' || p.metodo === 'POST')) {
+    if (p.metodo === 'POST' && !testigoAntiValido(testigo, p.campos['af'])) {
+      return { codigo: 403, cabeceras: CABECERAS_BASE, cuerpo: '' }
+    }
     if (esCliente) return noEncontrado(p.idioma)
     const [org] = (await dentro((q) => q`
       select organizacion_id from persona where id = ${personaId}::uuid
     `)) as unknown as Array<{ organizacion_id: string }>
-    const m = await comoQuien((q) => medidas(q, org!.organizacion_id, p.idioma))
-    return html(200, pintarMedidas(m, p.idioma))
+    const orgId = org!.organizacion_id
+
+    // La pantalla señalaba los renglones sin hitos y no daba forma de crearlos. Ya la
+    // da: es la misma pantalla, y por eso el mensaje sale con la lista ya rehecha —
+    // el renglón arreglado desaparece de ella en la misma respuesta.
+    let errores: readonly string[] = []
+    let hecho: string | null = null
+    if (p.metodo === 'POST') {
+      const r = await comoQuien((q) => crearHitos(
+        q, (p.campos['renglon'] ?? '').trim(), orgId, p.idioma))
+      if (r.hecho) {
+        hecho = t(p.idioma, 'medida.hitos_creados').replace('{n}', String(r.cuantos))
+      } else errores = [r.motivo]
+    }
+
+    const m = await comoQuien((q) => medidas(q, orgId, p.idioma))
+    return html(errores.length === 0 ? 200 : 400,
+      pintarMedidas(m, p.idioma, testigoAnti(testigo), errores, hecho))
   }
 
   // El perfil. Poco, y lo que decide que los avisos sobrevivan: un aviso del que no
