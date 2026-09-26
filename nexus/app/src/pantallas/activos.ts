@@ -164,8 +164,6 @@ export function pintarActivos(
 
 export const ESTILOS_ACTIVOS = `
 /* Lo que salió bien se dice igual de claro que lo que salió mal. */
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* Trece casillas. Se reparten en rejilla para que quepan en un teléfono sin que
    ninguna quede más estrecha que lo que hay que escribir dentro. */
 .nuevo{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));

@@ -109,7 +109,19 @@ export async function pendientes(q: Consulta): Promise<readonly Pendiente[]> {
 }
 
 export type Hecho =
-  | { readonly hecho: true; readonly ficha?: string }
+  | {
+      readonly hecho: true
+      readonly ficha?: string
+      /**
+       * Cuántas sesiones abiertas se cortaron al dar de baja.
+       *
+       * La función de la base lo devuelve y ese número se tiraba. Importa por dos cosas:
+       * quien da de baja a alguien quiere saber si estaba dentro en ese momento, y —lo que
+       * lo hace más que cortesía— esta misma cuenta estuvo rota, devolviendo cero siempre,
+       * y nadie lo vio precisamente porque nadie la miraba.
+       */
+      readonly sesiones?: number
+    }
   | { readonly hecho: false; readonly motivo: string }
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -198,8 +210,10 @@ export async function desactivar(
   if (!p) return { hecho: false, motivo: t(idioma, 'persona.error.no_existe') }
   if (!p.activa) return { hecho: false, motivo: t(idioma, 'persona.error.ya_baja') }
 
-  await q`select desactivar_persona(${personaId}::uuid, ${quien}::uuid, ${motivo.trim()})`
-  return { hecho: true }
+  const [r] = (await q`
+    select desactivar_persona(${personaId}::uuid, ${quien}::uuid, ${motivo.trim()}) as n
+  `) as unknown as Array<{ n: number }>
+  return { hecho: true, sesiones: Number(r?.n ?? 0) }
 }
 
 export async function reactivar(

@@ -51,6 +51,47 @@ async function entrar(correo: string, clave = CLAVE, secreto = SECRETO): Promise
   return new RegExp(`${NOMBRE_COOKIE}=([^;]+)`).exec(p2.cabeceras!['Set-Cookie']!)![1]!
 }
 
+/**
+ * Crea una persona de GPS con clave y segundo factor, y devuelve su id.
+ *
+ * Va por la base y no por el circuito de invitación a propósito: lo que estas dos pruebas
+ * miden es la baja, y montar el alta entera por HTTP para llegar ahí metería en medio media
+ * docena de cosas que se pueden romper por su cuenta.
+ */
+async function personaNueva(correo: string): Promise<string> {
+  const hash = await cifrarClave(CLAVE)
+  const [p] = (await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    return q`insert into persona (organizacion_id, correo, nombre, metodo, clave_hash,
+                                  totp_secreto)
+             values (${G}, ${correo},'De prueba','clave_2fa', ${hash}, ${SECRETO})
+             on conflict (lower(correo)) do update
+               -- Los tres campos de la baja van juntos o ninguno: hay una
+               -- restricción que lo exige, y limpiar solo el motivo la rompe.
+               set activa = true, baja_en = null, baja_por = null, baja_motivo = null
+             returning id`
+  })) as unknown as Array<{ id: string }>
+  // Y se le cierran las sesiones que arrastre de una ejecución anterior. Sin esto la
+  // cuenta de sesiones cortadas crece cada vez que se corren las pruebas, y una prueba
+  // que depende de cuántas veces se ha corrido antes falla un día sola.
+  await dentro(async (q) => {
+    await q.unsafe('set local role none')
+    await q`update sesion set cerrada_en = now(), motivo_cierre = 'limpieza de prueba'
+             where persona_id = ${p!.id}::uuid and cerrada_en is null`
+  })
+  return p!.id
+}
+
+/** Una persona con una sesión abierta ahora mismo. */
+async function conSesion(correo: string): Promise<string> {
+  const id = await personaNueva(correo)
+  await entrar(correo)
+  return id
+}
+
+/** Y una que existe pero no ha entrado. */
+const sinSesion = personaNueva
+
 /** Manda un formulario a /personas con el testigo antifalsificación que le toca. */
 const aPersonas = (cookie: string, campos: Record<string, string>) => pedir({
   metodo: 'POST', ruta: '/personas', cookie,
@@ -316,6 +357,34 @@ test('dar de baja corta la sesión en el acto, no cuando cierre el navegador', a
   `)) as unknown as Array<{ n: number }>
   assert.equal(typeof n!.n, 'number')
   await dentro((q) => q`select reactivar_persona(${OTRO}::uuid)`)
+})
+
+test('dar de baja DICE cuántas sesiones cortó, y no se deduce de la lista', async () => {
+  // La función de la base devolvía ese número y la aplicación lo tiraba. Lo encontró un
+  // repaso de funciones del esquema cuyo resultado nadie recoge, y no es cortesía: quien da
+  // de baja a alguien quiere saber si estaba dentro en ese momento. Y hay una razón más
+  // fuerte — **esta misma cuenta estuvo rota**, devolviendo cero siempre, y nadie lo vio
+  // precisamente porque nadie la miraba. Un número que se enseña es un número que se
+  // comprueba solo.
+  const quien = await conSesion('cuenta-sesiones@prueba.test')
+  const r = await aPersonas(yo, {
+    accion: 'baja', persona: quien, motivo: 'se va del proyecto',
+  })
+  assert.equal(r.codigo, 200)
+  assert.match(r.cuerpo ?? '', /class="bien-caja"/,
+    'la baja salió bien y la pantalla no lo dijo')
+  assert.match(r.cuerpo ?? '', /1 sesion/i,
+    'no dijo cuántas sesiones cortó, que es lo único que no se ve en la lista')
+
+  // Y de alguien que no estaba dentro, lo dice también: «ninguna» es una respuesta, y un
+  // hueco donde debería ir el número no se distingue de un número que no llegó.
+  const dormido = await sinSesion('cuenta-dormida@prueba.test')
+  const r2 = await aPersonas(yo, {
+    accion: 'baja', persona: dormido, motivo: 'tampoco sigue',
+  })
+  assert.equal(r2.codigo, 200)
+  assert.match(r2.cuerpo ?? '', /ninguna sesi/i,
+    'de alguien sin sesiones abiertas no dijo nada')
 })
 
 test('dar de baja sin decir por qué no da de baja a nadie', async () => {

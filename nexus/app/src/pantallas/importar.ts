@@ -191,8 +191,6 @@ export function pintarMapeo(
 
 export const ESTILOS_IMPORTAR = `
 /* Lo que salió bien se dice igual de claro que lo que salió mal. */
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* Deshacer una carga se pide con su motivo y sin ceremonia, pero discreto: no es de
    todos los días, y un botón grande invita a usarlo como si lo fuera. */
 .deshacer{display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;width:100%;

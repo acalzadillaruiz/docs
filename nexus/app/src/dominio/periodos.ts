@@ -99,7 +99,7 @@ export async function meses(q: Consulta, orgId: string, idioma: Idioma): Promise
 }
 
 export type Cambio =
-  | { readonly hecho: true }
+  | { readonly hecho: true; readonly cuantas?: number }
   | { readonly hecho: false; readonly motivo: string }
 
 export async function abrirMes(
@@ -181,6 +181,11 @@ export async function instalarPlan(
   if (await tienePlan(q, orgId) > 0) {
     return { hecho: false, motivo: t(idioma, 'periodo.error.plan_ya') }
   }
-  await q`select instalar_plan_cuentas(${orgId}::uuid)`
-  return { hecho: true }
+  // La función devuelve cuántas cuentas creó y ese número se tiraba. Lo encontró un
+  // repaso de funciones del esquema cuyo resultado nadie recoge: «plan instalado» sin
+  // decir de cuántas cuentas deja a quien lo pulsa sin saber si instaló las 87 o ninguna.
+  const [r] = (await q`
+    select instalar_plan_cuentas(${orgId}::uuid) as n
+  `) as unknown as Array<{ n: number }>
+  return { hecho: true, cuantas: Number(r?.n ?? 0) }
 }

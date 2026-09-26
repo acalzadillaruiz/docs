@@ -213,8 +213,6 @@ export const ESTILOS_MEDIDAS = `
   padding:14px 17px;border-top:1px solid var(--ln);text-decoration:none;color:inherit}
 /* Lo que salió bien se dice igual de claro que lo que salió mal. Una acción que
    contesta con la misma pantalla y sin una línea parece que no hizo nada. */
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* La columna de la derecha: el importe y, debajo, el botón que arregla la fila. */
 .fi-a{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .fi-a form{margin:0}

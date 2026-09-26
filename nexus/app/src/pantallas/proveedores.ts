@@ -139,8 +139,6 @@ export function pintarProveedores(
 
 export const ESTILOS_PROVEEDORES = `
 /* Lo que salió bien se dice igual de claro que lo que salió mal. */
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 .reg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
   align-items:end;margin:0 0 6px}
 .reg label{font-family:"JetBrains Mono",monospace;font-size:9.5px;font-weight:700;

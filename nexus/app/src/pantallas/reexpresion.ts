@@ -140,8 +140,6 @@ export function pintarReexpresion(
 
 export const ESTILOS_REEX = `
 /* Lo que salió bien se dice igual de claro que lo que salió mal. */
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* La tabla de índices. La columna de variación existe para que un cero de más se
    vea: un «+1.240 %» salta a la vista y el número solo no. */
 .ix{width:100%;border-collapse:collapse;font-size:13.5px}

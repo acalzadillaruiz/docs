@@ -87,6 +87,13 @@ label:focus-within{outline:2px solid var(--ik);outline-offset:2px;border-radius:
 .mal-caja ul{margin:0;padding-left:18px}
 .mal-caja li,.mal-caja p{color:var(--rj);font-weight:600;font-size:14px;margin:0}
 .mal-caja li + li{margin-top:5px}
+/* Y la de «salió bien», que estaba copiada palabra por palabra en SIETE pantallas y no
+   estaba en las dos últimas: la de valores fiscales y la del estado de un contrato
+   pintaban la caja sin
+   ninguna regla detrás, así que lo que salía bien salía como texto suelto. Es literalmente
+   lo que dice el comentario de arriba sobre la de al lado, y me pasó igual. */
+.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
+  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 .hd :where(a,button,input,select):focus-visible,.hd label:focus-within{
   outline-color:#E9F0F6}
 .hd{background:var(--nv);color:#E9F0F6;padding-block:22px 34px}

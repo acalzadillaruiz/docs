@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-27, 03:30 (España)
+**Última actualización:** 2026-09-27, 04:20 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -34,8 +34,61 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **un correo que no se manda** — y el quinto barrido, del último
-nivel que quedaba.
+**Lo último terminado:** dos acciones que hacían su trabajo **sin decir qué habían hecho**, y
+un sexto barrido que **probé y descarté** — que es parte del resultado y conviene que quede
+escrito.
+
+### El barrido que no merece ser permanente
+
+Los cinco barridos existentes buscan cosas *declaradas* que nadie usa. El nivel que faltaba
+era otro: **funciones del esquema cuyo resultado la aplicación tira**. Es la forma exacta de
+un fallo real de hace unos trozos —`desactivar_persona` devolvía cero siempre y nadie lo vio
+porque nadie mira lo que devuelve.
+
+Lo escribí, lo corrí sobre las 147 funciones que devuelven algo, y **no lo dejo puesto**. De
+14 sitios señalados, la mayoría eran falsos positivos: el resultado sí se recoge, pero la
+asignación cruza varias líneas o va dentro de un ternario y el reconocedor de texto no lo ve.
+Un barrido con ese ruido se convierte en uno que la gente aprende a ignorar, y entonces es
+peor que no tenerlo. Queda en el repositorio como `db/resultados-descartados.py`, para lanzarlo
+a mano cuando se añadan funciones nuevas y leerlo con criterio, con su cabecera explicando
+por qué no está en `probar.sh`.
+
+De lo que señaló, **dos cosas eran de verdad**, y las dos son el mismo defecto:
+
+1. **Dar de baja a alguien no decía cuántas sesiones le cortaba.** Cortar la sesión de una
+   persona es echarla del sistema en ese momento, y quien da la baja quiere saber si estaba
+   dentro. La función lo devolvía y se tiraba. Y hay una razón más fuerte que la cortesía:
+   **esa misma cuenta estuvo rota**, devolviendo cero siempre. Un número que se enseña es un
+   número que se comprueba solo.
+2. **Instalar el plan de cuentas decía «plan instalado» sin decir de cuántas cuentas.**
+   Instalar las 87 e instalar ninguna contestaban exactamente lo mismo.
+
+Y al arreglar el primero salió que **la pantalla de personas no tenía dónde decir que algo
+había salido bien**: cada acción de allí contestaba volviendo a la lista, y había que deducir
+del cambio que había funcionado.
+
+### Un defecto mío, que era la misma cosa otra vez
+
+La caja verde de «salió bien» estaba **copiada palabra por palabra en siete pantallas**, y no
+estaba en las dos que hice ayer: `/fiscales` y el estado de un contrato pintaban la caja **sin
+ninguna regla detrás**, así que lo que salía bien salía como texto suelto. La regla de al
+lado, la de los errores, vive compartida en `base.ts` con un comentario que dice
+—literalmente— que está ahí para que ninguna pantalla se quede enseñando el error como texto
+suelto por haberse olvidado de copiarla. Me pasó igual con la hermana. Ahora las dos están
+juntas y las siete copias fuera.
+
+**888 pruebas, todas pasan.** Verificado rompiendo a propósito las dos mitades de cada cosa:
+que el dominio vuelva a tirar la cuenta, y que la pantalla deje de pintarla. Y la prueba de
+las sesiones cortadas se corrió **dos veces seguidas** a propósito: la primera versión
+dependía de cuántas veces se hubieran corrido las pruebas antes, porque las sesiones se
+acumulaban. Una prueba que depende de su propio historial falla un día sola.
+
+**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
+añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
+`DESPLEGAR.md`.
+
+**Antes:** **un correo que no se manda**, y el quinto barrido —valores de enum que nadie
+escribe— que lo encontró.
 
 El barrido nuevo busca **valores de enum que la aplicación nunca escribe**. Es la misma
 forma del agujero grande de ayer: `estado_contrato` declaraba cinco estados y se llegaba a
@@ -75,10 +128,6 @@ motivos y su afirmación de que **fallan cuando dejan de mirar** — al de enums
 el primer día: contestó «0 valores» tan contento porque la base de datos se había caído.
 
 **887 pruebas, todas pasan.**
-
-**Lo que sigue esperando al CEO, y bloquea el despliegue:** crear el VPS en Hostinger,
-añadir el registro A de `nexus` apuntando a su IP, y darme la IP. Los cinco pasos están en
-`DESPLEGAR.md`.
 
 **Antes:** **un contrato que termina ya puede terminarse**, y el barrido de columnas que
 lo encontró.

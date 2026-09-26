@@ -748,7 +748,11 @@ export async function resolver(
       // nada: la pantalla volvía sin el aviso de antes y había que deducir de su
       // ausencia que había funcionado. Deducir de una ausencia es justo lo que este
       // sistema no deja hacer en ninguna otra parte.
-      else hecho = t(p.idioma, 'periodo.plan_puesto')
+      else {
+        hecho = r.cuantas === undefined
+          ? t(p.idioma, 'periodo.plan_puesto')
+          : t(p.idioma, 'periodo.plan_puesto_n').replace('{n}', String(r.cuantas))
+      }
     } else if (p.metodo === 'POST') {
       const cuando = anioMes(p)
       if (cuando === null) {
@@ -1192,6 +1196,7 @@ export async function resolver(
     // en ninguna parte de donde se pueda volver a sacar: eso es lo que lo hace una
     // llave y no una contraseña escrita en una pizarra.
     let enlace: string | null = null
+    let hechoPersonas: string | null = null
 
     if (p.metodo === 'POST') {
       const accion = p.campos['accion']
@@ -1213,10 +1218,19 @@ export async function resolver(
           q, (p.campos['persona'] ?? '').trim(), personaId,
           p.campos['motivo'] ?? '', p.idioma))
         if (!r.hecho) errores = [r.motivo]
+        // Cuántas sesiones se cortaron. La función de la base lo devolvía y se tiraba, y
+        // quien da de baja a alguien quiere saber si estaba dentro en ese momento.
+        else {
+          const n = r.sesiones ?? 0
+          hechoPersonas = n > 0
+            ? t(p.idioma, 'persona.baja_hecha').replace('{n}', String(n))
+            : t(p.idioma, 'persona.baja_hecha_sin')
+        }
       } else if (accion === 'alta') {
         const r = await comoQuien((q) => reactivar(
           q, (p.campos['persona'] ?? '').trim(), p.idioma))
         if (!r.hecho) errores = [r.motivo]
+        else hechoPersonas = t(p.idioma, 'persona.alta_hecha')
       }
     }
 
@@ -1227,7 +1241,7 @@ export async function resolver(
     ])
     return html(errores.length === 0 ? 200 : 400,
       pintarPersonas({ gente, invitaciones, empresas: lista, enlace },
-        p.idioma, testigoAnti(testigo), errores))
+        p.idioma, testigoAnti(testigo), errores, hechoPersonas))
   }
 
   // La reexpresion por inflacion. Nunca la ve el cliente: es contabilidad.

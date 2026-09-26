@@ -33,6 +33,12 @@ export type DatosPersonas = {
 export function pintarPersonas(
   d: DatosPersonas, idioma: Idioma, antifalsificacion: string,
   errores: readonly string[] = [],
+  /**
+   * Lo que salió bien. No lo tenía: dar de baja a alguien y reactivarlo contestaban sin
+   * decir nada, y había que deducir de la lista que había funcionado. Deducir de una
+   * ausencia es lo que este sistema no deja hacer en ninguna otra parte.
+   */
+  hecho: string | null = null,
 ): string {
   const x = TEXTOS[idioma]
   const t = traductor(idioma)
@@ -105,6 +111,7 @@ export function pintarPersonas(
   ${errores.length === 0 ? '' : `<div class="mal-caja"><ul>${
     errores.map((e) => `<li>${escapar(e)}</li>`).join('')
   }</ul></div>`}
+  ${hecho === null ? '' : `<div class="bien-caja">${escapar(hecho)}</div>`}
 
   ${d.enlace === null ? '' : `
   <div class="enlace">

@@ -97,8 +97,6 @@ export function pintarPeriodos(
 
 export const ESTILOS_PERIODOS = `
 /* Lo que salió bien se dice igual de claro que lo que salió mal. */
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 /* El aviso del día 1. Sale en ámbar y con su botón dentro porque es lo único que hay
    que hacer antes de nada: sin plan de cuentas no se importa una factura, no se
    asienta un cobro y no sirve de nada abrir un mes. */

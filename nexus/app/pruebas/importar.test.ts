@@ -744,7 +744,14 @@ test('el día 1 se puede instalar el plan de cuentas desde la pantalla', async (
   assert.equal(await comoNueva((q) => tienePlan(q, NUEVA)), 0)
   const r = await comoNueva((q) => instalarPlan(q, NUEVA, 'es'))
   assert.equal(r.hecho, true)
-  assert.ok(await comoNueva((q) => tienePlan(q, NUEVA)) > 50, 'el plan entero')
+  const puestas = await comoNueva((q) => tienePlan(q, NUEVA))
+  assert.ok(puestas > 50, 'el plan entero')
+  // Y CUÁNTAS cuentas creó. La función de la base lo devolvía y la aplicación lo tiraba, así
+  // que la pantalla decía «plan instalado» sin decir de cuántas: instalar 87 e instalar
+  // ninguna contestaban exactamente lo mismo. Se compara con las que hay de verdad, no con
+  // un 87 escrito a mano que habría que cambiar cada vez que el plan crezca.
+  assert.equal(r.hecho && r.cuantas, puestas,
+    'no dijo cuántas cuentas creó, o dijo un número que no es el que hay')
 
   // Y no se instala dos veces: dos numeraciones mezcladas no se separan después.
   const otra = await comoNueva((q) => instalarPlan(q, NUEVA, 'es'))

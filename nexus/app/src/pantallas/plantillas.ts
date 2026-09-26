@@ -121,8 +121,6 @@ export function pintarPlantillas(
 }
 
 export const ESTILOS_PLANTILLAS = `
-.bien-caja{margin-top:18px;background:var(--cd);border:1px solid var(--grt);
-  border-radius:12px;padding:13px 15px;color:var(--grt);font-weight:600;font-size:14px}
 .expl{margin:0 0 11px;font-size:13.5px;color:var(--ik2);line-height:1.45;max-width:66ch}
 .expl.aviso{margin-top:18px;background:var(--amb);border-left:3px solid var(--am);
   border-radius:0 11px 11px 0;padding:12px 15px;color:var(--ik2)}
