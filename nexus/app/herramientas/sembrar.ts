@@ -86,7 +86,11 @@ export async function sembrar(): Promise<void> {
              (array['Suministro de cabezales','Cuadrilla de mantenimiento','Transporte de crudo',
                     'Alquiler de bomba de lodo','Reacondicionamiento de pozo'])[1+(i%5)]||' · Pozo '||i,
              'Contract '||i,'vigente','VES', 3000000 + i*450000,'${TASA}'::uuid,'${YO}'::uuid
-        from generate_series(1,40) i;
+        -- Catorce, no cuarenta: tres de cada uno de los cinco tipos de contrato mas
+        -- el detallado de abajo. Cuarenta filas casi identicas no ensenaban nada que
+        -- no ensenen catorce, y cada una arrastra su valuacion, su cobro y sus cuatro
+        -- renglones — doscientas paginas mas en la instantanea navegable.
+        from generate_series(1,14) i;
 
       insert into renglon (contrato_id, numero, descripcion_es, descripcion_en, cantidad,
                            unidad, precio_unitario, costo_unitario)
@@ -96,6 +100,52 @@ export async function sembrar(): Promise<void> {
              'Item '||r, 12,'ud', 62500, 41000
         from contrato c cross join generate_series(1,4) r
        where c.organizacion_id = '${G}';
+
+      -- Y sus hitos, desde la plantilla del tipo de contrato.
+      --
+      -- Sin esto, de los 162 renglones de la muestra solo DOS se podian abrir: la
+      -- pantalla donde vive la tesis del producto —el avance sale de los hitos
+      -- verificados, no de una casilla— era la menos visitable de todas.
+      --
+      -- Se dejan a proposito los del ultimo contrato sin hitos, porque es lo que el
+      -- bloque «a que renglones se les olvido crear los hitos» de /medidas existe para
+      -- senalar, y un cuadro de mando que nunca tiene nada que decir no se mira.
+      select crear_hitos_desde_plantilla(rg.id)
+        from renglon rg join contrato c on c.id = rg.contrato_id
+       where c.organizacion_id = '${G}'
+         and c.codigo <> 'GPS-2027-014';
+
+      -- Los dos primeros hitos de cada renglon, ya ocurridos: el primero CON su papel
+      -- verificado y el segundo declarado SIN papel. Es la diferencia que el producto
+      -- entero existe para ensenar —la barra verde y la rayada— y con todo pendiente
+      -- no se ve en ninguna pantalla.
+      update hito h set estado = 'declarado',
+                        ocurrido_en = '2027-03-01'::date + (h.orden * 3)
+        from renglon rg join contrato c on c.id = rg.contrato_id
+       where h.renglon_id = rg.id and c.organizacion_id = '${G}'
+         and c.codigo <> 'GPS-2027-014' and h.orden <= 2;
+
+      -- El papel PRIMERO, y verificado. Poner el hito en 'verificado' sin su evidencia
+      -- no se puede: lo impide el disparador 'hito_exige_su_evidencia', y eso es la
+      -- tesis del producto hecha cerradura. Me paro aqui la primera vez que sembre
+      -- esto, y esta bien que me parara.
+      insert into evidencia (hito_id, clase, huella, nombre, bytes, tipo_mime,
+                             subida_por, ocurrido_en, verificada_en, verificada_por)
+      select h.id, c, encode(sha256((h.id::text || c::text)::bytea),'hex'),
+             'muestra-'||c::text||'.pdf', 24000,'application/pdf','${YO}'::uuid,
+             h.ocurrido_en, now(),'${YO}'::uuid
+        from hito h
+        join renglon rg on rg.id = h.renglon_id
+        join contrato ct on ct.id = rg.contrato_id
+        cross join unnest(h.exige) c
+       where ct.organizacion_id = '${G}' and ct.codigo <> 'GPS-2027-040'
+         and h.orden = 1
+      on conflict do nothing;
+
+      update hito h set estado = 'verificado'
+        from renglon rg join contrato c on c.id = rg.contrato_id
+       where h.renglon_id = rg.id and c.organizacion_id = '${G}'
+         and c.codigo <> 'GPS-2027-014' and h.orden = 1;
 
       insert into valuacion (organizacion_id, contrato_id, numero, periodo_desde,
                              periodo_hasta, obra, moneda, tasa_id, amortiza_pct,

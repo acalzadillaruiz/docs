@@ -1,6 +1,6 @@
 # GPS Nexus · estado
 
-**Última actualización:** 2026-09-26, 13:45 (España)
+**Última actualización:** 2026-09-26, 14:30 (España)
 **Sesiones gastadas:** 141 de las 141 del plan · **el plan se acabó; el producto no**
 **Fase en curso:** 5 — La contabilidad deja de vivir en Excel *(adelantada a primera por decisión del CEO)*
 
@@ -31,7 +31,49 @@ seguridad para funcionar sin conexión, y las ocho preguntas de contabilidad.
 
 ## RETOMAR AQUÍ
 
-**Lo último terminado:** **cargar el INPC del mes. Sin él la reexpresión no podía
+**Lo último terminado:** **el recorrido navegable, al día y con portada.** El CEO pidió
+poder entrar a ver la aplicación, y el recorrido publicado era de ocho trozos atrás.
+
+Publicado en https://claude.ai/artifact/613p36bPqXYLT31Tvdrck3 (versión 7), **138
+pantallas** en vez de 61. Es **privado**: para mostrárselo a alguien hay que compartirlo
+desde el menú de la propia página.
+
+Qué faltaba, y lo dijo el propio exportador al contar sus enlaces apagados:
+
+- **`/renglones/:id`, con 162 enlaces muertos.** La pantalla donde vive la tesis del
+  producto —barra verde lo verificado con papel, rayada lo declarado sin él— era la
+  menos visitable de todo el recorrido. También faltaban `/contratos/:id/valuar` (41),
+  `/valuaciones/:id` (40) y `/valuaciones/:id/cobrar` (40).
+- **Y todo lo de antes de entrar**, que no se había visto nunca: «Crea tu clave», la
+  pantalla que enseña una sola vez el secreto del segundo factor y los diez códigos, y
+  «Perdí el teléfono». El exportador ahora sabe pedir páginas por POST y sin sesión.
+
+Quedan **4 enlaces apagados** y son a propósito: `GPS-2027-014` se deja sin hitos para
+que el bloque «a qué renglones se les olvidó crear los hitos» tenga algo que señalar.
+
+Tres cosas que salieron de prepararlo:
+
+1. **De 162 renglones solo DOS se podían abrir.** El sembrador creaba los contratos sin
+   hitos. Arreglado: ahora los crea desde la plantilla del tipo.
+2. **Al sembrar hitos verificados, la base de datos me paró**: el disparador
+   `hito_exige_su_evidencia` no deja verificar un hito sin su evidencia comprobada. Es
+   la tesis hecha cerradura, y está bien que me parara — hay que sembrar el papel
+   primero, como en la vida real.
+3. **La muestra baja de 40 contratos a 15** (tres de cada uno de los cinco tipos, más
+   el detallado). Cuarenta filas casi idénticas no enseñaban nada y costaban doscientas
+   páginas más.
+
+De paso, dos cosas del exportador: una hoja de cálculo vuelve en `bytes` y no en
+`cuerpo`, así que las dos descargas salían como «SALTADA» con un 200 al lado; y los
+161 enlaces a documentos de evidencia ya no quedan grises, van a una página que explica
+que la evidencia de muestra no tiene archivo detrás.
+
+825 pruebas, todas pasan.
+
+**Lo siguiente** sigue siendo lo mismo, por orden: `regimen_iva` y `plantilla_hito`,
+las dos pantallas que mandan hacer algo que no se puede hacer.
+
+**Antes:** **cargar el INPC del mes. Sin él la reexpresión no podía
 correr, y la reexpresión es todo ese módulo.**
 
 La pantalla decía «No hay índice de precios (INPC) cargado a esa fecha. Sin índice no
